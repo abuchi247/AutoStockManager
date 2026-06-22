@@ -13,11 +13,14 @@ from app.database import close_db, init_db
 from app.middleware.rate_limit import create_rate_limiter, rate_limit_exceeded_handler
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers.auth import router as auth_router
+from app.routers.credit import router as credit_router
 from app.routers.spare_parts import router as spare_parts_router
 from app.routers.stock import router as stock_router
 from app.routers.transfers import router as transfers_router
 from app.routers.users import router as users_router
 from app.routers.customers import router as customers_router
+from app.routers.suppliers import router as suppliers_router
+from app.routers.sales import router as sales_router
 from app.services.session_service import close_redis_client, get_redis_client
 
 
@@ -89,6 +92,9 @@ def create_app() -> FastAPI:
     app.include_router(stock_router)
     app.include_router(transfers_router)
     app.include_router(customers_router)
+    app.include_router(suppliers_router)
+    app.include_router(credit_router)
+    app.include_router(sales_router)
 
     return app
 

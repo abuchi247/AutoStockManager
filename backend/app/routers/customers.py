@@ -1,4 +1,4 @@
-"""Customer management router with CRUD and purchase history endpoints.
+"""Customer management router with CRUD, purchase history, ledger, and aging endpoints.
 
 Provides the following endpoints:
 - GET    /api/v1/customers              - List all customers (paginated)
@@ -7,19 +7,28 @@ Provides the following endpoints:
 - PUT    /api/v1/customers/{id}         - Update a customer
 - DELETE /api/v1/customers/{id}         - Soft-delete a customer
 - GET    /api/v1/customers/{id}/purchase-history - Get purchase history
+- GET    /api/v1/customers/{id}/ledger  - Get credit ledger entries
+- GET    /api/v1/customers/{id}/aging   - Get aging analysis
 
-Satisfies Requirements: 6.1, 6.2
+Satisfies Requirements: 6.1, 6.2, 6.3, 7.1, 7.3
 """
 
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select, func
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.models.customer_credit_ledger import CustomerCreditLedger
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
+from app.schemas.credit import (
+    AgingAnalysisResponse,
+    CreditLedgerEntryResponse,
+    CreditLedgerListResponse,
+)
 from app.schemas.customer import (
     CustomerCreate,
     CustomerListResponse,
@@ -28,6 +37,7 @@ from app.schemas.customer import (
     PurchaseHistoryItem,
     PurchaseHistoryResponse,
 )
+from app.services.credit_ledger_service import CreditLedgerService
 from app.services.customer_service import (
     CustomerNotFoundError,
     CustomerService,
@@ -271,3 +281,124 @@ async def get_purchase_history(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Customer not found",
         )
+
+
+# =============================================================================
+# Credit Ledger & Aging Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/{customer_id}/ledger",
+    response_model=CreditLedgerListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get customer credit ledger",
+    description="Retrieve credit ledger entries for a customer. Manager/Admin only.",
+    responses={
+        403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+        404: {"model": ErrorResponse, "description": "Customer not found"},
+    },
+)
+async def get_customer_ledger(
+    customer_id: UUID,
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+    ),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> CreditLedgerListResponse:
+    """Get credit ledger entries for a customer.
+
+    Requirement 7.1: THE Credit_Ledger SHALL record entries for the following
+    transaction types: sale, payment, adjustment, and return.
+
+    Accessible by Manager and Admin roles.
+    """
+    # Verify customer exists
+    service = _get_customer_service(db)
+    try:
+        await service.get_customer(customer_id)
+    except CustomerNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found",
+        )
+
+    # Query ledger entries with pagination
+    offset = (page - 1) * page_size
+
+    # Get total count
+    count_stmt = (
+        select(func.count(CustomerCreditLedger.id))
+        .filter(CustomerCreditLedger.customer_id == customer_id)
+    )
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar() or 0
+
+    # Get paginated entries ordered by created_at descending (newest first)
+    stmt = (
+        select(CustomerCreditLedger)
+        .filter(CustomerCreditLedger.customer_id == customer_id)
+        .order_by(CustomerCreditLedger.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    entries = result.scalars().all()
+
+    return CreditLedgerListResponse(
+        data=[CreditLedgerEntryResponse.model_validate(e) for e in entries],
+        meta={"page": page, "total": total, "page_size": page_size},
+    )
+
+
+@router.get(
+    "/{customer_id}/aging",
+    response_model=AgingAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get customer aging analysis",
+    description="Get aging analysis for a customer's outstanding balance. Manager/Admin only.",
+    responses={
+        403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+        404: {"model": ErrorResponse, "description": "Customer not found"},
+    },
+)
+async def get_customer_aging(
+    customer_id: UUID,
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+    ),
+) -> AgingAnalysisResponse:
+    """Get aging analysis for a customer.
+
+    Requirement 7.3: THE Credit_Ledger SHALL calculate aging analysis for
+    each customer categorizing outstanding amounts into current, 1-30 days,
+    31-60 days, 61-90 days, and over 90 days overdue.
+
+    Accessible by Manager and Admin roles.
+    """
+    # Verify customer exists
+    service = _get_customer_service(db)
+    try:
+        await service.get_customer(customer_id)
+    except CustomerNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found",
+        )
+
+    # Calculate aging analysis
+    credit_service = CreditLedgerService(db=db)
+    aging = await credit_service.aging_analysis(customer_id)
+
+    return AgingAnalysisResponse(
+        customer_id=customer_id,
+        current=aging["current"],
+        days_1_30=aging["1_30_days"],
+        days_31_60=aging["31_60_days"],
+        days_61_90=aging["61_90_days"],
+        over_90_days=aging["over_90_days"],
+        total=aging["total"],
+    )

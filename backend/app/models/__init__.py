@@ -26,6 +26,11 @@ Exports:
     PaymentType        - Enum of payment types
     CustomerCreditLedger - Append-only immutable ledger for customer credit transactions
     CreditTransactionType - Enum of credit transaction types (SALE, PAYMENT, ADJUSTMENT, RETURN)
+    PurchaseOrder      - Purchase order model tracking supplier order lifecycle
+    PurchaseOrderItem  - Purchase order line item model
+    PurchaseOrderStatus - Enum of purchase order lifecycle statuses
+    Supplier           - Supplier profile model
+    SupplierAccountStatus - Enum of supplier account statuses
 """
 
 from app.models.base import BaseModel, SoftDeleteMixin, SoftDeleteQuery, with_soft_delete_filter
@@ -44,6 +49,8 @@ from app.models.sale import Sale, SaleItem, SaleStatus, PaymentType
 from app.models.transfer import Transfer, TransferStatus, VALID_TRANSFER_TRANSITIONS
 from app.models.customer import Customer, AccountStatus
 from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
+from app.models.supplier import Supplier, SupplierAccountStatus
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
 
 __all__ = [
     "BaseModel",
@@ -71,4 +78,9 @@ __all__ = [
     "CreditTransactionType",
     "Customer",
     "AccountStatus",
+    "Supplier",
+    "SupplierAccountStatus",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderStatus",
 ]

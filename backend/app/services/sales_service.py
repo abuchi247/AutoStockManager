@@ -34,6 +34,7 @@ from app.models.inventory_movement_ledger import MovementType
 from app.models.sale import Sale, SaleItem, SaleStatus, PaymentType
 from app.models.stock_status_cache import StockStatusCache
 from app.utils.fifo import consume_fifo_layers
+from app.utils.invoice_number import generate_invoice_number
 from app.utils.ledger import record_inventory_movement
 
 
@@ -175,7 +176,7 @@ class SalesService:
         1. Validate sale is in DRAFT status with at least one item
         2. For each item: acquire pessimistic lock on cache, validate stock,
            consume FIFO layers, record ledger entry
-        3. Generate invoice number
+        3. Generate sequential invoice number via PostgreSQL sequence
         4. Update sale totals and status
 
         Args:
@@ -190,9 +191,6 @@ class SalesService:
             SaleHasNoItemsError: If sale has no line items.
             InsufficientStockError: If stock is insufficient.
         """
-        import secrets
-        import time
-
         sale = await self._get_sale_with_items(sale_id)
 
         if sale.status != SaleStatus.DRAFT:
@@ -261,10 +259,8 @@ class SalesService:
             subtotal += item.line_total
             total_discount += item.discount_amount
 
-        # Generate invoice number
-        timestamp = str(int(time.time()))
-        random_hex = secrets.token_hex(3)
-        sale.invoice_number = f"INV-{timestamp}-{random_hex}"
+        # Generate sequential invoice number via PostgreSQL sequence
+        sale.invoice_number = await generate_invoice_number(self.db)
 
         # Update totals
         sale.subtotal = subtotal
