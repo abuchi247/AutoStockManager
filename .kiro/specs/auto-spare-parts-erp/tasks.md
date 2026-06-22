@@ -64,11 +64,11 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - Implement account lockout after 5 failed attempts within 15 minutes (30-minute lockout)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 2.8_
 
-  - [ ]* 3.2 Write property test for password complexity validation
+  - [x]* 3.2 Write property test for password complexity validation
     - **Property 8: Password Complexity Validation**
     - **Validates: Requirements 2.5**
 
-  - [ ] 3.3 Create RBAC middleware and security middleware
+  - [-] 3.3 Create RBAC middleware and security middleware
     - Create `backend/app/middleware/auth.py` with JWT verification and role extraction
     - Create `backend/app/middleware/rate_limit.py` using Redis + slowapi (100 req/min authenticated, 20 req/min unauthenticated)
     - Create `backend/app/middleware/security_headers.py` (CSP, X-Content-Type-Options, X-Frame-Options, HSTS)
