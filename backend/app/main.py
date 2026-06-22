@@ -12,6 +12,13 @@ from app.config import get_settings
 from app.database import close_db, init_db
 from app.middleware.rate_limit import create_rate_limiter, rate_limit_exceeded_handler
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.routers.auth import router as auth_router
+from app.routers.spare_parts import router as spare_parts_router
+from app.routers.stock import router as stock_router
+from app.routers.transfers import router as transfers_router
+from app.routers.users import router as users_router
+from app.routers.customers import router as customers_router
+from app.services.session_service import close_redis_client, get_redis_client
 
 
 @asynccontextmanager
@@ -19,8 +26,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown events."""
     # Startup
     await init_db()
+    await get_redis_client()  # Initialize Redis connection
     yield
     # Shutdown
+    await close_redis_client()
     await close_db()
 
 
@@ -72,6 +81,14 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "environment": settings.environment,
         }
+
+    # Register routers
+    app.include_router(auth_router)
+    app.include_router(users_router)
+    app.include_router(spare_parts_router)
+    app.include_router(stock_router)
+    app.include_router(transfers_router)
+    app.include_router(customers_router)
 
     return app
 

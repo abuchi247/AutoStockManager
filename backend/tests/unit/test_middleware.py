@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from jose import jwt
 from starlette.requests import Request
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.middleware.auth import get_current_user, require_roles
 from app.middleware.rate_limit import get_rate_limit_key, _dynamic_rate_limit
 from app.middleware.security_headers import SecurityHeadersMiddleware

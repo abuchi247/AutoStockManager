@@ -9,6 +9,10 @@ Satisfies Requirements:
 - 2.5: Password complexity (min 8, uppercase, lowercase, digit)
 - 2.7: bcrypt with cost factor 12
 - 2.8: Lock account after 5 failed attempts in 15 min (30-min lockout)
+- 17.3: Session registry tracking active refresh tokens per user
+- 17.4: Invalidate refresh token on logout and remove from session registry
+- 17.5: Record login history (timestamp, IP, user agent, success/failure)
+- 17.6: Admin session revocation (invalidate all refresh tokens for a user)
 """
 
 import re
@@ -24,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.models.user import User, UserRole
+from app.services.session_service import SessionService
 
 
 # =============================================================================
@@ -227,28 +232,47 @@ class AuthService:
     """Authentication service handling login, refresh, logout, and password reset.
 
     This service encapsulates all authentication business logic including
-    account lockout, token generation, and password management.
+    account lockout, token generation, password management, session registry
+    management, and login history recording.
     """
 
-    def __init__(self, db: AsyncSession, settings: Optional[Settings] = None):
+    def __init__(
+        self,
+        db: AsyncSession,
+        settings: Optional[Settings] = None,
+        session_service: Optional[SessionService] = None,
+    ):
         """Initialize the auth service.
 
         Args:
             db: Async SQLAlchemy session for database operations.
             settings: Application settings (defaults to singleton).
+            session_service: Session registry service for token tracking.
+                             If None, session registry features are disabled.
         """
         self.db = db
         self.settings = settings or get_settings()
+        self.session_service = session_service
 
-    async def login(self, username: str, password: str) -> dict[str, Any]:
-        """Authenticate a user and issue tokens (Requirements 2.2, 2.8).
+    async def login(
+        self,
+        username: str,
+        password: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Authenticate a user and issue tokens (Requirements 2.2, 2.8, 17.3, 17.5).
 
         Implements account lockout: after 5 failed attempts within 15 minutes,
         the account is locked for 30 minutes.
 
+        Records login attempt in history and registers session in Redis on success.
+
         Args:
             username: The user's login username.
             password: The plain-text password.
+            ip_address: Client IP address for login history.
+            user_agent: Client user agent for login history.
 
         Returns:
             Dict with access_token, refresh_token, and token_type on success.
@@ -263,14 +287,41 @@ class AuthService:
         user = result.scalar_one_or_none()
 
         if user is None:
+            # Record failed login attempt (user not found)
+            if self.session_service:
+                await self.session_service.record_login_attempt(
+                    username=username,
+                    success=False,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="User not found",
+                )
             raise AuthenticationError("Invalid username or password")
 
         # Check if account is inactive
         if not user.is_active:
+            if self.session_service:
+                await self.session_service.record_login_attempt(
+                    username=username,
+                    success=False,
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="Account inactive",
+                )
             raise AuthenticationError("Account is inactive")
 
         # Check if account is currently locked (Requirement 2.8)
         if user.is_locked:
+            if self.session_service:
+                await self.session_service.record_login_attempt(
+                    username=username,
+                    success=False,
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="Account locked",
+                )
             raise AccountLockedError(
                 "Account is locked due to too many failed login attempts. "
                 "Please try again later."
@@ -279,6 +330,15 @@ class AuthService:
         # Verify password
         if not verify_password(password, user.password_hash, self.settings):
             await self._handle_failed_login(user)
+            if self.session_service:
+                await self.session_service.record_login_attempt(
+                    username=username,
+                    success=False,
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    failure_reason="Invalid password",
+                )
             raise AuthenticationError("Invalid username or password")
 
         # Successful login: reset failed attempts
@@ -297,23 +357,54 @@ class AuthService:
             settings=self.settings,
         )
 
+        # Register session in Redis (Requirement 17.3)
+        if self.session_service:
+            # Extract JTI from the refresh token
+            refresh_payload = decode_token(refresh_token, self.settings)
+            jti = refresh_payload.get("jti", "")
+            await self.session_service.register_session(
+                user_id=str(user.id),
+                jti=jti,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
+            # Record successful login
+            await self.session_service.record_login_attempt(
+                username=username,
+                success=True,
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
         }
 
-    async def refresh_token(self, refresh_token_str: str) -> dict[str, Any]:
-        """Issue new tokens from a valid refresh token (Requirement 2.3).
+    async def refresh_token(
+        self,
+        refresh_token_str: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Issue new tokens from a valid refresh token (Requirements 2.3, 17.3, 17.4).
+
+        Validates the refresh token against the session registry before issuing
+        new tokens. The old session is removed and a new one is registered.
 
         Args:
             refresh_token_str: The current refresh token.
+            ip_address: Client IP address for session metadata.
+            user_agent: Client user agent for session metadata.
 
         Returns:
             Dict with new access_token, refresh_token, and token_type.
 
         Raises:
-            AuthenticationError: If the refresh token is invalid or expired.
+            AuthenticationError: If the refresh token is invalid, expired, or revoked.
         """
         try:
             payload = decode_token(refresh_token_str, self.settings)
@@ -326,6 +417,13 @@ class AuthService:
         user_id = payload.get("sub")
         if user_id is None:
             raise AuthenticationError("Invalid token payload")
+
+        # Validate token against session registry (Requirement 17.3)
+        old_jti = payload.get("jti", "")
+        if self.session_service:
+            is_valid = await self.session_service.is_session_valid(user_id, old_jti)
+            if not is_valid:
+                raise AuthenticationError("Token has been revoked")
 
         # Verify user still exists and is active
         result = await self.db.execute(
@@ -347,6 +445,18 @@ class AuthService:
             settings=self.settings,
         )
 
+        # Rotate session in registry: remove old, register new
+        if self.session_service:
+            await self.session_service.remove_session(user_id, old_jti)
+            new_payload = decode_token(new_refresh_token, self.settings)
+            new_jti = new_payload.get("jti", "")
+            await self.session_service.register_session(
+                user_id=user_id,
+                jti=new_jti,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
@@ -354,10 +464,10 @@ class AuthService:
         }
 
     async def logout(self, refresh_token_str: str) -> dict[str, str]:
-        """Invalidate a refresh token (logout).
+        """Invalidate a refresh token (logout) (Requirement 17.4).
 
-        In a production system, this would add the token's jti to a blacklist
-        (e.g., Redis). For now, we validate and acknowledge the logout.
+        Removes the token's JTI from the session registry in Redis,
+        effectively preventing any further use of this refresh token.
 
         Args:
             refresh_token_str: The refresh token to invalidate.
@@ -376,8 +486,13 @@ class AuthService:
         if payload.get("type") != "refresh":
             raise AuthenticationError("Invalid token type")
 
-        # In production, store jti in a blacklist (Redis SET)
-        # For now, the token is considered invalidated on the client side
+        user_id = payload.get("sub")
+        jti = payload.get("jti", "")
+
+        # Remove session from registry (Requirement 17.4)
+        if self.session_service and user_id:
+            await self.session_service.remove_session(user_id, jti)
+
         return {"message": "Successfully logged out"}
 
     async def request_password_reset(self, email: str) -> dict[str, Any]:
@@ -479,6 +594,30 @@ class AuthService:
             )
 
         await self.db.flush()
+
+    async def revoke_all_user_sessions(self, user_id: str) -> dict[str, Any]:
+        """Revoke all active sessions for a user (Requirement 17.6).
+
+        Admin action that immediately invalidates all refresh tokens for
+        a specified user by clearing their session registry in Redis.
+
+        Args:
+            user_id: The target user's UUID string.
+
+        Returns:
+            Dict with the number of sessions revoked.
+
+        Raises:
+            AuthenticationError: If session service is not available.
+        """
+        if not self.session_service:
+            raise AuthenticationError("Session service not available")
+
+        revoked_count = await self.session_service.revoke_all_sessions(user_id)
+        return {
+            "message": f"All sessions revoked for user {user_id}",
+            "revoked_count": revoked_count,
+        }
 
 
 # =============================================================================

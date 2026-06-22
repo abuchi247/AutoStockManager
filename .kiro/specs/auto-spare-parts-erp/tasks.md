@@ -55,7 +55,7 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - Apply partial unique indexes for soft-delete compatibility
     - _Requirements: 18.5, 18.7_
 
-- [ ] 3. Authentication and security infrastructure
+- [x] 3. Authentication and security infrastructure
   - [x] 3.1 Create User model and authentication service
     - Create `backend/app/models/user.py` with username, email, password_hash, role, is_active, locked_until, failed_login_attempts
     - Create `backend/app/services/auth_service.py` with login, refresh, logout, password reset, and account lockout logic
@@ -68,7 +68,7 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 8: Password Complexity Validation**
     - **Validates: Requirements 2.5**
 
-  - [-] 3.3 Create RBAC middleware and security middleware
+  - [x] 3.3 Create RBAC middleware and security middleware
     - Create `backend/app/middleware/auth.py` with JWT verification and role extraction
     - Create `backend/app/middleware/rate_limit.py` using Redis + slowapi (100 req/min authenticated, 20 req/min unauthenticated)
     - Create `backend/app/middleware/security_headers.py` (CSP, X-Content-Type-Options, X-Frame-Options, HSTS)
@@ -78,42 +78,42 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 25: RBAC Endpoint Enforcement**
     - **Validates: Requirements 17.1**
 
-  - [ ] 3.5 Create auth router with login, refresh, logout, password reset endpoints
+  - [x] 3.5 Create auth router with login, refresh, logout, password reset endpoints
     - Create `backend/app/routers/auth.py` with POST /api/v1/auth/login, /refresh, /logout, /reset-password
     - Create `backend/app/routers/users.py` with GET/POST /api/v1/users (Admin only)
     - Create `backend/app/schemas/auth.py` and `backend/app/schemas/user.py` with Pydantic models
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 17.3, 17.4, 17.5, 17.6_
 
-  - [ ] 3.6 Create session registry and login history
+  - [x] 3.6 Create session registry and login history
     - Implement session registry tracking active refresh tokens per user in Redis
     - Implement login history recording (timestamp, IP, user agent, success/failure)
     - Implement admin session revocation (invalidate all refresh tokens for a user)
     - _Requirements: 17.3, 17.4, 17.5, 17.6_
 
-- [ ] 4. Checkpoint - Ensure base infrastructure tests pass
+- [x] 4. Checkpoint - Ensure base infrastructure tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Core inventory domain
-  - [ ] 5.1 Create inventory service and spare parts CRUD
+- [x] 5. Core inventory domain
+  - [x] 5.1 Create inventory service and spare parts CRUD
     - Create `backend/app/services/inventory_service.py` with create, read, update, soft-delete operations
     - Create `backend/app/schemas/spare_part.py` with request/response Pydantic models
     - Create `backend/app/routers/spare_parts.py` with GET/POST/PUT/DELETE endpoints
     - Implement search by part_number, barcode, name, brand, category, vehicle_compatibility
     - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-  - [ ] 5.2 Create Stock_Status_Cache model and service
+  - [x] 5.2 Create Stock_Status_Cache model and service
     - Create `backend/app/models/stock_status_cache.py` with spare_part_id, location_id, current_quantity, last_reconciled_at
     - Create composite unique index on (spare_part_id, location_id)
     - Implement stock query endpoint GET /api/v1/stock/locations/{id}
     - _Requirements: 18.1, 18.3, 18.8_
 
-- [ ] 6. Immutable ledger infrastructure
-  - [ ] 6.1 Create Inventory_Movement_Ledger model
+- [x] 6. Immutable ledger infrastructure
+  - [x] 6.1 Create Inventory_Movement_Ledger model
     - Create `backend/app/models/inventory_movement_ledger.py` with spare_part_id, location_id, quantity_change, movement_type, reference_type, reference_id, unit_cost, created_by, created_at
     - Create composite index on (spare_part_id, location_id, created_at) for reconciliation
     - _Requirements: 4.8, 18.9_
 
-  - [ ] 6.2 Create Cost_Layer model and FIFO consumption algorithm
+  - [x] 6.2 Create Cost_Layer model and FIFO consumption algorithm
     - Create `backend/app/models/cost_layer.py` with spare_part_id, location_id, unit_cost, original_quantity, remaining_quantity, source_type, source_reference_id, created_at
     - Create partial composite index on (spare_part_id, location_id, created_at) WHERE remaining_quantity > 0
     - Create `backend/app/utils/fifo.py` with `consume_fifo_layers` function implementing chronological consumption with pessimistic locking
@@ -123,7 +123,7 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 1: FIFO Consumption Order**
     - **Validates: Requirements 1.5, 1.10, 3.7, 4.11**
 
-  - [ ] 6.4 Implement atomic ledger-write + cache-update pattern
+  - [x] 6.4 Implement atomic ledger-write + cache-update pattern
     - Create helper function that writes to Inventory_Movement_Ledger and atomically updates Stock_Status_Cache in the same transaction
     - _Requirements: 18.2_
 
@@ -135,18 +135,18 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 6: Double-Entry Balance**
     - **Validates: Requirements 1.7**
 
-- [ ] 7. Multi-location management
-  - [ ] 7.1 Create Transfer model and transfer service
+- [x] 7. Multi-location management
+  - [x] 7.1 Create Transfer model and transfer service
     - Create `backend/app/models/transfer.py` with spare_part_id, source/destination location, quantity, status, consumed_layer_details (JSON), requested_by, approved_by, received_by, timestamps
     - Create `backend/app/services/transfer_service.py` with create, approve, receive, cancel operations
     - Implement transfer state machine: pending → approved → in_transit → received (or cancelled)
     - _Requirements: 4.2, 4.4_
 
-  - [ ] 7.2 Implement transfer approval with FIFO cost layer consumption
+  - [x] 7.2 Implement transfer approval with FIFO cost layer consumption
     - In approve flow: acquire pessimistic lock on source Stock_Status_Cache, validate quantity, consume FIFO layers at source, write ledger entries (TRANSFER_OUT at source, TRANSFER_IN_TRANSIT), update cache, store consumed layer details on transfer record
     - _Requirements: 4.3, 4.5, 4.9, 4.11_
 
-  - [ ] 7.3 Implement transfer receive with cost layer creation at destination
+  - [x] 7.3 Implement transfer receive with cost layer creation at destination
     - In receive flow: write ledger entries (TRANSFER_RECEIVED from in_transit, TRANSFER_IN at destination), create new cost layers at destination using unit costs from consumed source layers, update destination cache
     - _Requirements: 4.6, 4.10, 4.12_
 
@@ -162,21 +162,21 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 12: Transfer Quantity Validation**
     - **Validates: Requirements 4.9**
 
-  - [ ] 7.7 Create transfer router with endpoints
+  - [x] 7.7 Create transfer router with endpoints
     - Create `backend/app/routers/transfers.py` with GET/POST /api/v1/transfers, POST /approve, POST /receive
     - Create `backend/app/schemas/transfer.py` with request/response models
     - _Requirements: 4.2, 4.4, 4.5, 4.6_
 
-- [ ] 8. Checkpoint - Ensure inventory and transfer tests pass
+- [x] 8. Checkpoint - Ensure inventory and transfer tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Sales management
-  - [ ] 9.1 Create Sale and SaleItem models
+  - [x] 9.1 Create Sale and SaleItem models
     - Create `backend/app/models/sale.py` with customer_id, location_id, invoice_number, status, payment_type, subtotal, tax_amount, total_amount, discount_total
     - Create sale_items table with sale_id, spare_part_id, quantity, unit_price, discount_amount, line_total, cost_of_goods_sold
     - _Requirements: 5.1_
 
-  - [ ] 9.2 Implement sales service with pessimistic locking and FIFO COGS
+  - [x] 9.2 Implement sales service with pessimistic locking and FIFO COGS
     - Create `backend/app/services/sales_service.py` with create_sale and confirm_sale methods
     - In confirm_sale: acquire SELECT FOR UPDATE on Stock_Status_Cache rows, validate stock, consume FIFO layers (calculate COGS), write ledger entries, update cache — all in single transaction
     - Implement line_total calculation as (quantity × unit_price) - discount_amount
@@ -190,7 +190,7 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - **Property 14: Sale Stock Deduction via Ledger**
     - **Validates: Requirements 5.2**
 
-  - [ ] 9.5 Implement sales return with new cost layer creation
+  - [x] 9.5 Implement sales return with new cost layer creation
     - Implement return_sale method that creates return entries in the ledger, creates a new cost layer at return location using original sale line item's unit cost with created_at = return processing date
     - Ensure no previously consumed/closed cost layers are modified
     - _Requirements: 5.8, 5.12, 5.13, 5.14_
@@ -213,14 +213,14 @@ This plan implements a comprehensive ERP system for automotive spare parts using
     - _Requirements: 5.1, 5.3, 5.4_
 
 - [ ] 10. Customer and credit management
-  - [ ] 10.1 Create Customer model and customer service
+  - [x] 10.1 Create Customer model and customer service
     - Create `backend/app/models/customer.py` with name, phone, email, address, tax_id, credit_limit, account_status
     - Create `backend/app/services/customer_service.py` with CRUD and purchase history
     - Create `backend/app/routers/customers.py` with GET/POST endpoints
     - Create `backend/app/schemas/customer.py` with Pydantic models
     - _Requirements: 6.1, 6.2_
 
-  - [ ] 10.2 Create Customer_Credit_Ledger model and credit ledger service
+  - [x] 10.2 Create Customer_Credit_Ledger model and credit ledger service
     - Create `backend/app/models/customer_credit_ledger.py` with customer_id, transaction_type (sale/payment/adjustment/return), amount, reference_type, reference_id, notes, created_by
     - Create `backend/app/services/credit_ledger_service.py` with record_debit, record_credit, validate_credit_limit, calculate_balance, aging_analysis
     - Implement credit limit enforcement at database transaction layer using pessimistic lock on customer record

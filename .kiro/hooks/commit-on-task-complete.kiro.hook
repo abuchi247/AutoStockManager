@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Commit on task completion",
+  "description": "After each spec task is completed, automatically stage and commit the changes with a descriptive message referencing the task ID.",
+  "version": "1",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "If the tool just used was task_update with status='completed', run `git add -A && git commit -m \"feat: complete task [TASK_ID]\"` in the workspace root to commit the changes. Use the task ID from the tool call. If the tool was not a task completion, do nothing."
+  }
+}
