@@ -52,10 +52,10 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h2 className="text-center text-xl font-semibold text-foreground">
+      <h2 className="text-center text-xl font-semibold text-[#333]">
         Welcome back
       </h2>
-      <p className="text-center text-sm text-muted-foreground mt-1">
+      <p className="text-center text-sm text-[#666] mt-1">
         Sign in to continue to your dashboard
       </p>
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
         <div>
           <label
             htmlFor="username"
-            className="block text-sm font-medium text-foreground"
+            className="block text-sm font-medium text-[#333]"
           >
             Username
           </label>
@@ -94,14 +94,14 @@ export default function LoginPage() {
             aria-required="true"
             aria-invalid={displayError ? 'true' : undefined}
             aria-describedby={displayError ? 'login-error' : undefined}
-            className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-1.5 flex h-10 w-full rounded-md border border-[#ddd] bg-white px-3 py-2 text-sm transition-colors placeholder:text-gray-400 focus:outline-none focus:border-[#2196F3] focus:ring-2 focus:ring-[#2196F3]/10 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-foreground"
+            className="block text-sm font-medium text-[#333]"
           >
             Password
           </label>
@@ -116,14 +116,14 @@ export default function LoginPage() {
             disabled={isLoading}
             aria-required="true"
             aria-invalid={displayError ? 'true' : undefined}
-            className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-1.5 flex h-10 w-full rounded-md border border-[#ddd] bg-white px-3 py-2 text-sm transition-colors placeholder:text-gray-400 focus:outline-none focus:border-[#2196F3] focus:ring-2 focus:ring-[#2196F3]/10 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <div className="flex items-center justify-end">
           <Link
             href="/reset-password"
-            className="text-sm font-medium text-primary hover:text-primary/80"
+            className="text-sm font-medium text-[#667eea] hover:text-[#764ba2] transition-colors"
           >
             Forgot password?
           </Link>
@@ -133,7 +133,8 @@ export default function LoginPage() {
           type="submit"
           disabled={isLoading}
           aria-busy={isLoading}
-          className="flex w-full justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          className="flex w-full justify-center rounded-md px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(102,126,234,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#667eea] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:translate-y-0"
+          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">

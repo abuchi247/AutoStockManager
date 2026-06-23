@@ -45,6 +45,16 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Custom colors for dark sidebar
+        sidebar: {
+          dark: '#2d3748',
+          darker: '#1a202c',
+          text: '#cbd5e0',
+          'active-bg': 'rgba(102, 126, 234, 0.15)',
+          'active-border': '#667eea',
+          hover: 'rgba(255, 255, 255, 0.05)',
+        },
+        page: '#f7fafc',
       },
       borderRadius: {
         lg: 'var(--radius)',
