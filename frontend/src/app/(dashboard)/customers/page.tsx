@@ -89,7 +89,7 @@ export default function CustomersPage() {
         `/customers?${params.toString()}`
       );
       setCustomers(response.data);
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load customers';
       setError(message);

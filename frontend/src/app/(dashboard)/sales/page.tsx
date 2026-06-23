@@ -94,7 +94,7 @@ export default function SalesPage() {
         `/sales?${params.toString()}`
       );
       setSales(response.data);
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load sales';
       setError(message);

@@ -97,7 +97,7 @@ export default function InventoryPage() {
         `/spare-parts?${params.toString()}`
       );
       setParts(response.data);
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load spare parts';
       setError(message);
@@ -108,7 +108,7 @@ export default function InventoryPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await get<{ data: Category[] }>('/spare-parts/categories');
+      const response = await get<{ data: Category[]; meta: { page: number; total: number; page_size: number } }>('/spare-parts/categories');
       setCategories(response.data);
     } catch {
       // Categories are optional for display
@@ -117,7 +117,7 @@ export default function InventoryPage() {
 
   const fetchBrands = useCallback(async () => {
     try {
-      const response = await get<{ data: string[] }>('/spare-parts/brands');
+      const response = await get<{ data: string[]; meta: { page: number; total: number; page_size: number } }>('/spare-parts/brands');
       setBrands(response.data);
     } catch {
       // Brands are optional for display

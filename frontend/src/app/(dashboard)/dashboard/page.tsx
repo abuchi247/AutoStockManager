@@ -27,8 +27,8 @@ export default function DashboardPage() {
 
   const fetchKPIs = useCallback(async () => {
     try {
-      const response = await api.get<{ data: DashboardKPIs }>('/dashboard/kpis');
-      setKpis(response.data.data);
+      const response = await api.get<DashboardKPIs>('/dashboard/kpis');
+      setKpis(response.data);
       setLastUpdated(new Date());
       setError(null);
     } catch (err: unknown) {

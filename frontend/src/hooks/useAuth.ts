@@ -168,12 +168,13 @@ export function useAuth(): UseAuthReturn {
 
   /**
    * Check if the current user has one of the specified roles.
+   * Uses case-insensitive comparison since JWT may return title-case roles.
    */
   const hasRole = useCallback(
     (roles: UserRole | UserRole[]): boolean => {
       if (!user) return false;
       const roleArray = Array.isArray(roles) ? roles : [roles];
-      return roleArray.includes(user.role as UserRole);
+      return roleArray.some(r => r.toLowerCase() === (user.role || '').toLowerCase());
     },
     [user]
   );

@@ -48,7 +48,7 @@ export default function CreateSalePage() {
   // Form state
   const [customerId, setCustomerId] = useState('');
   const [locationId, setLocationId] = useState('');
-  const [paymentType, setPaymentType] = useState<string>('cash');
+  const [paymentType, setPaymentType] = useState<string>('CASH');
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
   // Reference data
@@ -72,8 +72,8 @@ export default function CreateSalePage() {
     async function fetchData() {
       try {
         const [customersRes, locationsRes] = await Promise.all([
-          get<{ data: Customer[] }>('/customers'),
-          get<{ data: Location[] }>('/stock/locations'),
+          get<{ data: Customer[]; meta: { page: number; total: number; page_size: number } }>('/customers'),
+          get<{ data: Location[]; meta: { page: number; total: number; page_size: number } }>('/locations'),
         ]);
         setCustomers(customersRes.data);
         setLocations(locationsRes.data);
@@ -98,7 +98,7 @@ export default function CreateSalePage() {
         const params = new URLSearchParams();
         params.set('search', partSearch);
         params.set('page_size', '10');
-        const response = await get<{ data: SparePart[] }>(
+        const response = await get<{ data: SparePart[]; meta: { page: number; total: number; page_size: number } }>(
           `/spare-parts?${params.toString()}`
         );
         setPartResults(response.data);
@@ -184,10 +184,10 @@ export default function CreateSalePage() {
     setError(null);
     try {
       const payload = buildSalePayload();
-      const response = await post<{ data: Sale }>('/sales', payload);
+      const sale = await post<Sale>('/sales', payload);
       setSuccess('Sale saved as draft successfully.');
       setTimeout(() => {
-        router.push(`/sales/${response.data.id}`);
+        router.push(`/sales/${sale.id}`);
       }, 1000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save sale';
@@ -212,11 +212,11 @@ export default function CreateSalePage() {
     try {
       // First create the sale
       const payload = buildSalePayload();
-      const createResponse = await post<{ data: Sale }>('/sales', payload);
-      const saleId = createResponse.data.id;
+      const sale = await post<Sale>('/sales', payload);
+      const saleId = sale.id;
 
       // Then confirm it
-      await post<{ data: Sale }>(`/sales/${saleId}/confirm`);
+      await post<Sale>(`/sales/${saleId}/confirm`);
       setSuccess('Sale confirmed successfully. Stock has been deducted.');
       setTimeout(() => {
         router.push(`/sales/${saleId}`);
@@ -244,10 +244,8 @@ export default function CreateSalePage() {
   ];
 
   const paymentOptions: SelectOption[] = [
-    { value: 'cash', label: 'Cash' },
-    { value: 'credit', label: 'Credit' },
-    { value: 'card', label: 'Card' },
-    { value: 'transfer', label: 'Transfer' },
+    { value: 'CASH', label: 'Cash' },
+    { value: 'CREDIT', label: 'Credit' },
   ];
 
   return (

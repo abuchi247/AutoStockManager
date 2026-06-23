@@ -105,7 +105,7 @@ export default function SettingsPage() {
         `/users?${params.toString()}`
       );
       setUsers(response.data);
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load users';
       setError(message);
@@ -141,7 +141,12 @@ export default function SettingsPage() {
     setIsCreating(true);
     setCreateError(null);
     try {
-      await post('/users', newUser);
+      // Backend expects title-case roles: "Admin", "Manager", "Salesperson", "Storekeeper"
+      const payload = {
+        ...newUser,
+        role: newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1),
+      };
+      await post('/users', payload);
       setShowCreateModal(false);
       setNewUser({
         username: '',
@@ -174,7 +179,12 @@ export default function SettingsPage() {
     setIsEditing(true);
     setEditError(null);
     try {
-      await put(`/users/${editingUser.id}`, editData);
+      // Backend expects title-case roles
+      const payload = {
+        ...editData,
+        role: editData.role ? editData.role.charAt(0).toUpperCase() + editData.role.slice(1) : undefined,
+      };
+      await put(`/users/${editingUser.id}`, payload);
       setShowEditModal(false);
       setEditingUser(null);
       setEditData({});

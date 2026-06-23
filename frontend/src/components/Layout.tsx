@@ -70,6 +70,12 @@ const navItems: NavItem[] = [
     icon: '📈',
   },
   {
+    label: 'Locations',
+    href: '/locations',
+    roles: ['admin', 'manager', 'storekeeper'],
+    icon: '🏢',
+  },
+  {
     label: 'Settings',
     href: '/settings',
     roles: ['admin'],
