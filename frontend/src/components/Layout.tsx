@@ -129,11 +129,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden transition-opacity duration-300"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -142,17 +142,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-200 ease-in-out
+          fixed inset-y-0 left-0 z-50 w-64 transform glass-sidebar transition-transform duration-300 ease-in-out
           lg:relative lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `.trim()}
       >
         {/* Logo / Brand */}
-        <div className="flex h-16 items-center gap-2 border-b px-6">
-          <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-6">
+          <svg className="h-8 w-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          <span className="text-lg font-bold text-gray-900">AutoStock</span>
+          <span className="text-lg font-bold text-white">AutoStock</span>
         </div>
 
         {/* Navigation */}
@@ -163,11 +163,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   href={item.href}
                   className={`
-                    flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors
+                    flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                     ${
                       isActive(item.href)
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'bg-white/15 text-white border-l-2 border-indigo-300 shadow-sm'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }
                   `.trim()}
                   onClick={() => setSidebarOpen(false)}
@@ -182,16 +182,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User info at bottom */}
-        <div className="border-t p-4">
+        <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-700">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-sm font-semibold text-white backdrop-blur-sm">
               {user?.username?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="flex-1 truncate">
-              <p className="truncate text-sm font-medium text-gray-900">
+              <p className="truncate text-sm font-medium text-white">
                 {user?.username || 'User'}
               </p>
-              <p className="truncate text-xs capitalize text-gray-500">
+              <p className="truncate text-xs capitalize text-white/60">
                 {user?.role || 'unknown'}
               </p>
             </div>
@@ -202,11 +202,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-16 items-center justify-between border-b bg-white px-4 shadow-sm lg:px-6">
+        <header className="flex h-16 items-center justify-between glass-card rounded-none border-x-0 border-t-0 px-4 lg:px-6">
           {/* Mobile menu button */}
           <button
             type="button"
-            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
+            className="rounded-xl p-2 text-gray-500 hover:bg-white/50 hover:text-gray-700 transition-all duration-200 lg:hidden"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
           >
@@ -215,15 +215,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
 
-          {/* Page title area - can be customized by individual pages */}
+          {/* Page title area */}
           <div className="hidden lg:block" />
 
           {/* Right side actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Notifications bell */}
             <Link
               href="/notifications"
-              className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              className="rounded-xl p-2.5 text-gray-500 hover:bg-white/50 hover:text-indigo-600 transition-all duration-200"
               aria-label="View notifications"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -235,7 +235,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={logout}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              className="rounded-xl px-4 py-2 text-sm font-medium text-gray-600 hover:bg-white/50 hover:text-gray-900 transition-all duration-200"
             >
               Logout
             </button>
@@ -243,7 +243,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 page-enter">
           {children}
         </main>
       </div>

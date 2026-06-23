@@ -53,25 +53,26 @@ export function Modal({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="modal-overlay p-4"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div
-        className={`w-full ${sizeClasses[size]} rounded-lg bg-white shadow-xl`}
+        className={`modal-glass w-full ${sizeClasses[size]}`}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between border-b px-6 py-4">
+          <div className="flex items-center justify-between border-b border-white/20 pb-4 mb-4">
             <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-xl p-1.5 text-gray-400 hover:bg-white/50 hover:text-gray-600
+                transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400/30"
               aria-label="Close modal"
             >
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -82,11 +83,11 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className="px-6 py-4">{children}</div>
+        <div className="text-gray-700">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
+          <div className="flex items-center justify-end gap-3 border-t border-white/20 pt-4 mt-4">
             {footer}
           </div>
         )}

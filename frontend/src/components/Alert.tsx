@@ -12,30 +12,32 @@ interface AlertProps {
   className?: string;
 }
 
-const variantConfig: Record<AlertVariant, { bg: string; border: string; icon: string; title: string }> = {
+const variantConfig: Record<AlertVariant, {
+  gradient: string; icon: string; title: string; text: string;
+}> = {
   success: {
-    bg: 'bg-green-50',
-    border: 'border-green-400',
-    icon: 'text-green-400',
-    title: 'text-green-800',
+    gradient: 'from-emerald-400 to-green-500',
+    icon: 'text-emerald-500',
+    title: 'text-emerald-800',
+    text: 'text-emerald-700',
   },
   error: {
-    bg: 'bg-red-50',
-    border: 'border-red-400',
-    icon: 'text-red-400',
-    title: 'text-red-800',
+    gradient: 'from-rose-400 to-red-500',
+    icon: 'text-rose-500',
+    title: 'text-rose-800',
+    text: 'text-rose-700',
   },
   warning: {
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-400',
-    icon: 'text-yellow-400',
-    title: 'text-yellow-800',
+    gradient: 'from-amber-400 to-orange-500',
+    icon: 'text-amber-500',
+    title: 'text-amber-800',
+    text: 'text-amber-700',
   },
   info: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-400',
-    icon: 'text-blue-400',
+    gradient: 'from-blue-400 to-indigo-500',
+    icon: 'text-blue-500',
     title: 'text-blue-800',
+    text: 'text-blue-700',
   },
 };
 
@@ -83,16 +85,24 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
 
   return (
     <div
-      className={`rounded-md border-l-4 p-4 ${config.bg} ${config.border} ${className}`}
+      className={`
+        relative overflow-hidden rounded-2xl border border-white/30 bg-white/70
+        backdrop-blur-xl shadow-glass-sm p-4 transition-all duration-300
+        hover:shadow-glass
+        ${className}
+      `.trim()}
       role="alert"
     >
-      <div className="flex">
+      {/* Gradient accent border on the left */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${config.gradient} rounded-l-2xl`} />
+
+      <div className="flex pl-3">
         <div className={`flex-shrink-0 ${config.icon}`}>{icons[variant]}</div>
         <div className="ml-3 flex-1">
           {title && (
-            <h3 className={`text-sm font-medium ${config.title}`}>{title}</h3>
+            <h3 className={`text-sm font-semibold ${config.title}`}>{title}</h3>
           )}
-          <div className={`text-sm ${config.title} ${title ? 'mt-1' : ''}`}>
+          <div className={`text-sm ${config.text} ${title ? 'mt-1' : ''}`}>
             {children}
           </div>
         </div>
@@ -101,7 +111,9 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
             <button
               type="button"
               onClick={onClose}
-              className={`inline-flex rounded-md p-1.5 ${config.icon} hover:opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2`}
+              className={`inline-flex rounded-xl p-1.5 ${config.icon}
+                hover:bg-white/50 transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-offset-1`}
               aria-label="Dismiss"
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

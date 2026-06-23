@@ -8,7 +8,7 @@ interface LoadingSpinnerProps {
 }
 
 const sizeClasses = {
-  sm: 'h-4 w-4',
+  sm: 'h-5 w-5',
   md: 'h-8 w-8',
   lg: 'h-12 w-12',
 };
@@ -16,27 +16,26 @@ const sizeClasses = {
 export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerProps) {
   return (
     <div className={`flex items-center justify-center ${className}`} role="status">
-      <svg
-        className={`animate-spin text-blue-600 ${sizeClasses[size]}`}
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
+      <div className={`relative ${sizeClasses[size]}`}>
+        <div
+          className={`absolute inset-0 rounded-full animate-spin`}
+          style={{
+            background: 'conic-gradient(from 0deg, transparent, #667eea, #764ba2)',
+            mask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px))',
+            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px))',
+          }}
+          aria-hidden="true"
         />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        <div
+          className="absolute inset-0 rounded-full opacity-20"
+          style={{
+            background: 'conic-gradient(from 0deg, #667eea, #764ba2, #667eea)',
+            mask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px))',
+            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px))',
+          }}
+          aria-hidden="true"
         />
-      </svg>
+      </div>
       <span className="sr-only">Loading...</span>
     </div>
   );

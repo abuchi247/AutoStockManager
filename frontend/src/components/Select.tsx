@@ -30,7 +30,7 @@ export function Select({
       {label && (
         <label
           htmlFor={selectId}
-          className="mb-1 block text-sm font-medium text-gray-700"
+          className="mb-1.5 block text-sm font-medium text-gray-700"
         >
           {label}
         </label>
@@ -38,14 +38,13 @@ export function Select({
       <select
         id={selectId}
         className={`
-          block w-full rounded-md border px-3 py-2 text-sm shadow-sm
-          focus:outline-none focus:ring-2 focus:ring-offset-0
+          glass-input block w-full
           ${
             error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+              ? 'border-rose-300/70 focus:border-rose-400 focus:ring-rose-400/30'
+              : ''
           }
-          disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500
+          disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-100/30
           ${className}
         `.trim()}
         aria-invalid={error ? 'true' : undefined}
@@ -64,7 +63,7 @@ export function Select({
         ))}
       </select>
       {error && (
-        <p id={`${selectId}-error`} className="mt-1 text-sm text-red-600" role="alert">
+        <p id={`${selectId}-error`} className="mt-1.5 text-sm text-rose-600" role="alert">
           {error}
         </p>
       )}

@@ -14,19 +14,19 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:bg-blue-300',
+    'btn-gradient text-white hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none',
   secondary:
-    'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-400 border border-gray-300 disabled:bg-gray-50 disabled:text-gray-400',
+    'bg-white/50 backdrop-blur-sm text-gray-700 border border-white/40 hover:bg-white/70 hover:shadow-glass-sm focus:ring-primary-400/30 disabled:opacity-50 disabled:text-gray-400',
   danger:
-    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 disabled:bg-red-300',
+    'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:shadow-glow-accent disabled:opacity-50 disabled:cursor-not-allowed',
   ghost:
-    'bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-400 disabled:text-gray-300',
+    'bg-transparent text-gray-600 hover:bg-white/40 hover:backdrop-blur-sm focus:ring-primary-400/30 disabled:text-gray-300',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-3 text-base',
+  sm: 'px-3.5 py-1.5 text-sm',
+  md: 'px-5 py-2.5 text-sm',
+  lg: 'px-7 py-3 text-base',
 };
 
 export function Button({
@@ -41,8 +41,10 @@ export function Button({
   return (
     <button
       className={`
-        inline-flex items-center justify-center rounded-md font-medium
-        transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+        inline-flex items-center justify-center rounded-xl font-semibold
+        transition-all duration-200 ease-out
+        focus:outline-none focus:ring-2 focus:ring-offset-1
+        hover:-translate-y-0.5 active:translate-y-0
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${isLoading ? 'cursor-wait opacity-70' : ''}
