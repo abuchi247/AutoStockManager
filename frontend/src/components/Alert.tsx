@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export type AlertVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -13,28 +14,36 @@ interface AlertProps {
 }
 
 const variantConfig: Record<AlertVariant, {
-  gradient: string; icon: string; title: string; text: string;
+  border: string;
+  bg: string;
+  icon: string;
+  title: string;
+  text: string;
 }> = {
   success: {
-    gradient: 'from-emerald-400 to-green-500',
-    icon: 'text-emerald-500',
-    title: 'text-emerald-800',
-    text: 'text-emerald-700',
+    border: 'border-l-green-500',
+    bg: 'bg-green-50',
+    icon: 'text-green-500',
+    title: 'text-green-800',
+    text: 'text-green-700',
   },
   error: {
-    gradient: 'from-rose-400 to-red-500',
-    icon: 'text-rose-500',
-    title: 'text-rose-800',
-    text: 'text-rose-700',
+    border: 'border-l-red-500',
+    bg: 'bg-red-50',
+    icon: 'text-red-500',
+    title: 'text-red-800',
+    text: 'text-red-700',
   },
   warning: {
-    gradient: 'from-amber-400 to-orange-500',
-    icon: 'text-amber-500',
-    title: 'text-amber-800',
-    text: 'text-amber-700',
+    border: 'border-l-yellow-500',
+    bg: 'bg-yellow-50',
+    icon: 'text-yellow-500',
+    title: 'text-yellow-800',
+    text: 'text-yellow-700',
   },
   info: {
-    gradient: 'from-blue-400 to-indigo-500',
+    border: 'border-l-blue-500',
+    bg: 'bg-blue-50',
     icon: 'text-blue-500',
     title: 'text-blue-800',
     text: 'text-blue-700',
@@ -85,24 +94,21 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
 
   return (
     <div
-      className={`
-        relative overflow-hidden rounded-2xl border border-white/30 bg-white/70
-        backdrop-blur-xl shadow-glass-sm p-4 transition-all duration-300
-        hover:shadow-glass
-        ${className}
-      `.trim()}
+      className={cn(
+        'rounded-md border-l-4 p-4',
+        config.border,
+        config.bg,
+        className
+      )}
       role="alert"
     >
-      {/* Gradient accent border on the left */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${config.gradient} rounded-l-2xl`} />
-
-      <div className="flex pl-3">
-        <div className={`flex-shrink-0 ${config.icon}`}>{icons[variant]}</div>
+      <div className="flex">
+        <div className={cn('flex-shrink-0', config.icon)}>{icons[variant]}</div>
         <div className="ml-3 flex-1">
           {title && (
-            <h3 className={`text-sm font-semibold ${config.title}`}>{title}</h3>
+            <h3 className={cn('text-sm font-medium', config.title)}>{title}</h3>
           )}
-          <div className={`text-sm ${config.text} ${title ? 'mt-1' : ''}`}>
+          <div className={cn('text-sm', config.text, title && 'mt-1')}>
             {children}
           </div>
         </div>
@@ -111,9 +117,11 @@ export function Alert({ variant = 'info', title, children, onClose, className = 
             <button
               type="button"
               onClick={onClose}
-              className={`inline-flex rounded-xl p-1.5 ${config.icon}
-                hover:bg-white/50 transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-offset-1`}
+              className={cn(
+                'inline-flex rounded-md p-1.5',
+                config.icon,
+                'hover:bg-white/50 focus:outline-none focus:ring-2 focus:ring-offset-2'
+              )}
               aria-label="Dismiss"
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

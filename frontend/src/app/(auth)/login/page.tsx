@@ -52,22 +52,22 @@ export default function LoginPage() {
 
   return (
     <div>
-      <h2 className="text-center text-2xl font-semibold text-gray-800">
+      <h2 className="text-center text-xl font-semibold text-foreground">
         Welcome back
       </h2>
-      <p className="text-center text-sm text-gray-500 mt-1">
+      <p className="text-center text-sm text-muted-foreground mt-1">
         Sign in to continue to your dashboard
       </p>
 
       <form
-        className="mt-6 space-y-5"
+        className="mt-6 space-y-4"
         onSubmit={handleSubmit}
         noValidate
         aria-label="Login form"
       >
         {displayError && (
           <div
-            className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
             role="alert"
             aria-live="assertive"
           >
@@ -78,7 +78,7 @@ export default function LoginPage() {
         <div>
           <label
             htmlFor="username"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-foreground"
           >
             Username
           </label>
@@ -94,14 +94,14 @@ export default function LoginPage() {
             aria-required="true"
             aria-invalid={displayError ? 'true' : undefined}
             aria-describedby={displayError ? 'login-error' : undefined}
-            className="mt-1 block w-full glass-input disabled:cursor-not-allowed disabled:bg-gray-100/30 sm:text-sm"
+            className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-foreground"
           >
             Password
           </label>
@@ -116,14 +116,14 @@ export default function LoginPage() {
             disabled={isLoading}
             aria-required="true"
             aria-invalid={displayError ? 'true' : undefined}
-            className="mt-1 block w-full glass-input disabled:cursor-not-allowed disabled:bg-gray-100/30 sm:text-sm"
+            className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <div className="flex items-center justify-end">
           <Link
             href="/reset-password"
-            className="text-sm font-medium text-primary-600 hover:text-primary-500"
+            className="text-sm font-medium text-primary hover:text-primary/80"
           >
             Forgot password?
           </Link>
@@ -133,7 +133,7 @@ export default function LoginPage() {
           type="submit"
           disabled={isLoading}
           aria-busy={isLoading}
-          className="flex w-full justify-center btn-gradient rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">

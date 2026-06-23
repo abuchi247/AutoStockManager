@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 interface ModalProps {
   isOpen: boolean;
@@ -53,29 +54,31 @@ export function Modal({
   return (
     <div
       ref={overlayRef}
-      className="modal-overlay p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div
-        className={`modal-glass w-full ${sizeClasses[size]}`}
+        className={cn(
+          'w-full rounded-lg border border-border bg-background p-6 shadow-lg animate-fade-in',
+          sizeClasses[size]
+        )}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between border-b border-white/20 pb-4 mb-4">
-            <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
+          <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+            <h2 id="modal-title" className="text-lg font-semibold text-foreground">
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl p-1.5 text-gray-400 hover:bg-white/50 hover:text-gray-600
-                transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400/30"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Close modal"
             >
-              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
               </svg>
             </button>
@@ -83,11 +86,11 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className="text-gray-700">{children}</div>
+        <div className="text-sm text-foreground">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-white/20 pt-4 mt-4">
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 mt-4">
             {footer}
           </div>
         )}

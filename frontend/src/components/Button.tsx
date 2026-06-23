@@ -1,33 +1,42 @@
 'use client';
 
 import React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+const buttonVariants = cva(
+  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      },
+      size: {
+        sm: 'h-8 px-3 text-xs',
+        md: 'h-9 px-4 py-2',
+        lg: 'h-10 px-6 py-2 text-base',
+      },
+    },
+    defaultVariants: {
+      variant: 'primary',
+      size: 'md',
+    },
+  }
+);
+
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
   isLoading?: boolean;
   children: React.ReactNode;
 }
-
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    'btn-gradient text-white hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none',
-  secondary:
-    'bg-white/50 backdrop-blur-sm text-gray-700 border border-white/40 hover:bg-white/70 hover:shadow-glass-sm focus:ring-primary-400/30 disabled:opacity-50 disabled:text-gray-400',
-  danger:
-    'bg-gradient-to-r from-rose-500 to-pink-600 text-white hover:shadow-glow-accent disabled:opacity-50 disabled:cursor-not-allowed',
-  ghost:
-    'bg-transparent text-gray-600 hover:bg-white/40 hover:backdrop-blur-sm focus:ring-primary-400/30 disabled:text-gray-300',
-};
-
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3.5 py-1.5 text-sm',
-  md: 'px-5 py-2.5 text-sm',
-  lg: 'px-7 py-3 text-base',
-};
 
 export function Button({
   variant = 'primary',
@@ -40,16 +49,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`
-        inline-flex items-center justify-center rounded-xl font-semibold
-        transition-all duration-200 ease-out
-        focus:outline-none focus:ring-2 focus:ring-offset-1
-        hover:-translate-y-0.5 active:translate-y-0
-        ${variantClasses[variant]}
-        ${sizeClasses[size]}
-        ${isLoading ? 'cursor-wait opacity-70' : ''}
-        ${className}
-      `.trim()}
+      className={cn(buttonVariants({ variant, size }), className)}
       disabled={disabled || isLoading}
       {...props}
     >
@@ -81,4 +81,5 @@ export function Button({
   );
 }
 
+export { buttonVariants };
 export default Button;
