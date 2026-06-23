@@ -168,7 +168,7 @@ class PurchaseService:
             status=PurchaseOrderStatus.DRAFT,
             total_amount=Decimal("0.00"),
             notes=notes,
-            created_by=self.user_id,
+            created_by=str(self.user_id) if self.user_id else None,
         )
         self.db.add(po)
         await self.db.flush()
@@ -314,7 +314,7 @@ class PurchaseService:
             received_by=received_by,
             received_at=datetime.now(timezone.utc),
             notes=notes,
-            created_by=self.user_id,
+            created_by=str(self.user_id) if self.user_id else None,
         )
         self.db.add(grn)
         await self.db.flush()
@@ -350,7 +350,7 @@ class PurchaseService:
                 spare_part_id=po_item.spare_part_id,
                 quantity_received=quantity_received,
                 unit_cost=unit_cost,
-                created_by=self.user_id,
+                created_by=str(self.user_id) if self.user_id else None,
             )
             self.db.add(grn_item)
 
@@ -366,7 +366,7 @@ class PurchaseService:
                 remaining_quantity=quantity_received,
                 source_type="purchase",
                 source_reference_id=grn.id,
-                created_by=self.user_id,
+                created_by=str(self.user_id) if self.user_id else None,
             )
             self.db.add(cost_layer)
 

@@ -92,11 +92,11 @@ class SparePart(BaseModel, SoftDeleteMixin):
         comment="Manufacturer or brand name",
     )
 
-    category_id: Mapped[uuid.UUID] = mapped_column(
+    category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("categories.id"),
-        nullable=False,
-        comment="Primary category for this spare part",
+        nullable=True,
+        comment="Primary category for this spare part (optional)",
     )
 
     subcategory_id: Mapped[Optional[uuid.UUID]] = mapped_column(

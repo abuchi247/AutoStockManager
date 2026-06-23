@@ -25,12 +25,12 @@ from app.database import async_session_factory
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-VALID_ROLES = ["ADMIN", "MANAGER", "SALESPERSON", "STOREKEEPER"]
+VALID_ROLES = ["Admin", "Manager", "Salesperson", "Storekeeper"]
 
 
 async def create_user(username: str, password: str, email: str, role: str) -> None:
     """Create a new user or report if one already exists."""
-    role = role.upper()
+    role = role.capitalize()
     if role not in VALID_ROLES:
         print(f"Error: Invalid role '{role}'. Must be one of: {', '.join(VALID_ROLES)}")
         sys.exit(1)

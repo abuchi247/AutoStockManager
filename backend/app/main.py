@@ -25,6 +25,7 @@ from app.routers.reports import router as reports_router
 from app.routers.transfers import router as transfers_router
 from app.routers.users import router as users_router
 from app.routers.customers import router as customers_router
+from app.routers.locations import router as locations_router
 from app.routers.suppliers import router as suppliers_router
 from app.routers.purchases import router as purchases_router
 from app.routers.sales import router as sales_router
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(transfers_router)
     app.include_router(customers_router)
     app.include_router(suppliers_router)
+    app.include_router(locations_router)
     app.include_router(credit_router)
     app.include_router(sales_router)
     app.include_router(purchases_router)

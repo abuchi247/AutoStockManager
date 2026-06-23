@@ -109,8 +109,9 @@ class InventoryService:
         if data.barcode:
             await self._validate_unique_barcode(data.barcode)
 
-        # Validate category exists
-        await self._validate_category_exists(data.category_id)
+        # Validate category exists (if provided)
+        if data.category_id:
+            await self._validate_category_exists(data.category_id)
 
         # Validate subcategory exists (if provided)
         if data.subcategory_id:

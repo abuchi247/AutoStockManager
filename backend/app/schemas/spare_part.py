@@ -52,8 +52,8 @@ class SparePartCreate(BaseModel):
         description="Manufacturer or brand name",
         examples=["Bosch"],
     )
-    category_id: UUID = Field(
-        ...,
+    category_id: Optional[UUID] = Field(
+        default=None,
         description="Primary category UUID",
     )
     subcategory_id: Optional[UUID] = Field(
@@ -238,7 +238,7 @@ class SparePartResponse(BaseModel):
     name: str = Field(..., description="Product display name")
     description: Optional[str] = Field(default=None, description="Detailed description")
     brand: Optional[str] = Field(default=None, description="Manufacturer or brand")
-    category_id: UUID = Field(..., description="Primary category UUID")
+    category_id: Optional[UUID] = Field(default=None, description="Primary category UUID")
     subcategory_id: Optional[UUID] = Field(default=None, description="Subcategory UUID")
     vehicle_compatibility: Optional[list[str]] = Field(
         default=None, description="Compatible vehicles"
