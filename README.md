@@ -170,6 +170,34 @@ This system digitizes and streamlines operations for auto spare parts businesses
 | Notifications | `/api/v1/notifications` | List, mark read |
 | Barcodes | `/api/v1/barcodes` | Lookup, decode |
 
+## Creating Users
+
+This is an internal ERP system — there's no public signup. Admins create user accounts via the Settings page or the CLI script.
+
+### Using the CLI script
+
+```bash
+# Create an admin
+docker exec autostockmanager-backend python scripts/create_user.py \
+  --username admin --password Admin123! --role ADMIN --email admin@example.com
+
+# Create a manager
+docker exec autostockmanager-backend python scripts/create_user.py \
+  -u manager -p Manager1! -r MANAGER -e manager@example.com
+
+# Create a salesperson
+docker exec autostockmanager-backend python scripts/create_user.py \
+  -u sales1 -p Sales123! -r SALESPERSON -e sales@example.com
+
+# Create a storekeeper
+docker exec autostockmanager-backend python scripts/create_user.py \
+  -u store1 -p Store123! -r STOREKEEPER -e store@example.com
+```
+
+**Password requirements:** minimum 8 characters, at least one uppercase letter, one lowercase letter, and one digit.
+
+**Available roles:** `ADMIN`, `MANAGER`, `SALESPERSON`, `STOREKEEPER`
+
 ## Running Tests
 
 ```bash
