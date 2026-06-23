@@ -18,6 +18,7 @@ import {
   clearAuth,
   isTokenExpired,
   getRefreshToken,
+  decodeToken,
   StoredUser,
 } from '@/lib/auth';
 import type { LoginRequest, LoginResponse, UserRole } from '@/lib/types';
@@ -79,16 +80,19 @@ export function useAuth(): UseAuthReturn {
     setError(null);
 
     try {
-      const response = await api.post<{ data: LoginResponse }>('/auth/login', credentials);
-      const { access_token, refresh_token, user: userProfile } = response.data.data;
+      const response = await api.post<LoginResponse>('/auth/login', credentials);
+      const { access_token, refresh_token } = response.data;
 
       setTokens(access_token, refresh_token);
 
+      // Decode the JWT to get user info
+      const decoded = decodeToken(access_token) as { sub?: string; role?: string } | null;
+      
       const storedUser: StoredUser = {
-        id: userProfile.id,
-        username: userProfile.username,
-        email: userProfile.email,
-        role: userProfile.role,
+        id: decoded?.sub || '',
+        username: credentials.username,
+        email: '',
+        role: (decoded?.role || 'admin').toLowerCase(),
       };
 
       setStoredUser(storedUser);
@@ -131,10 +135,10 @@ export function useAuth(): UseAuthReturn {
 
     try {
       const response = await api.post<{
-        data: { access_token: string; refresh_token: string };
+        access_token: string; refresh_token: string;
       }>('/auth/refresh', { refresh_token: refreshToken });
 
-      const { access_token, refresh_token: newRefreshToken } = response.data.data;
+      const { access_token, refresh_token: newRefreshToken } = response.data;
       setTokens(access_token, newRefreshToken);
 
       // Refresh stored user if we have one
