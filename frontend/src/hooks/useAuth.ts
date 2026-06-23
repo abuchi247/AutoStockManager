@@ -122,6 +122,10 @@ export function useAuth(): UseAuthReturn {
       clearAuth();
       setUser(null);
       setError(null);
+      // Redirect to login page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   }, []);
 
