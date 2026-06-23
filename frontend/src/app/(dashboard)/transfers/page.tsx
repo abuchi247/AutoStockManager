@@ -1,0 +1,372 @@
+'use client';
+
+/**
+ * Transfer List Page
+ *
+ * Displays all transfers with filtering by status, create transfer modal,
+ * and links to transfer details.
+ *
+ * Requirements: 4.2, 4.4, 4.5, 4.6
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { get, post } from '@/lib/api';
+import {
+  DataTable,
+  Button,
+  Input,
+  Select,
+  Badge,
+  Alert,
+  Modal,
+} from '@/components';
+import type { Column, SelectOption, BadgeVariant } from '@/components';
+import type {
+  Transfer,
+  TransferCreate,
+  TransferStatus,
+  PaginatedResponse,
+  SparePart,
+  Location,
+} from '@/lib/types';
+
+const STATUS_OPTIONS: SelectOption[] = [
+  { value: '', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'received', label: 'Received' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+function getStatusBadge(status: TransferStatus): React.ReactNode {
+  const map: Record<TransferStatus, { variant: BadgeVariant; label: string }> = {
+    pending: { variant: 'warning', label: 'Pending' },
+    approved: { variant: 'info', label: 'Approved' },
+    in_transit: { variant: 'info', label: 'In Transit' },
+    received: { variant: 'success', label: 'Received' },
+    cancelled: { variant: 'danger', label: 'Cancelled' },
+  };
+  const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-NG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export default function TransfersPage() {
+  const router = useRouter();
+
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 20;
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('');
+
+  // Sort
+  const [sortField, setSortField] = useState<string>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Create modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<TransferCreate>({
+    spare_part_id: '',
+    source_location_id: '',
+    destination_location_id: '',
+    quantity: 1,
+  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Lookup data for modal
+  const [parts, setParts] = useState<SparePart[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  const fetchTransfers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
+      if (statusFilter) params.set('status', statusFilter);
+      if (sortField) params.set('sort_by', sortField);
+      if (sortDirection) params.set('sort_direction', sortDirection);
+
+      const response = await get<PaginatedResponse<Transfer>>(
+        `/transfers?${params.toString()}`
+      );
+      setTransfers(response.data);
+      setTotalPages(response.meta.total_pages);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load transfers';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, statusFilter, sortField, sortDirection]);
+
+  useEffect(() => {
+    fetchTransfers();
+  }, [fetchTransfers]);
+
+  const fetchLookupData = useCallback(async () => {
+    try {
+      const [partsRes, locationsRes] = await Promise.all([
+        get<PaginatedResponse<SparePart>>('/spare-parts?page_size=1000'),
+        get<PaginatedResponse<Location>>('/stock/locations?page_size=100'),
+      ]);
+      setParts(partsRes.data);
+      setLocations(locationsRes.data);
+    } catch {
+      // Silently fail - user can still see the list
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLookupData();
+  }, [fetchLookupData]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const handleCreateTransfer = async () => {
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      await post('/transfers', createForm);
+      setShowCreateModal(false);
+      setCreateForm({
+        spare_part_id: '',
+        source_location_id: '',
+        destination_location_id: '',
+        quantity: 1,
+      });
+      setSuccessMsg('Transfer created successfully');
+      fetchTransfers();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create transfer';
+      setCreateError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const partOptions: SelectOption[] = parts.map((p) => ({
+    value: p.id,
+    label: `${p.part_number} - ${p.name}`,
+  }));
+
+  const locationOptions: SelectOption[] = locations.map((l) => ({
+    value: l.id,
+    label: `${l.name} (${l.type})`,
+  }));
+
+  const columns: Column<Transfer>[] = [
+    {
+      key: 'spare_part',
+      header: 'Part',
+      render: (item) => (
+        <button
+          type="button"
+          className="text-left text-blue-600 hover:text-blue-800 hover:underline"
+          onClick={() => router.push(`/transfers/${item.id}`)}
+        >
+          {item.spare_part?.name ?? item.spare_part_id.slice(0, 8)}
+        </button>
+      ),
+    },
+    {
+      key: 'route',
+      header: 'From → To',
+      render: (item) => (
+        <span>
+          {item.source_location?.name ?? 'Unknown'} → {item.destination_location?.name ?? 'Unknown'}
+        </span>
+      ),
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      sortable: true,
+      render: (item) => <span className="font-medium">{item.quantity}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (item) => getStatusBadge(item.status),
+    },
+    {
+      key: 'requested_by',
+      header: 'Requested By',
+      render: (item) => <span>{item.requested_by?.slice(0, 8) ?? '—'}</span>,
+    },
+    {
+      key: 'created_at',
+      header: 'Date',
+      sortable: true,
+      render: (item) => <span>{formatDate(item.created_at)}</span>,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Transfers</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage inventory transfers between locations
+          </p>
+        </div>
+        <Button onClick={() => setShowCreateModal(true)}>
+          Create Transfer
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-48">
+          <Select
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by status"
+          />
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {error && (
+        <Alert variant="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {successMsg && (
+        <Alert variant="success" onClose={() => setSuccessMsg(null)}>
+          {successMsg}
+        </Alert>
+      )}
+
+      {/* Data table */}
+      <DataTable
+        columns={columns}
+        data={transfers as unknown as Record<string, unknown>[]}
+        isLoading={isLoading}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        emptyMessage="No transfers found. Create your first transfer to get started."
+      />
+
+      {/* Create Transfer Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setCreateError(null);
+        }}
+        title="Create Transfer"
+        size="lg"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCreateModal(false);
+                setCreateError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTransfer}
+              isLoading={isCreating}
+              disabled={
+                !createForm.spare_part_id ||
+                !createForm.source_location_id ||
+                !createForm.destination_location_id ||
+                createForm.quantity < 1
+              }
+            >
+              Create
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {createError && (
+            <Alert variant="error" onClose={() => setCreateError(null)}>
+              {createError}
+            </Alert>
+          )}
+          <Select
+            label="Part"
+            placeholder="Select a part"
+            options={partOptions}
+            value={createForm.spare_part_id}
+            onChange={(e) =>
+              setCreateForm({ ...createForm, spare_part_id: e.target.value })
+            }
+          />
+          <Select
+            label="Source Location"
+            placeholder="Select source location"
+            options={locationOptions}
+            value={createForm.source_location_id}
+            onChange={(e) =>
+              setCreateForm({ ...createForm, source_location_id: e.target.value })
+            }
+          />
+          <Select
+            label="Destination Location"
+            placeholder="Select destination location"
+            options={locationOptions.filter(
+              (l) => l.value !== createForm.source_location_id
+            )}
+            value={createForm.destination_location_id}
+            onChange={(e) =>
+              setCreateForm({ ...createForm, destination_location_id: e.target.value })
+            }
+          />
+          <Input
+            label="Quantity"
+            type="number"
+            min={1}
+            value={String(createForm.quantity)}
+            onChange={(e) =>
+              setCreateForm({
+                ...createForm,
+                quantity: Math.max(1, parseInt(e.target.value) || 1),
+              })
+            }
+          />
+        </div>
+      </Modal>
+    </div>
+  );
+}

@@ -1,0 +1,127 @@
+"""
+SQLAlchemy ORM models package.
+
+This package contains all database model definitions for the Auto Spare Parts
+ERP system. Models are organized by domain and all inherit from BaseModel
+(which provides audit columns) and optionally use SoftDeleteMixin for
+financial/important records that require soft-deletion.
+
+Exports:
+    BaseModel          - Abstract base with id, created_at, updated_at, created_by, updated_by
+    SoftDeleteMixin    - Mixin adding deleted_at, deleted_by for soft-delete support
+    SoftDeleteQuery    - Helper class for building soft-delete-aware queries
+    with_soft_delete_filter - Function to apply soft-delete filtering to any query
+    User               - User authentication and authorization model
+    Category           - Hierarchical category model
+    SparePart          - Spare part product model
+    LoginHistory       - Login attempt history model
+    InventoryMovementLedger - Append-only immutable ledger for stock movements
+    MovementType       - Enum of movement types (PURCHASE, SALE, TRANSFER_OUT, etc.)
+    ReferenceType      - Enum of reference document types (sale, grn, transfer, etc.)
+    CostLayer          - FIFO cost layer for inventory valuation
+    StockStatusCache   - Stock quantity cache per part per location
+    Sale               - Sale transaction model
+    SaleItem           - Sale line item model
+    SaleStatus         - Enum of sale lifecycle statuses
+    PaymentType        - Enum of payment types
+    CustomerCreditLedger - Append-only immutable ledger for customer credit transactions
+    CreditTransactionType - Enum of credit transaction types (SALE, PAYMENT, ADJUSTMENT, RETURN)
+    PurchaseOrder      - Purchase order model tracking supplier order lifecycle
+    PurchaseOrderItem  - Purchase order line item model
+    PurchaseOrderStatus - Enum of purchase order lifecycle statuses
+    Supplier           - Supplier profile model
+    SupplierAccountStatus - Enum of supplier account statuses
+    SupplierLedger     - Append-only immutable ledger for supplier financial transactions
+    SupplierTransactionType - Enum of supplier transaction types (PURCHASE, PAYMENT, ADJUSTMENT, RETURN)
+    AuditSession       - Audit session model for snapshot-based inventory auditing
+    AuditSnapshotItem  - Frozen stock quantities captured at audit initiation
+    AuditCount         - Physical count submitted during an audit session
+    AuditType          - Enum of audit types (CYCLE_COUNT, FULL_STOCK_COUNT)
+    AuditStatus        - Enum of audit session statuses (INITIATED, IN_PROGRESS, COMPLETED, CANCELLED)
+    Invoice            - Invoice model storing generated PDF data
+    InvoiceFormat      - Enum of invoice formats (A4, THERMAL)
+    Notification       - Per-user notification model with read/unread status
+    NotificationType   - Enum of notification types (LOW_STOCK, CREDIT_LIMIT_EXCEEDED, etc.)
+    AuditTrail         - Append-only audit trail model for recording critical actions
+    ActionType         - Enum of auditable action types (LOGIN, LOGOUT, CREATE, UPDATE, etc.)
+"""
+
+from app.models.base import BaseModel, SoftDeleteMixin, SoftDeleteQuery, with_soft_delete_filter
+from app.models.user import User, UserRole
+from app.models.category import Category
+from app.models.spare_part import SparePart
+from app.models.login_history import LoginHistory
+from app.models.inventory_movement_ledger import (
+    InventoryMovementLedger,
+    MovementType,
+    ReferenceType,
+)
+from app.models.cost_layer import CostLayer
+from app.models.stock_status_cache import StockStatusCache
+from app.models.sale import Sale, SaleItem, SaleStatus, PaymentType
+from app.models.transfer import Transfer, TransferStatus, VALID_TRANSFER_TRANSITIONS
+from app.models.customer import Customer, AccountStatus
+from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
+from app.models.supplier import Supplier, SupplierAccountStatus
+from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
+from app.models.goods_receipt_note import GoodsReceiptNote
+from app.models.grn_items import GRNItem
+from app.models.audit_session import (
+    AuditSession,
+    AuditSnapshotItem,
+    AuditCount,
+    AuditType,
+    AuditStatus,
+)
+from app.models.notification import Notification, NotificationType
+from app.models.invoice import Invoice, InvoiceFormat
+from app.models.audit_trail import AuditTrail, ActionType
+
+__all__ = [
+    "BaseModel",
+    "SoftDeleteMixin",
+    "SoftDeleteQuery",
+    "with_soft_delete_filter",
+    "User",
+    "UserRole",
+    "Category",
+    "SparePart",
+    "LoginHistory",
+    "InventoryMovementLedger",
+    "MovementType",
+    "ReferenceType",
+    "CostLayer",
+    "StockStatusCache",
+    "Sale",
+    "SaleItem",
+    "SaleStatus",
+    "PaymentType",
+    "Transfer",
+    "TransferStatus",
+    "VALID_TRANSFER_TRANSITIONS",
+    "CustomerCreditLedger",
+    "CreditTransactionType",
+    "Customer",
+    "AccountStatus",
+    "Supplier",
+    "SupplierAccountStatus",
+    "SupplierLedger",
+    "SupplierTransactionType",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderStatus",
+    "GoodsReceiptNote",
+    "GRNItem",
+    "AuditSession",
+    "AuditSnapshotItem",
+    "AuditCount",
+    "AuditType",
+    "AuditStatus",
+    "Invoice",
+    "InvoiceFormat",
+    "Notification",
+    "NotificationType",
+    "AuditTrail",
+    "ActionType",
+]
