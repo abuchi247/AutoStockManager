@@ -120,10 +120,10 @@ export default function DashboardPage() {
           />
         )}
 
-        {kpis?.pending_purchase_orders != null && (
+        {kpis?.pending_po_count != null && (
           <KPICard
             title="Pending Purchase Orders"
-            value={kpis.pending_purchase_orders.toString()}
+            value={kpis.pending_po_count.toString()}
             borderColor="#9C27B0"
           />
         )}
@@ -157,10 +157,10 @@ export default function DashboardPage() {
                       {index + 1}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-[#333]">
-                      {product.name}
+                      {product.part_name}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700">
-                      {product.quantity_sold.toLocaleString()}
+                      {Number(product.total_quantity_sold).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -199,11 +199,11 @@ function KPICard({ title, value, borderColor }: KPICardProps) {
 
 // --- Utility Functions ---
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number | string): string {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Number(amount));
 }

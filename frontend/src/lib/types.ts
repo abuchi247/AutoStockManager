@@ -547,16 +547,17 @@ export interface Notification {
 // --- Dashboard ---
 
 export interface DashboardKPIs {
-  total_sales_today: number;
-  total_sales_month: number;
-  outstanding_receivables: number;
+  total_sales_today: string | number;
+  total_sales_month: string | number;
+  outstanding_receivables: string | number;
   low_stock_count: number;
-  pending_purchase_orders: number;
+  pending_po_count: number;
   top_selling_products: Array<{
     spare_part_id: string;
-    name: string;
-    quantity_sold: number;
-  }>;
+    part_name: string;
+    part_number: string;
+    total_quantity_sold: string | number;
+  }> | null;
 }
 
 // --- Reports ---
