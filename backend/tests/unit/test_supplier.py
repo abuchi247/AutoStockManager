@@ -2,17 +2,21 @@
 
 Tests cover:
 - Supplier model creation and field validation
+- SupplierLedger model creation
 - SupplierService CRUD operations
 - SupplierService balance and aging calculations
+- SupplierService payment recording
 - Supplier router endpoints
 """
 
 import pytest
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from app.models.supplier import Supplier, SupplierAccountStatus
+from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
 from app.schemas.supplier import (
     SupplierCreate,
     SupplierUpdate,
@@ -94,6 +98,61 @@ class TestSupplierModel:
         repr_str = repr(supplier)
         assert "Test Supplier" in repr_str
         assert "Supplier" in repr_str
+
+
+class TestSupplierLedgerModel:
+    """Tests for the SupplierLedger SQLAlchemy model."""
+
+    def test_supplier_ledger_creation(self):
+        """SupplierLedger can be created with all required fields."""
+        entry = SupplierLedger(
+            supplier_id=uuid4(),
+            transaction_type=SupplierTransactionType.PURCHASE.value,
+            amount=Decimal("5000.00"),
+            reference_type="purchase_order",
+            reference_id=uuid4(),
+            created_by=uuid4(),
+        )
+        assert entry.amount == Decimal("5000.00")
+        assert entry.transaction_type == "PURCHASE"
+
+    def test_supplier_ledger_tablename(self):
+        """SupplierLedger model uses the correct table name."""
+        assert SupplierLedger.__tablename__ == "supplier_ledger"
+
+    def test_supplier_transaction_type_enum_values(self):
+        """SupplierTransactionType enum has expected values."""
+        assert SupplierTransactionType.PURCHASE.value == "PURCHASE"
+        assert SupplierTransactionType.PAYMENT.value == "PAYMENT"
+        assert SupplierTransactionType.ADJUSTMENT.value == "ADJUSTMENT"
+        assert SupplierTransactionType.RETURN.value == "RETURN"
+
+    def test_supplier_ledger_payment_negative_amount(self):
+        """Payment entries should use negative amounts."""
+        entry = SupplierLedger(
+            supplier_id=uuid4(),
+            transaction_type=SupplierTransactionType.PAYMENT.value,
+            amount=Decimal("-2000.00"),
+            reference_type="payment",
+            reference_id=uuid4(),
+            created_by=uuid4(),
+        )
+        assert entry.amount == Decimal("-2000.00")
+
+    def test_supplier_ledger_repr(self):
+        """SupplierLedger __repr__ contains key attributes."""
+        entry = SupplierLedger(
+            supplier_id=uuid4(),
+            transaction_type=SupplierTransactionType.PURCHASE.value,
+            amount=Decimal("1000.00"),
+            reference_type="purchase_order",
+            reference_id=uuid4(),
+            created_by=uuid4(),
+        )
+        entry.id = uuid4()
+        repr_str = repr(entry)
+        assert "SupplierLedger" in repr_str
+        assert "PURCHASE" in repr_str
 
 
 # =============================================================================
@@ -333,37 +392,123 @@ class TestSupplierService:
         assert result.deleted_by == "admin-1"
 
     @pytest.mark.asyncio
-    async def test_calculate_balance(self, service, mock_db):
-        """calculate_balance returns Decimal zero (placeholder)."""
+    async def test_calculate_balance_from_ledger(self, service, mock_db):
+        """calculate_balance returns sum from supplier ledger."""
         supplier_id = uuid4()
         existing_supplier = Supplier(name="Balance Test")
         existing_supplier.id = supplier_id
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = existing_supplier
-        mock_db.execute.return_value = mock_result
+        # First call: get_supplier (verify exists)
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+
+        # Second call: SUM query returns balance
+        mock_balance_result = MagicMock()
+        mock_balance_result.scalar.return_value = Decimal("3000.00")
+
+        mock_db.execute.side_effect = [mock_supplier_result, mock_balance_result]
+
+        balance = await service.calculate_balance(supplier_id)
+        assert balance == Decimal("3000.00")
+
+    @pytest.mark.asyncio
+    async def test_calculate_balance_no_entries(self, service, mock_db):
+        """calculate_balance returns 0.00 when no ledger entries exist."""
+        supplier_id = uuid4()
+        existing_supplier = Supplier(name="Empty Supplier")
+        existing_supplier.id = supplier_id
+
+        # First call: get_supplier
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+
+        # Second call: SUM returns coalesced 0
+        mock_balance_result = MagicMock()
+        mock_balance_result.scalar.return_value = Decimal("0.00")
+
+        mock_db.execute.side_effect = [mock_supplier_result, mock_balance_result]
 
         balance = await service.calculate_balance(supplier_id)
         assert balance == Decimal("0.00")
 
     @pytest.mark.asyncio
     async def test_calculate_aging(self, service, mock_db):
-        """calculate_aging returns aging buckets (placeholder)."""
+        """calculate_aging returns aging buckets with correct categorization."""
         supplier_id = uuid4()
         existing_supplier = Supplier(name="Aging Test")
         existing_supplier.id = supplier_id
 
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = existing_supplier
-        mock_db.execute.return_value = mock_result
+        now = datetime.now(timezone.utc)
 
-        aging = await service.calculate_aging(supplier_id)
+        # Create mock ledger entries
+        entry_current = MagicMock()
+        entry_current.amount = Decimal("1000.00")
+        entry_current.created_at = now  # Current (0 days)
+
+        entry_30_days = MagicMock()
+        entry_30_days.amount = Decimal("2000.00")
+        entry_30_days.created_at = now - timedelta(days=15)  # 1-30 days
+
+        entry_60_days = MagicMock()
+        entry_60_days.amount = Decimal("1500.00")
+        entry_60_days.created_at = now - timedelta(days=45)  # 31-60 days
+
+        # A payment of 500
+        entry_payment = MagicMock()
+        entry_payment.amount = Decimal("-500.00")
+        entry_payment.created_at = now - timedelta(days=5)
+
+        # First call: get_supplier
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+
+        # Second call: get all ledger entries (ordered by created_at)
+        mock_ledger_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [entry_60_days, entry_30_days, entry_payment, entry_current]
+        mock_ledger_result.scalars.return_value = mock_scalars
+
+        mock_db.execute.side_effect = [mock_supplier_result, mock_ledger_result]
+
+        aging = await service.calculate_aging(supplier_id, as_of_date=now)
+
         assert "current" in aging
         assert "days_1_30" in aging
         assert "days_31_60" in aging
         assert "days_61_90" in aging
         assert "days_over_90" in aging
         assert "total" in aging
+        # Payment of 500 applied FIFO to oldest debit (entry_60_days: 1500 -> 1000)
+        assert aging["days_31_60"] == Decimal("1000.00")
+        assert aging["days_1_30"] == Decimal("2000.00")
+        assert aging["current"] == Decimal("1000.00")
+        assert aging["total"] == Decimal("4000.00")
+
+    @pytest.mark.asyncio
+    async def test_calculate_aging_no_entries(self, service, mock_db):
+        """calculate_aging returns zero buckets when no ledger entries exist."""
+        supplier_id = uuid4()
+        existing_supplier = Supplier(name="Empty Aging")
+        existing_supplier.id = supplier_id
+
+        # First call: get_supplier
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+
+        # Second call: empty ledger entries
+        mock_ledger_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = []
+        mock_ledger_result.scalars.return_value = mock_scalars
+
+        mock_db.execute.side_effect = [mock_supplier_result, mock_ledger_result]
+
+        aging = await service.calculate_aging(supplier_id)
+        assert aging["current"] == Decimal("0.00")
+        assert aging["days_1_30"] == Decimal("0.00")
+        assert aging["days_31_60"] == Decimal("0.00")
+        assert aging["days_61_90"] == Decimal("0.00")
+        assert aging["days_over_90"] == Decimal("0.00")
         assert aging["total"] == Decimal("0.00")
 
     @pytest.mark.asyncio
@@ -375,3 +520,115 @@ class TestSupplierService:
 
         with pytest.raises(SupplierNotFoundError):
             await service.calculate_balance(uuid4())
+
+    @pytest.mark.asyncio
+    async def test_record_purchase_debit(self, service, mock_db):
+        """record_purchase_debit creates a positive ledger entry."""
+        supplier_id = uuid4()
+        existing_supplier = Supplier(name="Debit Test")
+        existing_supplier.id = supplier_id
+
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+        mock_db.execute.return_value = mock_supplier_result
+
+        reference_id = uuid4()
+        created_by = uuid4()
+
+        entry = await service.record_purchase_debit(
+            supplier_id=supplier_id,
+            amount=Decimal("5000.00"),
+            reference_id=reference_id,
+            created_by=created_by,
+            notes="PO-001 received",
+        )
+
+        mock_db.add.assert_called_once()
+        assert entry.amount == Decimal("5000.00")
+        assert entry.transaction_type == SupplierTransactionType.PURCHASE.value
+        assert entry.reference_type == "purchase_order"
+        assert entry.supplier_id == supplier_id
+
+    @pytest.mark.asyncio
+    async def test_record_purchase_debit_invalid_amount(self, service, mock_db):
+        """record_purchase_debit raises ValueError for non-positive amount."""
+        supplier_id = uuid4()
+        with pytest.raises(ValueError, match="Purchase debit amount must be positive"):
+            await service.record_purchase_debit(
+                supplier_id=supplier_id,
+                amount=Decimal("0"),
+                reference_id=uuid4(),
+                created_by=uuid4(),
+            )
+
+    @pytest.mark.asyncio
+    async def test_record_payment(self, service, mock_db):
+        """record_payment creates a negative ledger entry."""
+        supplier_id = uuid4()
+        existing_supplier = Supplier(name="Payment Test")
+        existing_supplier.id = supplier_id
+
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+        mock_db.execute.return_value = mock_supplier_result
+
+        reference_id = uuid4()
+        created_by = uuid4()
+
+        entry = await service.record_payment(
+            supplier_id=supplier_id,
+            amount=Decimal("2000.00"),
+            reference_id=reference_id,
+            created_by=created_by,
+            notes="Bank transfer payment",
+        )
+
+        mock_db.add.assert_called_once()
+        assert entry.amount == Decimal("-2000.00")
+        assert entry.transaction_type == SupplierTransactionType.PAYMENT.value
+        assert entry.reference_type == "payment"
+
+    @pytest.mark.asyncio
+    async def test_record_payment_invalid_amount(self, service, mock_db):
+        """record_payment raises ValueError for non-positive amount."""
+        supplier_id = uuid4()
+        with pytest.raises(ValueError, match="Payment amount must be positive"):
+            await service.record_payment(
+                supplier_id=supplier_id,
+                amount=Decimal("-100"),
+                reference_id=uuid4(),
+                created_by=uuid4(),
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_purchase_history(self, service, mock_db):
+        """get_purchase_history returns paginated purchase orders."""
+        supplier_id = uuid4()
+        existing_supplier = Supplier(name="History Test")
+        existing_supplier.id = supplier_id
+
+        # First call: get_supplier
+        mock_supplier_result = MagicMock()
+        mock_supplier_result.scalar_one_or_none.return_value = existing_supplier
+
+        # Second call: count
+        mock_count_result = MagicMock()
+        mock_count_result.scalar.return_value = 3
+
+        # Third call: list
+        mock_po1 = MagicMock()
+        mock_po2 = MagicMock()
+        mock_list_result = MagicMock()
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [mock_po1, mock_po2]
+        mock_list_result.scalars.return_value = mock_scalars
+
+        mock_db.execute.side_effect = [
+            mock_supplier_result,
+            mock_count_result,
+            mock_list_result,
+        ]
+
+        orders, total = await service.get_purchase_history(supplier_id)
+        assert total == 3
+        assert len(orders) == 2

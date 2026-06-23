@@ -31,6 +31,19 @@ Exports:
     PurchaseOrderStatus - Enum of purchase order lifecycle statuses
     Supplier           - Supplier profile model
     SupplierAccountStatus - Enum of supplier account statuses
+    SupplierLedger     - Append-only immutable ledger for supplier financial transactions
+    SupplierTransactionType - Enum of supplier transaction types (PURCHASE, PAYMENT, ADJUSTMENT, RETURN)
+    AuditSession       - Audit session model for snapshot-based inventory auditing
+    AuditSnapshotItem  - Frozen stock quantities captured at audit initiation
+    AuditCount         - Physical count submitted during an audit session
+    AuditType          - Enum of audit types (CYCLE_COUNT, FULL_STOCK_COUNT)
+    AuditStatus        - Enum of audit session statuses (INITIATED, IN_PROGRESS, COMPLETED, CANCELLED)
+    Invoice            - Invoice model storing generated PDF data
+    InvoiceFormat      - Enum of invoice formats (A4, THERMAL)
+    Notification       - Per-user notification model with read/unread status
+    NotificationType   - Enum of notification types (LOW_STOCK, CREDIT_LIMIT_EXCEEDED, etc.)
+    AuditTrail         - Append-only audit trail model for recording critical actions
+    ActionType         - Enum of auditable action types (LOGIN, LOGOUT, CREATE, UPDATE, etc.)
 """
 
 from app.models.base import BaseModel, SoftDeleteMixin, SoftDeleteQuery, with_soft_delete_filter
@@ -50,7 +63,20 @@ from app.models.transfer import Transfer, TransferStatus, VALID_TRANSFER_TRANSIT
 from app.models.customer import Customer, AccountStatus
 from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
 from app.models.supplier import Supplier, SupplierAccountStatus
+from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
+from app.models.goods_receipt_note import GoodsReceiptNote
+from app.models.grn_items import GRNItem
+from app.models.audit_session import (
+    AuditSession,
+    AuditSnapshotItem,
+    AuditCount,
+    AuditType,
+    AuditStatus,
+)
+from app.models.notification import Notification, NotificationType
+from app.models.invoice import Invoice, InvoiceFormat
+from app.models.audit_trail import AuditTrail, ActionType
 
 __all__ = [
     "BaseModel",
@@ -80,7 +106,22 @@ __all__ = [
     "AccountStatus",
     "Supplier",
     "SupplierAccountStatus",
+    "SupplierLedger",
+    "SupplierTransactionType",
     "PurchaseOrder",
     "PurchaseOrderItem",
     "PurchaseOrderStatus",
+    "GoodsReceiptNote",
+    "GRNItem",
+    "AuditSession",
+    "AuditSnapshotItem",
+    "AuditCount",
+    "AuditType",
+    "AuditStatus",
+    "Invoice",
+    "InvoiceFormat",
+    "Notification",
+    "NotificationType",
+    "AuditTrail",
+    "ActionType",
 ]

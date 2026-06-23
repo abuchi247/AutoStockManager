@@ -1,0 +1,464 @@
+'use client';
+
+/**
+ * Sale Detail Page
+ *
+ * Shows sale information, line items, and provides:
+ * - Confirm button (if DRAFT) with stock validation feedback
+ * - Return button (if CONFIRMED) with item selection for returns
+ *
+ * Requirements: 5.1, 5.3, 5.6, 5.7, 5.8
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { get, post } from '@/lib/api';
+import {
+  Button,
+  Badge,
+  Alert,
+  Modal,
+  LoadingSpinner,
+} from '@/components';
+import type { BadgeVariant } from '@/components';
+import type { Sale, SaleItem, SaleStatus, SaleReturnRequest } from '@/lib/types';
+
+function getStatusBadge(status: SaleStatus): React.ReactNode {
+  const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
+    draft: { variant: 'warning', label: 'Draft' },
+    confirmed: { variant: 'success', label: 'Confirmed' },
+    returned: { variant: 'info', label: 'Returned' },
+    cancelled: { variant: 'danger', label: 'Cancelled' },
+  };
+  const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-NG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+interface ReturnItem {
+  sale_item_id: string;
+  quantity: number;
+  max_quantity: number;
+  part_name: string;
+  reason: string;
+  selected: boolean;
+}
+
+export default function SaleDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const saleId = params.id as string;
+
+  const [sale, setSale] = useState<Sale | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Confirm state
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  // Return state
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
+  const [isReturning, setIsReturning] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+
+  const fetchSale = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await get<{ data: Sale }>(`/sales/${saleId}`);
+      setSale(response.data);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load sale details';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [saleId]);
+
+  useEffect(() => {
+    fetchSale();
+  }, [fetchSale]);
+
+  const handleConfirm = async () => {
+    setIsConfirming(true);
+    setError(null);
+    try {
+      await post<{ data: Sale }>(`/sales/${saleId}/confirm`);
+      setSuccess('Sale confirmed successfully. Stock has been deducted.');
+      fetchSale();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
+              ?.error?.message ?? 'Failed to confirm sale. Insufficient stock for one or more items.')
+          : 'Failed to confirm sale. Insufficient stock for one or more items.';
+      setError(message);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const openReturnModal = () => {
+    if (!sale?.items) return;
+    const items: ReturnItem[] = sale.items.map((item) => ({
+      sale_item_id: item.id,
+      quantity: item.quantity,
+      max_quantity: item.quantity,
+      part_name: item.spare_part?.name || `Item ${item.id.slice(0, 8)}`,
+      reason: '',
+      selected: false,
+    }));
+    setReturnItems(items);
+    setReturnError(null);
+    setShowReturnModal(true);
+  };
+
+  const toggleReturnItem = (index: number) => {
+    setReturnItems((items) =>
+      items.map((item, i) =>
+        i === index ? { ...item, selected: !item.selected } : item
+      )
+    );
+  };
+
+  const updateReturnQuantity = (index: number, qty: number) => {
+    setReturnItems((items) =>
+      items.map((item, i) =>
+        i === index ? { ...item, quantity: Math.min(Math.max(1, qty), item.max_quantity) } : item
+      )
+    );
+  };
+
+  const updateReturnReason = (index: number, reason: string) => {
+    setReturnItems((items) =>
+      items.map((item, i) =>
+        i === index ? { ...item, reason } : item
+      )
+    );
+  };
+
+  const handleReturn = async () => {
+    const selectedItems = returnItems.filter((item) => item.selected);
+    if (selectedItems.length === 0) {
+      setReturnError('Please select at least one item to return.');
+      return;
+    }
+
+    setIsReturning(true);
+    setReturnError(null);
+    try {
+      const payload: SaleReturnRequest = {
+        items: selectedItems.map((item) => ({
+          sale_item_id: item.sale_item_id,
+          quantity: item.quantity,
+          reason: item.reason || undefined,
+        })),
+      };
+      await post<{ data: Sale }>(`/sales/${saleId}/return`, payload);
+      setShowReturnModal(false);
+      setSuccess('Return processed successfully. Stock has been restored.');
+      fetchSale();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
+              ?.error?.message ?? 'Failed to process return.')
+          : 'Failed to process return.';
+      setReturnError(message);
+    } finally {
+      setIsReturning(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error && !sale) {
+    return (
+      <div className="p-6">
+        <Alert variant="error">{error}</Alert>
+        <div className="mt-4">
+          <Button variant="secondary" onClick={() => router.push('/sales')}>
+            Back to Sales
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sale) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Sale {sale.invoice_number || `DRAFT-${sale.id.slice(0, 8)}`}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Created {formatDate(sale.created_at)}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {sale.status === 'draft' && (
+            <Button
+              onClick={handleConfirm}
+              isLoading={isConfirming}
+            >
+              Confirm Sale
+            </Button>
+          )}
+          {sale.status === 'confirmed' && (
+            <Button
+              variant="danger"
+              onClick={openReturnModal}
+            >
+              Process Return
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => router.push('/sales')}>
+            Back to Sales
+          </Button>
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {error && (
+        <Alert variant="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert variant="success" onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+
+      {/* Sale info card */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Sale Information</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-sm font-medium text-gray-500">Status</p>
+            <div className="mt-1">{getStatusBadge(sale.status)}</div>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Customer</p>
+            <p className="mt-1 text-sm text-gray-900">
+              {sale.customer?.name ?? 'Walk-in'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Payment Type</p>
+            <p className="mt-1 text-sm capitalize text-gray-900">{sale.payment_type}</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Invoice Number</p>
+            <p className="mt-1 text-sm text-gray-900">
+              {sale.invoice_number || 'Not assigned (draft)'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Line items */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Line Items</h2>
+        {sale.items && sale.items.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Part
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Qty
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Unit Price
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Discount
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Line Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {sale.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <p className="font-medium text-gray-900">
+                        {item.spare_part?.name ?? `Part ${item.spare_part_id.slice(0, 8)}`}
+                      </p>
+                      {item.spare_part?.part_number && (
+                        <p className="text-gray-500">{item.spare_part.part_number}</p>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                      {item.quantity}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                      {formatCurrency(item.unit_price)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                      {item.discount_amount > 0
+                        ? formatCurrency(item.discount_amount)
+                        : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
+                      {formatCurrency(item.line_total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">No line items.</p>
+        )}
+
+        {/* Totals */}
+        <div className="mt-4 flex justify-end">
+          <div className="w-full max-w-xs space-y-2 rounded-md bg-gray-50 p-4">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Subtotal:</span>
+              <span>{formatCurrency(sale.subtotal)}</span>
+            </div>
+            {sale.discount_total > 0 && (
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Discount:</span>
+                <span className="text-red-600">-{formatCurrency(sale.discount_total)}</span>
+              </div>
+            )}
+            {sale.tax_amount > 0 && (
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Tax:</span>
+                <span>{formatCurrency(sale.tax_amount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
+              <span>Total:</span>
+              <span>{formatCurrency(sale.total_amount)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Return Modal */}
+      <Modal
+        isOpen={showReturnModal}
+        onClose={() => setShowReturnModal(false)}
+        title="Process Return"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowReturnModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleReturn}
+              isLoading={isReturning}
+            >
+              Process Return
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {returnError && (
+            <Alert variant="error" onClose={() => setReturnError(null)}>
+              {returnError}
+            </Alert>
+          )}
+          <p className="text-sm text-gray-600">
+            Select items to return and specify the quantity for each.
+          </p>
+          <div className="max-h-80 overflow-y-auto space-y-3">
+            {returnItems.map((item, index) => (
+              <div
+                key={item.sale_item_id}
+                className={`rounded-md border p-3 ${
+                  item.selected ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={item.selected}
+                    onChange={() => toggleReturnItem(index)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    aria-label={`Select ${item.part_name} for return`}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{item.part_name}</p>
+                    <p className="text-xs text-gray-500">
+                      Max returnable: {item.max_quantity}
+                    </p>
+                  </div>
+                  {item.selected && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500">Qty:</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={item.max_quantity}
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateReturnQuantity(index, parseInt(e.target.value) || 1)
+                        }
+                        className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        aria-label={`Return quantity for ${item.part_name}`}
+                      />
+                    </div>
+                  )}
+                </div>
+                {item.selected && (
+                  <div className="mt-2 ml-7">
+                    <input
+                      type="text"
+                      placeholder="Reason for return (optional)"
+                      value={item.reason}
+                      onChange={(e) => updateReturnReason(index, e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      aria-label={`Return reason for ${item.part_name}`}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}

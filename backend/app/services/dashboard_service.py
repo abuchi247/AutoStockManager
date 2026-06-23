@@ -1,0 +1,277 @@
+"""
+Dashboard service providing KPI widgets for the executive dashboard.
+
+This module implements role-based KPI queries for the dashboard including:
+- Total sales today and this month
+- Outstanding receivables
+- Low stock item count
+- Pending purchase orders count
+- Top selling products for the current month
+
+All KPI queries are designed using aggregate SQL functions (SUM, COUNT)
+to ensure data loads within 3 seconds.
+
+Satisfies Requirement 13.1: KPI widgets for sales, receivables, stock, POs, top products.
+Satisfies Requirement 13.2: All KPI data loads within 3 seconds.
+Satisfies Requirement 13.4: Role-based KPI visibility.
+"""
+
+import uuid
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Optional
+
+from sqlalchemy import func, select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.customer_credit_ledger import CustomerCreditLedger
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderStatus
+from app.models.sale import Sale, SaleItem, SaleStatus
+from app.models.spare_part import SparePart
+from app.models.stock_status_cache import StockStatusCache
+from app.models.user import UserRole
+
+
+class KPIData:
+    """Container for dashboard KPI data.
+
+    Attributes:
+        total_sales_today: Total confirmed sales amount for today.
+        total_sales_month: Total confirmed sales amount for the current month.
+        outstanding_receivables: Sum of outstanding customer credit balances.
+        low_stock_count: Count of spare parts below minimum stock level.
+        pending_po_count: Count of purchase orders in pending states.
+        top_selling_products: List of top selling products for the current month.
+    """
+
+    def __init__(
+        self,
+        total_sales_today: Decimal = Decimal("0.00"),
+        total_sales_month: Decimal = Decimal("0.00"),
+        outstanding_receivables: Optional[Decimal] = None,
+        low_stock_count: Optional[int] = None,
+        pending_po_count: Optional[int] = None,
+        top_selling_products: Optional[list[dict]] = None,
+    ):
+        self.total_sales_today = total_sales_today
+        self.total_sales_month = total_sales_month
+        self.outstanding_receivables = outstanding_receivables
+        self.low_stock_count = low_stock_count
+        self.pending_po_count = pending_po_count
+        self.top_selling_products = top_selling_products if top_selling_products is not None else []
+
+    def to_dict(self) -> dict:
+        """Convert KPI data to a serializable dictionary."""
+        result = {
+            "total_sales_today": str(self.total_sales_today),
+            "total_sales_month": str(self.total_sales_month),
+        }
+        if self.outstanding_receivables is not None:
+            result["outstanding_receivables"] = str(self.outstanding_receivables)
+        if self.low_stock_count is not None:
+            result["low_stock_count"] = self.low_stock_count
+        if self.pending_po_count is not None:
+            result["pending_po_count"] = self.pending_po_count
+        if self.top_selling_products is not None:
+            result["top_selling_products"] = self.top_selling_products
+        return result
+
+
+class DashboardService:
+    """Service for generating dashboard KPI data.
+
+    Implements role-based KPI visibility:
+    - Salesperson: sees only sales KPIs (total_sales_today, total_sales_month)
+    - Manager/Admin: sees all KPIs
+    - Storekeeper: sees low stock count and pending POs (inventory-related)
+
+    Satisfies Requirement 13.4: Role-based KPI visibility.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_kpis(self, user_role: str) -> KPIData:
+        """Retrieve KPI data based on user role.
+
+        Args:
+            user_role: The role of the requesting user (Admin, Manager, Salesperson, Storekeeper).
+
+        Returns:
+            KPIData with role-appropriate KPI values populated.
+
+        Satisfies Requirement 13.1: All KPI widgets.
+        Satisfies Requirement 13.2: Efficient aggregate queries for sub-3-second loading.
+        Satisfies Requirement 13.4: Role-based visibility filtering.
+        """
+        kpi_data = KPIData()
+
+        # Sales KPIs are visible to all roles
+        kpi_data.total_sales_today = await self._get_total_sales_today()
+        kpi_data.total_sales_month = await self._get_total_sales_month()
+
+        # Manager and Admin see all KPIs
+        if user_role in (UserRole.ADMIN.value, UserRole.MANAGER.value):
+            kpi_data.outstanding_receivables = await self._get_outstanding_receivables()
+            kpi_data.low_stock_count = await self._get_low_stock_count()
+            kpi_data.pending_po_count = await self._get_pending_po_count()
+            kpi_data.top_selling_products = await self._get_top_selling_products()
+
+        # Salesperson sees only sales KPIs (already populated above)
+        # Storekeeper sees inventory-related KPIs
+        elif user_role == UserRole.STOREKEEPER.value:
+            kpi_data.low_stock_count = await self._get_low_stock_count()
+            kpi_data.pending_po_count = await self._get_pending_po_count()
+
+        return kpi_data
+
+    async def _get_total_sales_today(self) -> Decimal:
+        """Get the sum of confirmed sale total_amount for today.
+
+        Uses an aggregate SUM query filtered by status=CONFIRMED and
+        created_at date = today (UTC).
+
+        Returns:
+            Total sales amount for today, or 0.00 if no sales.
+        """
+        today = date.today()
+        stmt = select(
+            func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
+        ).where(
+            and_(
+                Sale.status == SaleStatus.CONFIRMED,
+                func.date(Sale.created_at) == today,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or Decimal("0.00")
+
+    async def _get_total_sales_month(self) -> Decimal:
+        """Get the sum of confirmed sale total_amount for the current month.
+
+        Uses an aggregate SUM query filtered by status=CONFIRMED and
+        created_at within the current calendar month (UTC).
+
+        Returns:
+            Total sales amount for this month, or 0.00 if no sales.
+        """
+        today = date.today()
+        first_of_month = today.replace(day=1)
+        stmt = select(
+            func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
+        ).where(
+            and_(
+                Sale.status == SaleStatus.CONFIRMED,
+                func.date(Sale.created_at) >= first_of_month,
+                func.date(Sale.created_at) <= today,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or Decimal("0.00")
+
+    async def _get_outstanding_receivables(self) -> Decimal:
+        """Get the total outstanding customer receivables.
+
+        Outstanding receivables = SUM of all entries in the customer credit
+        ledger. Positive amounts are debits (charges), negative are credits
+        (payments). The net sum represents total outstanding balance.
+
+        Returns:
+            Total outstanding receivables, or 0.00 if none.
+        """
+        stmt = select(
+            func.coalesce(func.sum(CustomerCreditLedger.amount), Decimal("0.00"))
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or Decimal("0.00")
+
+    async def _get_low_stock_count(self) -> int:
+        """Get the count of spare parts with stock below minimum level.
+
+        Joins StockStatusCache with SparePart to compare current_quantity
+        against min_stock_level. Counts items where current stock is below
+        the defined minimum threshold.
+
+        Returns:
+            Count of low-stock items.
+        """
+        stmt = select(func.count()).select_from(StockStatusCache).join(
+            SparePart,
+            StockStatusCache.spare_part_id == SparePart.id,
+        ).where(
+            StockStatusCache.current_quantity < SparePart.min_stock_level
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
+
+    async def _get_pending_po_count(self) -> int:
+        """Get the count of purchase orders in pending states.
+
+        Counts POs with status in (DRAFT, APPROVED, ORDERED) — these are
+        not yet fully received or cancelled.
+
+        Returns:
+            Count of pending purchase orders.
+        """
+        pending_statuses = [
+            PurchaseOrderStatus.DRAFT,
+            PurchaseOrderStatus.APPROVED,
+            PurchaseOrderStatus.ORDERED,
+        ]
+        stmt = select(func.count()).select_from(PurchaseOrder).where(
+            PurchaseOrder.status.in_(pending_statuses)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
+
+    async def _get_top_selling_products(self, limit: int = 5) -> list[dict]:
+        """Get the top selling products for the current month.
+
+        Groups SaleItem by spare_part_id for confirmed sales in the current
+        month, orders by total quantity sold descending, and returns the top N.
+
+        Args:
+            limit: Maximum number of products to return (default 5).
+
+        Returns:
+            List of dicts with spare_part_id, part_name, and total_quantity_sold.
+        """
+        today = date.today()
+        first_of_month = today.replace(day=1)
+
+        stmt = (
+            select(
+                SaleItem.spare_part_id,
+                SparePart.name.label("part_name"),
+                SparePart.part_number.label("part_number"),
+                func.sum(SaleItem.quantity).label("total_quantity_sold"),
+            )
+            .join(Sale, SaleItem.sale_id == Sale.id)
+            .join(SparePart, SaleItem.spare_part_id == SparePart.id)
+            .where(
+                and_(
+                    Sale.status == SaleStatus.CONFIRMED,
+                    func.date(Sale.created_at) >= first_of_month,
+                    func.date(Sale.created_at) <= today,
+                )
+            )
+            .group_by(
+                SaleItem.spare_part_id,
+                SparePart.name,
+                SparePart.part_number,
+            )
+            .order_by(func.sum(SaleItem.quantity).desc())
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "spare_part_id": str(row.spare_part_id),
+                "part_name": row.part_name,
+                "part_number": row.part_number,
+                "total_quantity_sold": str(row.total_quantity_sold),
+            }
+            for row in rows
+        ]
