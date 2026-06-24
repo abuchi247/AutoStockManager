@@ -81,29 +81,17 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 5. **Create admin user**
    ```bash
-   docker exec autostockmanager-backend python -c "
-   import asyncio, uuid
-   from datetime import datetime, timezone
-   from passlib.context import CryptContext
-   from sqlalchemy import text
-   from app.database import async_session_factory
-
-   pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
-
-   async def create_admin():
-       async with async_session_factory() as session:
-           await session.execute(text('''
-               INSERT INTO users (id, username, email, password_hash, role, is_active, failed_login_attempts, created_at, updated_at)
-               VALUES (:id, :username, :email, :pw, :role, true, 0, :now, :now)
-           '''), {'id': uuid.uuid4(), 'username': 'admin', 'email': 'admin@autostockmanager.com',
-                  'pw': pwd_context.hash('Admin123!'), 'role': 'ADMIN', 'now': datetime.now(timezone.utc)})
-           await session.commit()
-           print('Admin created - username: admin, password: Admin123!')
-   asyncio.run(create_admin())
-   "
+   docker exec autostockmanager-backend python scripts/create_user.py \
+     --username admin --password Admin123! --role Admin --email admin@autostockmanager.com
    ```
 
-6. **Access the application**
+6. **Seed default categories**
+   ```bash
+   docker exec autostockmanager-backend python scripts/seed_categories.py
+   ```
+   This creates 10 parent categories (Brakes, Filters, Engine Parts, etc.) with 35 subcategories.
+
+7. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Docs (Swagger): http://localhost:8000/docs
@@ -179,24 +167,24 @@ This is an internal ERP system — there's no public signup. Admins create user 
 ```bash
 # Create an admin
 docker exec autostockmanager-backend python scripts/create_user.py \
-  --username admin --password Admin123! --role ADMIN --email admin@example.com
+  --username admin --password Admin123! --role Admin --email admin@example.com
 
 # Create a manager
 docker exec autostockmanager-backend python scripts/create_user.py \
-  -u manager -p Manager1! -r MANAGER -e manager@example.com
+  -u manager -p Manager1! -r Manager -e manager@example.com
 
 # Create a salesperson
 docker exec autostockmanager-backend python scripts/create_user.py \
-  -u sales1 -p Sales123! -r SALESPERSON -e sales@example.com
+  -u sales1 -p Sales123! -r Salesperson -e sales@example.com
 
 # Create a storekeeper
 docker exec autostockmanager-backend python scripts/create_user.py \
-  -u store1 -p Store123! -r STOREKEEPER -e store@example.com
+  -u store1 -p Store123! -r Storekeeper -e store@example.com
 ```
 
 **Password requirements:** minimum 8 characters, at least one uppercase letter, one lowercase letter, and one digit.
 
-**Available roles:** `ADMIN`, `MANAGER`, `SALESPERSON`, `STOREKEEPER`
+**Available roles:** `Admin`, `Manager`, `Salesperson`, `Storekeeper`
 
 ## Running Tests
 
