@@ -15,9 +15,11 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.models.stock_status_cache import StockStatusCache
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
 from app.schemas.spare_part import (
@@ -67,8 +69,29 @@ async def list_spare_parts(
     service = _get_inventory_service(db)
     spare_parts, total = await service.list_spare_parts(page=page, page_size=page_size)
 
+    # Get total stock for each part from cache
+    part_ids = [sp.id for sp in spare_parts]
+    stock_map: dict = {}
+    if part_ids:
+        stock_stmt = (
+            select(
+                StockStatusCache.spare_part_id,
+                func.sum(StockStatusCache.current_quantity).label("total_stock"),
+            )
+            .filter(StockStatusCache.spare_part_id.in_(part_ids))
+            .group_by(StockStatusCache.spare_part_id)
+        )
+        stock_result = await db.execute(stock_stmt)
+        stock_map = {row.spare_part_id: row.total_stock for row in stock_result}
+
+    data = []
+    for sp in spare_parts:
+        resp = SparePartResponse.model_validate(sp)
+        resp.total_stock = stock_map.get(sp.id)
+        data.append(resp)
+
     return SparePartListResponse(
-        data=[SparePartResponse.model_validate(sp) for sp in spare_parts],
+        data=data,
         meta={"page": page, "total": total, "page_size": page_size},
     )
 
@@ -210,7 +233,17 @@ async def get_spare_part(
 
     try:
         spare_part = await service.get_spare_part(spare_part_id)
-        return SparePartResponse.model_validate(spare_part)
+        resp = SparePartResponse.model_validate(spare_part)
+
+        # Get total stock from cache
+        stock_stmt = (
+            select(func.sum(StockStatusCache.current_quantity).label("total_stock"))
+            .filter(StockStatusCache.spare_part_id == spare_part_id)
+        )
+        stock_result = await db.execute(stock_stmt)
+        resp.total_stock = stock_result.scalar()
+
+        return resp
     except SparePartNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

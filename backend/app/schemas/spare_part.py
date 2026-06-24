@@ -249,6 +249,7 @@ class SparePartResponse(BaseModel):
     min_stock_level: Decimal = Field(..., description="Minimum stock threshold")
     max_stock_level: Decimal = Field(..., description="Maximum stock capacity")
     reorder_quantity: Decimal = Field(..., description="Default reorder quantity")
+    total_stock: Optional[Decimal] = Field(default=None, description="Total stock across all locations")
     category: Optional[CategoryResponse] = Field(
         default=None, description="Category details"
     )

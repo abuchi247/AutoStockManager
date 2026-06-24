@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { get, put } from '@/lib/api';
+import { get, put, post } from '@/lib/api';
 import {
   Button,
   Input,
@@ -30,6 +30,17 @@ export default function InventoryDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editData, setEditData] = useState<SparePartUpdate>({});
+
+  // Stock adjustment state
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [adjustData, setAdjustData] = useState({
+    location_id: '',
+    quantity: 0,
+    reason: 'Initial stock entry',
+  });
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
 
   const fetchPart = useCallback(async () => {
     setIsLoading(true);
@@ -64,10 +75,20 @@ export default function InventoryDetailPage() {
     }
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    try {
+      const response = await get<{ data: Array<{ id: string; name: string }>; meta: { page: number; total: number; page_size: number } }>('/locations?page_size=100');
+      setLocations(response.data);
+    } catch {
+      // Optional
+    }
+  }, []);
+
   useEffect(() => {
     fetchPart();
     fetchCategories();
-  }, [fetchPart, fetchCategories]);
+    fetchLocations();
+  }, [fetchPart, fetchCategories, fetchLocations]);
 
   const handleEdit = () => {
     if (!part) return;
@@ -110,6 +131,38 @@ export default function InventoryDetailPage() {
       setEditError(message);
     } finally {
       setIsEditing(false);
+    }
+  };
+
+  const handleStockAdjust = async () => {
+    setIsAdjusting(true);
+    setAdjustError(null);
+    try {
+      await post('/stock/adjust', {
+        spare_part_id: partId,
+        location_id: adjustData.location_id,
+        quantity: adjustData.quantity,
+        reason: adjustData.reason,
+      });
+      setShowAdjustModal(false);
+      setAdjustData({ location_id: '', quantity: 0, reason: 'Initial stock entry' });
+      fetchPart();
+    } catch (err: unknown) {
+      let message = 'Failed to adjust stock';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string | Array<{ msg: string; loc: string[] }> } } };
+        const detail = axiosErr.response?.data?.detail;
+        if (typeof detail === 'string') {
+          message = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          message = detail.map((d) => `${d.loc?.[d.loc.length - 1] || 'field'}: ${d.msg}`).join(', ');
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setAdjustError(message);
+    } finally {
+      setIsAdjusting(false);
     }
   };
 
@@ -159,7 +212,12 @@ export default function InventoryDetailPage() {
             <p className="text-sm text-gray-500">Part # {part.part_number}</p>
           </div>
         </div>
-        <Button onClick={handleEdit}>Edit Part</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowAdjustModal(true)}>
+            Adjust Stock
+          </Button>
+          <Button onClick={handleEdit}>Edit Part</Button>
+        </div>
       </div>
 
       {/* Detail cards */}
@@ -372,6 +430,66 @@ export default function InventoryDetailPage() {
               placeholder="e.g. OEM quality front brake pad set for Toyota Corolla 2018-2023"
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* Stock Adjustment Modal */}
+      <Modal
+        isOpen={showAdjustModal}
+        onClose={() => {
+          setShowAdjustModal(false);
+          setAdjustError(null);
+        }}
+        title="Adjust Stock"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowAdjustModal(false); setAdjustError(null); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStockAdjust}
+              isLoading={isAdjusting}
+              disabled={!adjustData.location_id || adjustData.quantity === 0}
+            >
+              Apply Adjustment
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {adjustError && (
+            <Alert variant="error" onClose={() => setAdjustError(null)}>
+              {adjustError}
+            </Alert>
+          )}
+          <p className="text-sm text-gray-500">
+            Add or remove stock for <strong>{part.name}</strong>. Use a positive number to add stock, negative to remove.
+          </p>
+          <Select
+            label="Location"
+            options={[
+              { value: '', label: 'Select a location' },
+              ...locations.map((l) => ({ value: l.id, label: l.name })),
+            ]}
+            value={adjustData.location_id}
+            onChange={(e) => setAdjustData({ ...adjustData, location_id: e.target.value })}
+            required
+          />
+          <Input
+            label="Quantity"
+            type="number"
+            value={adjustData.quantity}
+            onChange={(e) => setAdjustData({ ...adjustData, quantity: parseInt(e.target.value) || 0 })}
+            required
+            placeholder="e.g. 50 (positive to add, negative to remove)"
+          />
+          <Input
+            label="Reason"
+            value={adjustData.reason}
+            onChange={(e) => setAdjustData({ ...adjustData, reason: e.target.value })}
+            placeholder="e.g. Initial stock entry, Physical count correction"
+          />
         </div>
       </Modal>
     </div>

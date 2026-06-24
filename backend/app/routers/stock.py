@@ -1,7 +1,8 @@
-"""Stock query router for reading stock levels from the cache.
+"""Stock query router for reading stock levels and making adjustments.
 
-Provides the following endpoint:
-- GET /api/v1/stock/locations/{id} - Get stock at a specific location
+Provides the following endpoints:
+- GET  /api/v1/stock/locations/{id} - Get stock at a specific location
+- POST /api/v1/stock/adjust         - Make a manual stock adjustment
 
 Reads from Stock_Status_Cache for performant stock queries rather than
 computing quantities from the full movement ledger.
@@ -9,15 +10,151 @@ computing quantities from the full movement ledger.
 Satisfies Requirements: 18.1, 18.3, 18.8
 """
 
+import uuid as uuid_mod
+from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import DbSession
+from app.middleware.auth import require_roles
+from app.models.user import User, UserRole
+from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType, ReferenceType
+from app.models.stock_status_cache import StockStatusCache
+from app.models.spare_part import SparePart
+from app.models.location import Location
 from app.schemas.stock import StockItemResponse, StockLocationResponse
 from app.services.stock_service import LocationNotFoundError, StockService
 
 router = APIRouter(prefix="/api/v1/stock", tags=["Stock"])
+
+
+class StockAdjustmentRequest(BaseModel):
+    """Request body for manual stock adjustment."""
+    spare_part_id: UUID = Field(..., description="The spare part to adjust")
+    location_id: UUID = Field(..., description="The location where stock is being adjusted")
+    quantity: int = Field(..., description="Quantity to add (positive) or remove (negative)")
+    reason: str = Field(default="Manual adjustment", max_length=500, description="Reason for the adjustment")
+
+
+class StockAdjustmentResponse(BaseModel):
+    """Response for a stock adjustment."""
+    spare_part_id: UUID
+    location_id: UUID
+    quantity_change: int
+    new_quantity: float
+    reason: str
+    movement_id: UUID
+
+
+@router.post(
+    "/adjust",
+    response_model=StockAdjustmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Make a stock adjustment",
+    description="Manually adjust stock for a spare part at a specific location. "
+    "Use positive quantities to add stock, negative to remove. Admin or Storekeeper only.",
+    responses={
+        404: {"description": "Spare part or location not found"},
+        400: {"description": "Insufficient stock for negative adjustment"},
+    },
+)
+async def adjust_stock(
+    request: StockAdjustmentRequest,
+    db: DbSession,
+    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.STOREKEEPER, UserRole.MANAGER)),
+) -> StockAdjustmentResponse:
+    """Make a manual stock adjustment.
+
+    Creates a ledger entry and updates the stock status cache.
+    Used for initial stock setup, corrections, or write-offs.
+    """
+    # Validate spare part exists
+    part_result = await db.execute(
+        select(SparePart).filter_by(id=request.spare_part_id, deleted_at=None)
+    )
+    part = part_result.scalar_one_or_none()
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spare part not found",
+        )
+
+    # Validate location exists
+    location_result = await db.execute(
+        select(Location).filter_by(id=request.location_id, deleted_at=None)
+    )
+    location = location_result.scalar_one_or_none()
+    if location is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Location not found",
+        )
+
+    # Get or create stock cache entry
+    cache_result = await db.execute(
+        select(StockStatusCache).filter_by(
+            spare_part_id=request.spare_part_id,
+            location_id=request.location_id,
+        )
+    )
+    cache = cache_result.scalar_one_or_none()
+
+    current_qty = float(cache.current_quantity) if cache else 0.0
+
+    # Validate negative adjustments don't go below zero
+    if request.quantity < 0 and (current_qty + request.quantity) < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient stock. Current: {current_qty}, adjustment: {request.quantity}",
+        )
+
+    # Create ledger entry
+    movement_id = uuid_mod.uuid4()
+    now = datetime.now(timezone.utc)
+    ledger_entry = InventoryMovementLedger(
+        id=movement_id,
+        spare_part_id=request.spare_part_id,
+        location_id=request.location_id,
+        quantity_change=Decimal(str(request.quantity)),
+        movement_type=MovementType.ADJUSTMENT.value,
+        reference_type="adjustment",
+        reference_id=movement_id,
+        unit_cost=Decimal(str(part.cost_price)) if part.cost_price else Decimal("0"),
+        created_by=current_user.id,
+        created_at=now,
+    )
+    db.add(ledger_entry)
+
+    # Update stock cache
+    new_qty = current_qty + request.quantity
+    if cache:
+        cache.current_quantity = Decimal(str(new_qty))
+        cache.updated_at = now
+    else:
+        new_cache = StockStatusCache(
+            id=uuid_mod.uuid4(),
+            spare_part_id=request.spare_part_id,
+            location_id=request.location_id,
+            current_quantity=Decimal(str(new_qty)),
+            updated_at=now,
+        )
+        db.add(new_cache)
+
+    await db.commit()
+
+    return StockAdjustmentResponse(
+        spare_part_id=request.spare_part_id,
+        location_id=request.location_id,
+        quantity_change=request.quantity,
+        new_quantity=new_qty,
+        reason=request.reason,
+        movement_id=movement_id,
+    )
 
 
 @router.get(
