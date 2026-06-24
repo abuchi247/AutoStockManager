@@ -30,6 +30,6 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Run the application with uvicorn
-# Railway injects PORT env var; fall back to 8000 for local dev
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run the application with uvicorn on port 8000
+# PORT=8000 must be set as a Railway service variable to match
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
