@@ -57,6 +57,7 @@ export default function InventoryDetailPage() {
     reference_type: string;
     reference_id: string;
     created_by: string;
+    created_by_username: string | null;
     created_at: string;
   }
   const [movements, setMovements] = useState<MovementItem[]>([]);
@@ -441,6 +442,7 @@ export default function InventoryDetailPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Location</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Type</th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Quantity</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">By</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Reference</th>
                   </tr>
                 </thead>
@@ -467,6 +469,9 @@ export default function InventoryDetailPage() {
                         m.quantity_change >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {m.quantity_change >= 0 ? '+' : ''}{m.quantity_change}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+                        {m.created_by_username || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                         {m.reference_type}

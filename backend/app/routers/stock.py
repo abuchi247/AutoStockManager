@@ -227,6 +227,7 @@ class MovementHistoryItem(BaseModel):
     reference_type: str
     reference_id: UUID
     created_by: UUID
+    created_by_username: Optional[str] = None
     created_at: datetime
 
 
@@ -304,8 +305,9 @@ async def get_movement_history(
     # Fetch paginated movements with location names
     offset = (page - 1) * page_size
     stmt = (
-        select(InventoryMovementLedger, Location.name.label("location_name"))
+        select(InventoryMovementLedger, Location.name.label("location_name"), User.username.label("created_by_username"))
         .outerjoin(Location, InventoryMovementLedger.location_id == Location.id)
+        .outerjoin(User, InventoryMovementLedger.created_by == User.id)
         .where(InventoryMovementLedger.spare_part_id == spare_part_id)
         .order_by(InventoryMovementLedger.created_at.desc())
         .offset(offset)
@@ -324,6 +326,7 @@ async def get_movement_history(
             reference_type=row.InventoryMovementLedger.reference_type,
             reference_id=row.InventoryMovementLedger.reference_id,
             created_by=row.InventoryMovementLedger.created_by,
+            created_by_username=row.created_by_username,
             created_at=row.InventoryMovementLedger.created_at,
         )
         for row in rows
