@@ -156,7 +156,18 @@ export default function SettingsPage() {
       });
       fetchUsers();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create user';
+      let message = 'Failed to create user';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string | Array<{ msg: string; loc: string[] }> } } };
+        const detail = axiosErr.response?.data?.detail;
+        if (typeof detail === 'string') {
+          message = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          message = detail.map((d) => `${d.loc?.[d.loc.length - 1] || 'field'}: ${d.msg}`).join(', ');
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setCreateError(message);
     } finally {
       setIsCreating(false);
@@ -190,7 +201,18 @@ export default function SettingsPage() {
       setEditData({});
       fetchUsers();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update user';
+      let message = 'Failed to update user';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string | Array<{ msg: string; loc: string[] }> } } };
+        const detail = axiosErr.response?.data?.detail;
+        if (typeof detail === 'string') {
+          message = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          message = detail.map((d) => `${d.loc?.[d.loc.length - 1] || 'field'}: ${d.msg}`).join(', ');
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setEditError(message);
     } finally {
       setIsEditing(false);
@@ -382,6 +404,7 @@ export default function SettingsPage() {
                 setNewUser({ ...newUser, password: e.target.value })
               }
               required
+              placeholder="Min 8 chars, 1 uppercase, 1 lowercase, 1 digit"
             />
             <Select
               label="Role"
