@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { get, put, post } from '@/lib/api';
+import { get, put, post, del } from '@/lib/api';
 import {
   Button,
   Input,
@@ -41,6 +41,44 @@ export default function InventoryDetailPage() {
     reason: 'Initial stock entry',
   });
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+
+  // Delete state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Movement history state
+  interface MovementItem {
+    id: string;
+    location_id: string;
+    location_name: string | null;
+    quantity_change: number;
+    movement_type: string;
+    reference_type: string;
+    reference_id: string;
+    created_by: string;
+    created_at: string;
+  }
+  const [movements, setMovements] = useState<MovementItem[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+  const [movementsPage, setMovementsPage] = useState(1);
+  const [movementsTotalPages, setMovementsTotalPages] = useState(1);
+
+  // Cost layers state
+  interface CostLayerItem {
+    id: string;
+    location_id: string;
+    location_name: string | null;
+    unit_cost: number;
+    original_quantity: number;
+    remaining_quantity: number;
+    source_type: string;
+    created_at: string;
+  }
+  const [costLayers, setCostLayers] = useState<CostLayerItem[]>([]);
+  const [costLayersLoading, setCostLayersLoading] = useState(false);
+  const [costLayersPage, setCostLayersPage] = useState(1);
+  const [costLayersTotalPages, setCostLayersTotalPages] = useState(1);
 
   const fetchPart = useCallback(async () => {
     setIsLoading(true);
@@ -84,11 +122,49 @@ export default function InventoryDetailPage() {
     }
   }, []);
 
+  const fetchMovements = useCallback(async () => {
+    setMovementsLoading(true);
+    try {
+      const response = await get<{ data: MovementItem[]; meta: { page: number; total: number; page_size: number } }>(
+        `/stock/movements/${partId}?page=${movementsPage}&page_size=10`
+      );
+      setMovements(response.data);
+      setMovementsTotalPages(Math.ceil((response.meta.total || 0) / 10));
+    } catch {
+      // Non-critical
+    } finally {
+      setMovementsLoading(false);
+    }
+  }, [partId, movementsPage]);
+
+  const fetchCostLayers = useCallback(async () => {
+    setCostLayersLoading(true);
+    try {
+      const response = await get<{ data: CostLayerItem[]; meta: { page: number; total: number; page_size: number } }>(
+        `/stock/cost-layers/${partId}?page=${costLayersPage}&page_size=10`
+      );
+      setCostLayers(response.data);
+      setCostLayersTotalPages(Math.ceil((response.meta.total || 0) / 10));
+    } catch {
+      // Non-critical
+    } finally {
+      setCostLayersLoading(false);
+    }
+  }, [partId, costLayersPage]);
+
   useEffect(() => {
     fetchPart();
     fetchCategories();
     fetchLocations();
   }, [fetchPart, fetchCategories, fetchLocations]);
+
+  useEffect(() => {
+    fetchMovements();
+  }, [fetchMovements]);
+
+  useEffect(() => {
+    fetchCostLayers();
+  }, [fetchCostLayers]);
 
   const handleEdit = () => {
     if (!part) return;
@@ -172,6 +248,28 @@ export default function InventoryDetailPage() {
     return cat?.name || '—';
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await del(`/spare-parts/${partId}`);
+      router.push('/inventory');
+    } catch (err: unknown) {
+      let message = 'Failed to delete spare part';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        if (typeof axiosErr.response?.data?.detail === 'string') {
+          message = axiosErr.response.data.detail;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setDeleteError(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const categoryOptions: SelectOption[] = [
     { value: '', label: 'No category' },
     ...categories.map((c) => ({ value: c.id, label: c.name })),
@@ -217,6 +315,9 @@ export default function InventoryDetailPage() {
             Adjust Stock
           </Button>
           <Button onClick={handleEdit}>Edit Part</Button>
+          <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
+            Delete
+          </Button>
         </div>
       </div>
 
@@ -320,6 +421,196 @@ export default function InventoryDetailPage() {
           </div>
         </dl>
       </div>
+
+      {/* Movement History */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Movement History</h2>
+        {movementsLoading ? (
+          <div className="flex justify-center py-4">
+            <LoadingSpinner size="md" />
+          </div>
+        ) : movements.length === 0 ? (
+          <p className="text-sm text-gray-500">No stock movements recorded yet.</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Location</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Type</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Quantity</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Reference</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {movements.map((m) => (
+                    <tr key={m.id}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {new Date(m.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {m.location_name || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        <Badge variant={
+                          m.movement_type === 'PURCHASE' ? 'success' :
+                          m.movement_type === 'SALE' ? 'danger' :
+                          m.movement_type === 'ADJUSTMENT' ? 'warning' :
+                          'default'
+                        }>
+                          {m.movement_type}
+                        </Badge>
+                      </td>
+                      <td className={`whitespace-nowrap px-4 py-3 text-sm text-right font-medium ${
+                        m.quantity_change >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {m.quantity_change >= 0 ? '+' : ''}{m.quantity_change}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                        {m.reference_type}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {movementsTotalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setMovementsPage((p) => Math.max(1, p - 1))}
+                  disabled={movementsPage <= 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-500">
+                  Page {movementsPage} of {movementsTotalPages}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setMovementsPage((p) => Math.min(movementsTotalPages, p + 1))}
+                  disabled={movementsPage >= movementsTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Cost Layers */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Cost Layers (FIFO)</h2>
+        {costLayersLoading ? (
+          <div className="flex justify-center py-4">
+            <LoadingSpinner size="md" />
+          </div>
+        ) : costLayers.length === 0 ? (
+          <p className="text-sm text-gray-500">No active cost layers.</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Location</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Unit Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Original Qty</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Remaining Qty</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {costLayers.map((cl) => (
+                    <tr key={cl.id}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {new Date(cl.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {cl.location_name || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        ${cl.unit_cost.toFixed(2)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {cl.original_quantity}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {cl.remaining_quantity}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                        {cl.source_type}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {costLayersTotalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCostLayersPage((p) => Math.max(1, p - 1))}
+                  disabled={costLayersPage <= 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-500">
+                  Page {costLayersPage} of {costLayersTotalPages}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCostLayersPage((p) => Math.min(costLayersTotalPages, p + 1))}
+                  disabled={costLayersPage >= costLayersTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeleteError(null);
+        }}
+        title="Delete Spare Part"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setShowDeleteModal(false); setDeleteError(null); }}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDelete} isLoading={isDeleting}>
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {deleteError && (
+            <Alert variant="error" onClose={() => setDeleteError(null)}>
+              {deleteError}
+            </Alert>
+          )}
+          <p className="text-sm text-gray-700">
+            Are you sure you want to delete this part? This action cannot be easily undone.
+          </p>
+          <p className="text-sm font-medium text-gray-900">{part.name} ({part.part_number})</p>
+        </div>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal

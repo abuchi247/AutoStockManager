@@ -76,6 +76,12 @@ export default function InventoryPage() {
     reorder_quantity: 0,
   });
 
+  // Barcode lookup modal
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
+
   // Sort
   const [sortField, setSortField] = useState<string>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -187,6 +193,31 @@ export default function InventoryPage() {
     }
   };
 
+  const handleBarcodeLookup = async () => {
+    if (!barcodeInput.trim()) return;
+    setBarcodeLoading(true);
+    setBarcodeError(null);
+    try {
+      const response = await get<{ spare_part_id: string }>(`/barcodes/lookup?barcode=${encodeURIComponent(barcodeInput.trim())}`);
+      setShowBarcodeModal(false);
+      setBarcodeInput('');
+      router.push(`/inventory/${response.spare_part_id}`);
+    } catch (err: unknown) {
+      let message = 'No spare part found with this barcode';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        if (typeof axiosErr.response?.data?.detail === 'string') {
+          message = axiosErr.response.data.detail;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setBarcodeError(message);
+    } finally {
+      setBarcodeLoading(false);
+    }
+  };
+
   const categoryOptions: SelectOption[] = [
     { value: '', label: 'All Categories' },
     ...categories.map((c) => ({ value: c.id, label: c.name })),
@@ -264,7 +295,12 @@ export default function InventoryPage() {
             Manage your spare parts inventory
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>Add Part</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowBarcodeModal(true)}>
+            Barcode Lookup
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>Add Part</Button>
+        </div>
       </div>
 
       {/* Search and filters */}
@@ -482,6 +518,62 @@ export default function InventoryPage() {
               placeholder="e.g. OEM quality front brake pad set for Toyota Corolla 2018-2023"
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* Barcode Lookup Modal */}
+      <Modal
+        isOpen={showBarcodeModal}
+        onClose={() => {
+          setShowBarcodeModal(false);
+          setBarcodeError(null);
+          setBarcodeInput('');
+        }}
+        title="Barcode Lookup"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowBarcodeModal(false);
+                setBarcodeError(null);
+                setBarcodeInput('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBarcodeLookup}
+              isLoading={barcodeLoading}
+              disabled={!barcodeInput.trim()}
+            >
+              Look Up
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {barcodeError && (
+            <Alert variant="error" onClose={() => setBarcodeError(null)}>
+              {barcodeError}
+            </Alert>
+          )}
+          <p className="text-sm text-gray-500">
+            Enter or scan a barcode to find the associated spare part.
+          </p>
+          <Input
+            label="Barcode"
+            value={barcodeInput}
+            onChange={(e) => setBarcodeInput(e.target.value)}
+            placeholder="e.g. ASM-00001 or 6901234567890"
+            required
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && barcodeInput.trim()) {
+                handleBarcodeLookup();
+              }
+            }}
+          />
         </div>
       </Modal>
     </div>

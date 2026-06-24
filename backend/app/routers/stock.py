@@ -1,8 +1,10 @@
 """Stock query router for reading stock levels and making adjustments.
 
 Provides the following endpoints:
-- GET  /api/v1/stock/locations/{id} - Get stock at a specific location
-- POST /api/v1/stock/adjust         - Make a manual stock adjustment
+- GET  /api/v1/stock/locations/{id}            - Get stock at a specific location
+- POST /api/v1/stock/adjust                    - Make a manual stock adjustment
+- GET  /api/v1/stock/movements/{spare_part_id} - Get movement history for a spare part
+- GET  /api/v1/stock/cost-layers/{spare_part_id} - Get FIFO cost layers for a spare part
 
 Reads from Stock_Status_Cache for performant stock queries rather than
 computing quantities from the full movement ledger.
@@ -13,17 +15,19 @@ Satisfies Requirements: 18.1, 18.3, 18.8
 import uuid as uuid_mod
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import DbSession
+from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
 from app.models.user import User, UserRole
 from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType, ReferenceType
+from app.models.cost_layer import CostLayer
 from app.models.stock_status_cache import StockStatusCache
 from app.models.spare_part import SparePart
 from app.models.location import Location
@@ -205,4 +209,217 @@ async def get_stock_at_location(
         location_name=result["location_name"],
         data=stock_items,
         meta=result["meta"],
+    )
+
+
+# =============================================================================
+# Response Models for Movement History and Cost Layers
+# =============================================================================
+
+
+class MovementHistoryItem(BaseModel):
+    """Single movement ledger entry."""
+    id: UUID
+    location_id: UUID
+    location_name: Optional[str] = None
+    quantity_change: float
+    movement_type: str
+    reference_type: str
+    reference_id: UUID
+    created_by: UUID
+    created_at: datetime
+
+
+class MovementHistoryResponse(BaseModel):
+    """Paginated response for movement history."""
+    data: list[MovementHistoryItem]
+    meta: dict[str, Any]
+
+
+class CostLayerItem(BaseModel):
+    """Single cost layer entry."""
+    id: UUID
+    location_id: UUID
+    location_name: Optional[str] = None
+    unit_cost: float
+    original_quantity: float
+    remaining_quantity: float
+    source_type: str
+    created_at: datetime
+
+
+class CostLayerResponse(BaseModel):
+    """Paginated response for cost layers."""
+    data: list[CostLayerItem]
+    meta: dict[str, Any]
+
+
+# =============================================================================
+# Movement History Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/movements/{spare_part_id}",
+    response_model=MovementHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get movement history for a spare part",
+    description="Returns paginated stock movement history from the inventory movement ledger.",
+    responses={
+        404: {"description": "Spare part not found"},
+    },
+)
+async def get_movement_history(
+    spare_part_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> MovementHistoryResponse:
+    """Get all stock movements for a specific spare part.
+
+    Returns movements ordered by created_at descending (most recent first),
+    with location names resolved for display.
+    """
+    # Validate spare part exists
+    part_result = await db.execute(
+        select(SparePart).filter_by(id=spare_part_id, deleted_at=None)
+    )
+    part = part_result.scalar_one_or_none()
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spare part not found",
+        )
+
+    # Count total movements
+    count_stmt = (
+        select(func.count())
+        .select_from(InventoryMovementLedger)
+        .where(InventoryMovementLedger.spare_part_id == spare_part_id)
+    )
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+
+    # Fetch paginated movements with location names
+    offset = (page - 1) * page_size
+    stmt = (
+        select(InventoryMovementLedger, Location.name.label("location_name"))
+        .outerjoin(Location, InventoryMovementLedger.location_id == Location.id)
+        .where(InventoryMovementLedger.spare_part_id == spare_part_id)
+        .order_by(InventoryMovementLedger.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items = [
+        MovementHistoryItem(
+            id=row.InventoryMovementLedger.id,
+            location_id=row.InventoryMovementLedger.location_id,
+            location_name=row.location_name,
+            quantity_change=float(row.InventoryMovementLedger.quantity_change),
+            movement_type=row.InventoryMovementLedger.movement_type,
+            reference_type=row.InventoryMovementLedger.reference_type,
+            reference_id=row.InventoryMovementLedger.reference_id,
+            created_by=row.InventoryMovementLedger.created_by,
+            created_at=row.InventoryMovementLedger.created_at,
+        )
+        for row in rows
+    ]
+
+    return MovementHistoryResponse(
+        data=items,
+        meta={
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+        },
+    )
+
+
+# =============================================================================
+# Cost Layers Endpoint
+# =============================================================================
+
+
+@router.get(
+    "/cost-layers/{spare_part_id}",
+    response_model=CostLayerResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get FIFO cost layers for a spare part",
+    description="Returns active cost layers (remaining_quantity > 0) for a spare part.",
+    responses={
+        404: {"description": "Spare part not found"},
+    },
+)
+async def get_cost_layers(
+    spare_part_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+    page: int = Query(default=1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> CostLayerResponse:
+    """Get active FIFO cost layers for a specific spare part.
+
+    Returns cost layers where remaining_quantity > 0, ordered by created_at
+    ascending (oldest first, per FIFO), with location names resolved.
+    """
+    # Validate spare part exists
+    part_result = await db.execute(
+        select(SparePart).filter_by(id=spare_part_id, deleted_at=None)
+    )
+    part = part_result.scalar_one_or_none()
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spare part not found",
+        )
+
+    # Count total active cost layers
+    count_stmt = (
+        select(func.count())
+        .select_from(CostLayer)
+        .where(CostLayer.spare_part_id == spare_part_id)
+        .where(CostLayer.remaining_quantity > 0)
+    )
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+
+    # Fetch paginated cost layers with location names
+    offset = (page - 1) * page_size
+    stmt = (
+        select(CostLayer, Location.name.label("location_name"))
+        .outerjoin(Location, CostLayer.location_id == Location.id)
+        .where(CostLayer.spare_part_id == spare_part_id)
+        .where(CostLayer.remaining_quantity > 0)
+        .order_by(CostLayer.created_at.asc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items = [
+        CostLayerItem(
+            id=row.CostLayer.id,
+            location_id=row.CostLayer.location_id,
+            location_name=row.location_name,
+            unit_cost=float(row.CostLayer.unit_cost),
+            original_quantity=float(row.CostLayer.original_quantity),
+            remaining_quantity=float(row.CostLayer.remaining_quantity),
+            source_type=row.CostLayer.source_type,
+            created_at=row.CostLayer.created_at,
+        )
+        for row in rows
+    ]
+
+    return CostLayerResponse(
+        data=items,
+        meta={
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+        },
     )
