@@ -82,16 +82,23 @@ def create_app() -> FastAPI:
     # Health check endpoint
     @app.get("/health", tags=["Health"])
     async def health_check():
-        return {"status": "healthy", "version": settings.app_version}
+        import os
+        return {
+            "status": "healthy",
+            "version": settings.app_version,
+            "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", os.environ.get("GIT_COMMIT_SHA", "local")),
+        }
 
     # API version prefix
     @app.get("/api/v1/status", tags=["Status"])
     async def api_status():
+        import os
         return {
             "status": "operational",
             "app_name": settings.app_name,
             "version": settings.app_version,
             "environment": settings.environment,
+            "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", os.environ.get("GIT_COMMIT_SHA", "local")),
         }
 
     # Register routers
