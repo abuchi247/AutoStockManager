@@ -362,6 +362,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, part_number: e.target.value })
               }
               required
+              placeholder="e.g. BRK-PAD-001"
             />
             <Input
               label="Barcode"
@@ -369,6 +370,7 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setNewPart({ ...newPart, barcode: e.target.value || undefined })
               }
+              placeholder="e.g. 6901234567890"
             />
             <Input
               label="Name"
@@ -377,6 +379,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, name: e.target.value })
               }
               required
+              placeholder="e.g. Front Brake Pad Set"
             />
             <Input
               label="Brand"
@@ -385,11 +388,12 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, brand: e.target.value })
               }
               required
+              placeholder="e.g. Bosch"
             />
             <Select
               label="Category"
               options={[
-                { value: '', label: 'Select category' },
+                { value: '', label: 'Select category (optional)' },
                 ...categories.map((c) => ({ value: c.id, label: c.name })),
               ]}
               value={newPart.category_id || ''}
@@ -407,6 +411,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, unit_of_measure: e.target.value })
               }
               required
+              placeholder="e.g. pcs, set, litre, kg"
             />
             <Input
               label="Cost Price"
@@ -418,6 +423,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, cost_price: parseFloat(e.target.value) || 0 })
               }
               required
+              placeholder="e.g. 25.00"
             />
             <Input
               label="Selling Price"
@@ -429,6 +435,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, selling_price: parseFloat(e.target.value) || 0 })
               }
               required
+              placeholder="e.g. 45.00"
             />
             <Input
               label="Min Stock Level"
@@ -438,6 +445,7 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setNewPart({ ...newPart, min_stock_level: parseInt(e.target.value) || 0 })
               }
+              placeholder="e.g. 10"
             />
             <Input
               label="Max Stock Level"
@@ -447,6 +455,7 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setNewPart({ ...newPart, max_stock_level: parseInt(e.target.value) || 0 })
               }
+              placeholder="e.g. 100"
             />
             <Input
               label="Reorder Quantity"
@@ -456,6 +465,7 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setNewPart({ ...newPart, reorder_quantity: parseInt(e.target.value) || 0 })
               }
+              placeholder="e.g. 20"
             />
           </div>
           <div>
@@ -469,7 +479,7 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setNewPart({ ...newPart, description: e.target.value || undefined })
               }
-              placeholder="Part description..."
+              placeholder="e.g. OEM quality front brake pad set for Toyota Corolla 2018-2023"
             />
           </div>
         </div>

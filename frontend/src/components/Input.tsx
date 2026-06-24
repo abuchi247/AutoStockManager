@@ -27,6 +27,7 @@ export function Input({
           className="mb-1.5 block text-sm font-medium text-foreground"
         >
           {label}
+          {props.required && <span className="ml-0.5 text-destructive">*</span>}
         </label>
       )}
       <input
