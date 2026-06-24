@@ -258,125 +258,53 @@ railway variable set NEXT_PUBLIC_API_URL=https://<backend-service>.up.railway.ap
 
 ### Step 6: Initialize the Database
 
-After the backend is deployed and the database is provisioned, run the setup commands:
+After the backend is deployed and the database is provisioned, run the setup script. This is a single command that creates tables, sequences, admin user, and seed data:
 
 ```bash
 # Link CLI to backend service
 railway link --service <backend-service-name>
 
-# Create all database tables
-railway run python3 -c "
-import asyncio
-from app.database import engine, Base
-from app.models import *
-
-async def create_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    await engine.dispose()
-
-asyncio.run(create_tables())
-"
-
-# Create the invoice number sequence
-railway run python3 -c "
-import asyncio
-from sqlalchemy import text
-from app.database import engine
-
-async def create_seq():
-    async with engine.begin() as conn:
-        await conn.execute(text('CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1'))
-    await engine.dispose()
-
-asyncio.run(create_seq())
-"
+# Run the all-in-one setup script (idempotent — safe to run multiple times)
+cd backend && railway run python3 scripts/setup_db.py
 ```
 
-### Step 7: Create Admin User
+This script will:
+1. Create all database tables (if they don't exist)
+2. Create the `invoice_number_seq` sequence
+3. Create an admin user (`admin` / `Admin123!`)
+4. Seed 45 default categories (Brakes, Filters, Engine Parts, etc.)
+
+**Note:** The backend also auto-creates tables on every startup via `init_db()`. This means new model/column changes deployed via git push will automatically create any missing tables without manual intervention. However, the setup script is still needed for first-time seeding of admin user and categories.
+
+### Step 7: Verify Setup
+
+After running the setup script, verify everything is working:
 
 ```bash
-railway run python3 -c "
-import sys
-sys.path.insert(0, '.')
-import asyncio, uuid, bcrypt
-from datetime import datetime, timezone
-from sqlalchemy import text
-from app.database import async_session_factory, engine
+# Test the health endpoint
+curl https://<backend-service>.up.railway.app/health
 
-async def create_admin():
-    async with async_session_factory() as session:
-        result = await session.execute(
-            text('SELECT id FROM users WHERE username = :u'), {'u': 'admin'})
-        if result.scalar():
-            print('Admin already exists')
-            return
-        pw_hash = bcrypt.hashpw('Admin123!'.encode(), bcrypt.gensalt(12)).decode()
-        await session.execute(text('''
-            INSERT INTO users (id, username, email, password_hash, role, is_active, failed_login_attempts, created_at, updated_at)
-            VALUES (:id, :u, :e, :pw, :r, TRUE, 0, :now, :now)
-        '''), {'id': uuid.uuid4(), 'u': 'admin', 'e': 'admin@autostockmanager.com',
-               'pw': pw_hash, 'r': 'Admin', 'now': datetime.now(timezone.utc)})
-        await session.commit()
-        print('Admin created: admin / Admin123!')
-    await engine.dispose()
-
-asyncio.run(create_admin())
-"
+# Test login
+curl -X POST https://<backend-service>.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"Admin123!"}'
 ```
 
-### Step 8: Seed Categories
+If you need to create additional users or re-seed categories manually, the individual scripts still work:
 
 ```bash
-railway run python3 -c "
-import sys
-sys.path.insert(0, '.')
-import asyncio, uuid
-from datetime import datetime, timezone
-from sqlalchemy import text
-from app.database import async_session_factory, engine
+# Create a specific user
+cd backend && railway run python3 scripts/create_user.py -u manager -p Manager1! -r Manager -e manager@example.com
 
-CATEGORIES = {
-    'Brakes': ['Brake Pads', 'Brake Discs', 'Brake Fluid'],
-    'Filters': ['Oil Filters', 'Air Filters', 'Fuel Filters', 'Cabin Filters'],
-    'Engine Parts': ['Pistons', 'Gaskets', 'Timing Belts', 'Spark Plugs'],
-    'Electrical': ['Batteries', 'Alternators', 'Starters', 'Sensors'],
-    'Suspension': ['Shock Absorbers', 'Springs', 'Control Arms'],
-    'Body Parts': ['Bumpers', 'Fenders', 'Mirrors', 'Lights'],
-    'Transmission': ['Clutch', 'Gearbox', 'CV Joints'],
-    'Cooling': ['Radiators', 'Water Pumps', 'Thermostats', 'Hoses'],
-    'Exhaust': ['Mufflers', 'Catalytic Converters', 'Exhaust Pipes'],
-    'Fuel System': ['Fuel Pumps', 'Injectors', 'Fuel Lines'],
-}
-
-async def seed():
-    async with async_session_factory() as session:
-        r = await session.execute(text('SELECT COUNT(*) FROM categories'))
-        if (r.scalar() or 0) > 0:
-            print('Categories exist, skipping'); return
-        now = datetime.now(timezone.utc)
-        for parent, subs in CATEGORIES.items():
-            pid = uuid.uuid4()
-            await session.execute(text('''INSERT INTO categories (id, name, parent_id, description, is_active, created_at, updated_at)
-                VALUES (:id, :n, NULL, :d, TRUE, :now, :now)'''),
-                {'id': pid, 'n': parent, 'd': f'Auto spare parts - {parent}', 'now': now})
-            for s in subs:
-                await session.execute(text('''INSERT INTO categories (id, name, parent_id, description, is_active, created_at, updated_at)
-                    VALUES (:id, :n, :pid, :d, TRUE, :now, :now)'''),
-                    {'id': uuid.uuid4(), 'n': s, 'pid': pid, 'd': f'{parent} - {s}', 'now': now})
-        await session.commit()
-        print('Categories seeded')
-    await engine.dispose()
-
-asyncio.run(seed())
-"
+# Re-seed categories (skips if any exist)
+cd backend && railway run python3 scripts/seed_categories.py
 ```
 
-### Step 9: Generate Public URLs
+### Step 8: Generate Public URLs
 
 In the Railway dashboard, go to each service → **Settings** → **Networking** → **Generate Domain**. This gives you public `*.up.railway.app` URLs.
 
-### Step 10: Redeploy Frontend
+### Step 9: Redeploy Frontend
 
 After setting `NEXT_PUBLIC_API_URL`, redeploy the frontend to bake the URL into the build:
 
@@ -390,11 +318,12 @@ railway redeploy -y
 | Issue | Solution |
 |-------|----------|
 | Backend returns 502 | Ensure the Dockerfile uses `${PORT:-8000}` — Railway injects its own PORT |
-| Login fails | Database is empty — run Steps 6–8 to initialize tables and create admin |
+| Login fails | Run `cd backend && railway run python3 scripts/setup_db.py` to initialize tables and create admin |
 | Frontend can't reach backend | Verify `NEXT_PUBLIC_API_URL` uses `https://` (not `http://`) and includes `/api/v1` |
 | CORS errors in browser | Set `CORS_ORIGINS=["*"]` on the backend service, or add the frontend URL specifically |
 | Variable change has no effect (frontend) | `NEXT_PUBLIC_*` vars are build-time; redeploy the frontend after changing |
 | `railway run` fails with "No such file" | Make sure you're in the `backend/` directory locally when running commands |
+| New columns/tables missing after deploy | The app auto-creates tables on startup; for column changes on existing tables, run Alembic migrations |
 
 ### Architecture on Railway
 

@@ -1,7 +1,9 @@
 """Async SQLAlchemy engine and session factory."""
 
+import logging
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -10,6 +12,8 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -53,10 +57,30 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database connection (verify connectivity)."""
+    """Initialize database: create all tables and required sequences.
+
+    Uses CREATE TABLE IF NOT EXISTS semantics — safe to run on every startup.
+    This ensures Railway deployments always have the latest schema without
+    manual intervention.
+    """
+    # Import all models so Base.metadata knows about them
+    _import_models()
+
     async with engine.begin() as conn:
-        # This verifies the connection is working
-        await conn.run_sync(lambda _: None)
+        # Create all tables that don't exist yet
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables synced (create_all)")
+
+        # Create invoice number sequence if it doesn't exist
+        await conn.execute(
+            text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1")
+        )
+        logger.info("invoice_number_seq sequence ensured")
+
+
+def _import_models() -> None:
+    """Import all models to register them with Base.metadata."""
+    import app.models  # noqa: F401
 
 
 async def close_db() -> None:
