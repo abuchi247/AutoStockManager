@@ -28,6 +28,12 @@ const navItems: NavItem[] = [
     icon: '📦',
   },
   {
+    label: 'Categories',
+    href: '/categories',
+    roles: ['admin', 'manager'],
+    icon: '🏷️',
+  },
+  {
     label: 'Sales',
     href: '/sales',
     roles: ['admin', 'manager', 'salesperson'],

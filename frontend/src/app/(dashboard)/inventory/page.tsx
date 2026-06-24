@@ -108,10 +108,21 @@ export default function InventoryPage() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await get<{ data: Category[]; meta: { page: number; total: number; page_size: number } }>('/spare-parts/categories');
-      setCategories(response.data);
+      const response = await get<{ data: Array<Category & { children?: Category[] }>; meta: { page: number; total: number; page_size: number } }>('/categories?page_size=500');
+      // Flatten tree into a flat list so we can look up any category by ID
+      const flat: Category[] = [];
+      const flatten = (items: Array<Category & { children?: Category[] }>) => {
+        for (const item of items) {
+          flat.push(item);
+          if (item.children && item.children.length > 0) {
+            flatten(item.children as Array<Category & { children?: Category[] }>);
+          }
+        }
+      };
+      flatten(response.data);
+      setCategories(flat);
     } catch {
-      // Categories are optional for display
+      // Categories are optional for display — don't break if API fails
     }
   }, []);
 
@@ -210,6 +221,15 @@ export default function InventoryPage() {
       key: 'brand',
       header: 'Brand',
       sortable: true,
+    },
+    {
+      key: 'category_id',
+      header: 'Category',
+      render: (item) => {
+        if (!item.category_id) return <span className="text-gray-400">—</span>;
+        const cat = categories.find((c) => c.id === item.category_id);
+        return <span>{cat?.name || '—'}</span>;
+      },
     },
     {
       key: 'total_stock',
