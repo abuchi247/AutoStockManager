@@ -48,14 +48,14 @@ function getStatusBadge(isActive: boolean): React.ReactNode {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { hasRole, user: currentUser } = useAuth();
+  const { hasRole, user: currentUser, isLoading: authLoading } = useAuth();
 
-  // Redirect non-admin users
+  // Redirect non-admin users (only after auth is loaded)
   useEffect(() => {
-    if (!hasRole('admin')) {
+    if (!authLoading && !hasRole('admin')) {
       router.replace('/dashboard');
     }
-  }, [hasRole, router]);
+  }, [hasRole, router, authLoading]);
 
   // Users list state
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -261,8 +261,8 @@ export default function SettingsPage() {
     },
   ];
 
-  // Don't render content for non-admins
-  if (!hasRole('admin')) {
+  // Don't render content for non-admins or while auth is loading
+  if (authLoading || !hasRole('admin')) {
     return null;
   }
 
