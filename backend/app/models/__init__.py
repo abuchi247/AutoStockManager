@@ -48,6 +48,7 @@ Exports:
 
 from app.models.base import BaseModel, SoftDeleteMixin, SoftDeleteQuery, with_soft_delete_filter
 from app.models.user import User, UserRole
+from app.models.location import Location
 from app.models.category import Category
 from app.models.spare_part import SparePart
 from app.models.login_history import LoginHistory
@@ -85,6 +86,7 @@ __all__ = [
     "with_soft_delete_filter",
     "User",
     "UserRole",
+    "Location",
     "Category",
     "SparePart",
     "LoginHistory",
