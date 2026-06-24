@@ -66,16 +66,21 @@ async def init_db() -> None:
     # Import all models so Base.metadata knows about them
     _import_models()
 
-    async with engine.begin() as conn:
-        # Create all tables that don't exist yet
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables synced (create_all)")
+    try:
+        async with engine.begin() as conn:
+            # Create all tables that don't exist yet
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables synced (create_all)")
 
-        # Create invoice number sequence if it doesn't exist
-        await conn.execute(
-            text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1")
-        )
-        logger.info("invoice_number_seq sequence ensured")
+            # Create invoice number sequence if it doesn't exist
+            await conn.execute(
+                text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1")
+            )
+            logger.info("invoice_number_seq sequence ensured")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't crash the app — let it start and retry connections later
+        # This prevents Railway from killing the container during deploy
 
 
 def _import_models() -> None:
