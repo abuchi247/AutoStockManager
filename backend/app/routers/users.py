@@ -22,6 +22,7 @@ from app.schemas.user import (
     UserCreate,
     UserListResponse,
     UserResponse,
+    UserUpdate,
 )
 from app.services.auth_service import (
     PasswordValidationError,
@@ -177,5 +178,79 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    return UserResponse.model_validate(user)
+
+
+@router.put(
+    "/{user_id}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update a user",
+    description="Update user details (email, role, active status). Admin only.",
+    responses={
+        403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+        409: {"model": ErrorResponse, "description": "Email already exists"},
+    },
+)
+async def update_user(
+    user_id: UUID,
+    request: UserUpdate,
+    db: DbSession,
+    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+) -> UserResponse:
+    """Update a user's profile.
+
+    Requirements:
+    - 2.1: Admin can manage users
+    - 17.1: Enforce RBAC (Admin only)
+    """
+    result = await db.execute(
+        select(User).filter_by(id=user_id, deleted_at=None)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Update fields if provided
+    if request.email is not None and request.email != user.email:
+        # Check for duplicate email
+        existing_email = await db.execute(
+            select(User).filter_by(email=request.email, deleted_at=None)
+        )
+        if existing_email.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already exists",
+            )
+        user.email = request.email
+
+    if request.username is not None and request.username != user.username:
+        # Check for duplicate username
+        existing_username = await db.execute(
+            select(User).filter_by(username=request.username, deleted_at=None)
+        )
+        if existing_username.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already exists",
+            )
+        user.username = request.username
+
+    if request.role is not None:
+        user.role = request.role.value
+
+    if request.is_active is not None:
+        user.is_active = request.is_active
+
+    user.updated_by = str(current_user.id)
+
+    await db.commit()
+    await db.refresh(user)
 
     return UserResponse.model_validate(user)
