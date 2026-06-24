@@ -251,9 +251,9 @@ export default function CreateSalePage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Sale</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Sale</h1>
           <p className="mt-1 text-sm text-gray-500">
             Add line items and save as draft or confirm to deduct stock
           </p>
@@ -276,7 +276,7 @@ export default function CreateSalePage() {
       )}
 
       {/* Sale details form */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Sale Details</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Select
@@ -302,7 +302,7 @@ export default function CreateSalePage() {
       </div>
 
       {/* Line items */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Line Items</h2>
 
         {/* Part search */}

@@ -72,7 +72,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-[28px] font-bold text-[#333]">Dashboard</h1>
           <p className="text-sm text-[#666]">
@@ -131,7 +131,7 @@ export default function DashboardPage() {
 
       {/* Top Selling Products */}
       {kpis?.top_selling_products && kpis.top_selling_products.length > 0 && (
-        <div className="rounded-lg bg-white p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+        <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
           <h2 className="text-base font-semibold text-[#333] mb-4">
             Top Selling Products
           </h2>

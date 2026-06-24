@@ -13,10 +13,10 @@ interface ModalProps {
 }
 
 const sizeClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  sm: 'max-w-[calc(100vw-2rem)] sm:max-w-sm',
+  md: 'max-w-[calc(100vw-2rem)] sm:max-w-md',
+  lg: 'max-w-[calc(100vw-2rem)] sm:max-w-lg',
+  xl: 'max-w-[calc(100vw-2rem)] sm:max-w-xl',
 };
 
 export function Modal({
@@ -62,7 +62,7 @@ export function Modal({
     >
       <div
         className={cn(
-          'w-full rounded-lg border border-border bg-background p-6 shadow-lg animate-fade-in',
+          'w-full rounded-lg border border-border bg-background p-4 sm:p-6 shadow-lg animate-fade-in max-h-[90vh] overflow-y-auto',
           sizeClasses[size]
         )}
       >

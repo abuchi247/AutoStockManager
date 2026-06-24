@@ -24,7 +24,7 @@ export default function AuthLayout({
         </div>
 
         {/* Card */}
-        <div className="rounded-xl bg-white px-8 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl bg-white px-5 py-6 sm:px-8 sm:py-8 shadow-[0_20px_60px_rgba(0,0,0,0.1)]">
           {children}
         </div>
       </div>
