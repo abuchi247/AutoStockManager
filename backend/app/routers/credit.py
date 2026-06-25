@@ -86,11 +86,14 @@ async def record_payment(
 
     service = _get_credit_service(db)
 
+    import uuid as uuid_mod
+    ref_id = request.reference_id or uuid_mod.uuid4()
+
     entry = await service.record_credit(
         customer_id=request.customer_id,
         amount=request.amount,
         reference_type="payment",
-        reference_id=request.reference_id,
+        reference_id=ref_id,
         created_by=current_user.id,
         transaction_type=CreditTransactionType.PAYMENT,
         notes=request.notes,
@@ -142,6 +145,9 @@ async def record_adjustment(
 
     service = _get_credit_service(db)
 
+    import uuid as uuid_mod
+    ref_id = request.reference_id or uuid_mod.uuid4()
+
     try:
         if request.amount > Decimal("0"):
             # Positive adjustment = debit (increases balance)
@@ -150,7 +156,7 @@ async def record_adjustment(
                 customer_id=request.customer_id,
                 amount=request.amount,
                 reference_type="adjustment",
-                reference_id=request.reference_id,
+                reference_id=ref_id,
                 created_by=current_user.id,
                 transaction_type=CreditTransactionType.ADJUSTMENT,
                 notes=request.notes,
@@ -162,7 +168,7 @@ async def record_adjustment(
                 customer_id=request.customer_id,
                 amount=abs(request.amount),
                 reference_type="adjustment",
-                reference_id=request.reference_id,
+                reference_id=ref_id,
                 created_by=current_user.id,
                 transaction_type=CreditTransactionType.ADJUSTMENT,
                 notes=request.notes,

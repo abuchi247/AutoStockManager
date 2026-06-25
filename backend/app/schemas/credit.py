@@ -36,9 +36,9 @@ class PaymentCreate(BaseModel):
         description="Payment amount (must be positive)",
         examples=[5000.00],
     )
-    reference_id: UUID = Field(
-        ...,
-        description="UUID of the payment reference document",
+    reference_id: Optional[UUID] = Field(
+        default=None,
+        description="Optional UUID of the payment reference document",
     )
     notes: Optional[str] = Field(
         default=None,
@@ -74,9 +74,9 @@ class AdjustmentCreate(BaseModel):
         description="Adjustment amount. Positive = increase balance (debit), negative = decrease balance (credit).",
         examples=[1500.00, -500.00],
     )
-    reference_id: UUID = Field(
-        ...,
-        description="UUID of the adjustment reference document",
+    reference_id: Optional[UUID] = Field(
+        default=None,
+        description="Optional UUID of the adjustment reference document",
     )
     notes: str = Field(
         ...,
