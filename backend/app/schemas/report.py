@@ -63,8 +63,8 @@ class InventoryReportRowSchema(BaseModel):
     part_number: str
     name: str
     brand: Optional[str] = None
-    category_id: UUID
-    location_id: UUID
+    category_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
     current_quantity: Decimal
     unit_cost: Decimal
     stock_value: Decimal

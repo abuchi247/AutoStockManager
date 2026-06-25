@@ -86,8 +86,8 @@ export default function AuditDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<{ data: AuditSession }>(`/audits/${auditId}`);
-      setAudit(response.data);
+      const response = await get<AuditSession>(`/audits/${auditId}`);
+      setAudit(response);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load audit session';
       setError(message);
@@ -98,10 +98,10 @@ export default function AuditDetailPage() {
 
   const fetchSnapshotItems = useCallback(async () => {
     try {
-      const response = await get<{ data: AuditSnapshotItem[] }>(
+      const response = await get<AuditSnapshotItem[]>(
         `/audits/${auditId}/snapshot`
       );
-      setSnapshotItems(response.data);
+      setSnapshotItems(response);
     } catch {
       // Snapshot items may not be available separately
     }
@@ -109,10 +109,10 @@ export default function AuditDetailPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const response = await get<{ data: AuditCount[] }>(
+      const response = await get<AuditCount[]>(
         `/audits/${auditId}/counts`
       );
-      setCounts(response.data);
+      setCounts(response);
     } catch {
       // Counts may not exist yet
     }
@@ -120,10 +120,10 @@ export default function AuditDetailPage() {
 
   const fetchReconciliation = useCallback(async () => {
     try {
-      const response = await get<{ data: ReconciliationItem[] }>(
+      const response = await get<{ session_id: string; movements: ReconciliationItem[] }>(
         `/audits/${auditId}/reconciliation`
       );
-      setReconciliation(response.data);
+      setReconciliation(response.movements);
     } catch {
       // Reconciliation may not be available
     }

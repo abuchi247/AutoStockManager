@@ -48,8 +48,8 @@ export default function PurchaseOrderDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<{ data: PurchaseOrder }>(`/purchase-orders/${id}`);
-      setOrder(response.data);
+      const response = await get<PurchaseOrder>(`/purchase-orders/${id}`);
+      setOrder({ ...response, status: response.status?.toLowerCase() as PurchaseOrderStatus });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load purchase order';
       setError(message);

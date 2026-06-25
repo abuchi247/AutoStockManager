@@ -96,7 +96,7 @@ export default function PurchasesPage() {
       const response = await get<PaginatedResponse<PurchaseOrder>>(
         `/purchase-orders?${params.toString()}`
       );
-      setOrders(response.data);
+      setOrders(response.data.map((po: PurchaseOrder) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus })));
       setTotalPages(response.meta.total_pages);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load purchase orders';

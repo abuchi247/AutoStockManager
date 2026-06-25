@@ -113,8 +113,8 @@ export default function TransferDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<{ data: Transfer }>(`/transfers/${transferId}`);
-      setTransfer(response.data);
+      const response = await get<Transfer>(`/transfers/${transferId}`);
+      setTransfer({ ...response, status: response.status?.toLowerCase() as TransferStatus });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load transfer';
       setError(message);

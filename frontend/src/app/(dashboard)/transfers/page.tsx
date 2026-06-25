@@ -107,7 +107,7 @@ export default function TransfersPage() {
       const response = await get<PaginatedResponse<Transfer>>(
         `/transfers?${params.toString()}`
       );
-      setTransfers(response.data);
+      setTransfers(response.data.map((t: Transfer) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus })));
       setTotalPages(response.meta.total_pages);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load transfers';
