@@ -18,9 +18,10 @@ import {
   Badge,
   Alert,
   Modal,
+  Select,
   LoadingSpinner,
 } from '@/components';
-import type { BadgeVariant } from '@/components';
+import type { BadgeVariant, SelectOption } from '@/components';
 import type { Sale, SaleItem, SaleStatus, SaleReturnRequest } from '@/lib/types';
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
@@ -81,6 +82,11 @@ export default function SaleDetailPage() {
   const [isReturning, setIsReturning] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
 
+  // Invoice state
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [invoiceFormat, setInvoiceFormat] = useState<'A4' | 'THERMAL'>('A4');
+
   const fetchSale = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -98,6 +104,48 @@ export default function SaleDetailPage() {
   useEffect(() => {
     fetchSale();
   }, [fetchSale]);
+
+  // Check if invoice exists for this sale
+  useEffect(() => {
+    if (sale?.status === 'confirmed') {
+      get<{ id: string }>(`/invoices/by-sale/${saleId}?format=${invoiceFormat}`)
+        .then((inv) => setInvoiceId(inv.id))
+        .catch(() => setInvoiceId(null));
+    }
+  }, [sale?.status, saleId, invoiceFormat]);
+
+  const handleGenerateInvoice = async () => {
+    setIsGeneratingInvoice(true);
+    setError(null);
+    try {
+      const result = await post<{ id: string }>('/invoices/generate', {
+        sale_id: saleId,
+        format: invoiceFormat,
+        overwrite: false,
+      });
+      setInvoiceId(result.id);
+      setSuccess(`Invoice generated successfully (${invoiceFormat} format)`);
+    } catch (err: unknown) {
+      let message = 'Failed to generate invoice';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        if (typeof axiosErr.response?.data?.detail === 'string') {
+          message = axiosErr.response.data.detail;
+        }
+      }
+      setError(message);
+    } finally {
+      setIsGeneratingInvoice(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!invoiceId) return;
+    // Open PDF in new tab — the backend returns the raw PDF
+    const token = localStorage.getItem('access_token');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    window.open(`${apiUrl}/invoices/${invoiceId}/pdf`, '_blank');
+  };
 
   const handleConfirm = async () => {
     setIsConfirming(true);
@@ -372,6 +420,35 @@ export default function SaleDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Invoice Section */}
+      {sale.status === 'confirmed' && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Invoice</h2>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="w-full sm:w-48">
+              <Select
+                label="Format"
+                options={[
+                  { value: 'A4', label: 'A4 (Full page)' },
+                  { value: 'THERMAL', label: 'Thermal (80mm receipt)' },
+                ] as SelectOption[]}
+                value={invoiceFormat}
+                onChange={(e) => setInvoiceFormat(e.target.value as 'A4' | 'THERMAL')}
+              />
+            </div>
+            {invoiceId ? (
+              <Button onClick={handleDownloadPdf}>
+                Download PDF
+              </Button>
+            ) : (
+              <Button onClick={handleGenerateInvoice} isLoading={isGeneratingInvoice}>
+                Generate Invoice
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Return Modal */}
       <Modal
