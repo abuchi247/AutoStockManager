@@ -134,6 +134,21 @@ async def adjust_stock(
     )
     db.add(ledger_entry)
 
+    # Create cost layer for positive adjustments (needed for FIFO sales)
+    if request.quantity > 0:
+        cost_layer = CostLayer(
+            id=uuid_mod.uuid4(),
+            spare_part_id=request.spare_part_id,
+            location_id=request.location_id,
+            unit_cost=Decimal(str(part.cost_price)) if part.cost_price else Decimal("0"),
+            original_quantity=Decimal(str(request.quantity)),
+            remaining_quantity=Decimal(str(request.quantity)),
+            source_type="adjustment",
+            source_reference_id=movement_id,
+            created_at=now,
+        )
+        db.add(cost_layer)
+
     # Update stock cache
     new_qty = current_qty + request.quantity
     if cache:
