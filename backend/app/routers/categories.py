@@ -40,17 +40,23 @@ router = APIRouter(prefix="/api/v1/categories", tags=["Categories"])
 # =============================================================================
 
 
-def _build_category_response(category: Category) -> CategoryResponse:
-    """Build a CategoryResponse from a Category model, including children and spare parts count."""
+def _build_category_response(category: Category, depth: int = 0) -> CategoryResponse:
+    """Build a CategoryResponse from a Category model, including children and spare parts count.
+    
+    Limits recursion depth to avoid lazy loading issues in async context.
+    """
     # Count spare parts using this category (as primary category)
-    spare_parts_count = len(category.spare_parts_as_category) if category.spare_parts_as_category else 0
+    try:
+        spare_parts_count = len(category.spare_parts_as_category) if category.spare_parts_as_category else 0
+    except Exception:
+        spare_parts_count = 0
 
-    # Build children recursively
+    # Build children (limit to 1 level deep to avoid lazy loading issues)
     children = []
-    if category.children:
+    if depth < 1 and category.children:
         for child in category.children:
-            if child.deleted_at is None:  # Only include non-deleted children
-                children.append(_build_category_response(child))
+            if child.deleted_at is None:
+                children.append(_build_category_response(child, depth + 1))
 
     return CategoryResponse(
         id=category.id,
