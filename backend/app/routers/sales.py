@@ -424,3 +424,54 @@ async def return_sale(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+@router.post(
+    "/{sale_id}/cancel",
+    response_model=SaleResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancel a draft sale",
+    description="Cancel a sale that is still in DRAFT status. Cannot cancel confirmed sales.",
+    responses={
+        400: {"model": ErrorResponse, "description": "Sale is not in DRAFT status"},
+        404: {"model": ErrorResponse, "description": "Sale not found"},
+    },
+)
+async def cancel_sale(
+    sale_id: UUID,
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+    ),
+) -> SaleResponse:
+    """Cancel a draft sale.
+
+    Only DRAFT sales can be cancelled. Confirmed sales must use the return flow.
+    """
+    from sqlalchemy.orm import selectinload
+
+    stmt = (
+        select(Sale)
+        .filter_by(id=sale_id)
+        .options(selectinload(Sale.items).selectinload(SaleItem.spare_part))
+    )
+    result = await db.execute(stmt)
+    sale = result.scalar_one_or_none()
+
+    if sale is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sale not found",
+        )
+
+    if sale.status != SaleStatus.DRAFT.value and sale.status != "DRAFT":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft sales can be cancelled. Use returns for confirmed sales.",
+        )
+
+    sale.status = "CANCELLED"
+    sale.updated_by = str(current_user.id)
+    await db.commit()
+
+    return SaleResponse.model_validate(sale)

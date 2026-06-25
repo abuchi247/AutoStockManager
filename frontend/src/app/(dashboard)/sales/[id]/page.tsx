@@ -76,6 +76,9 @@ export default function SaleDetailPage() {
   // Confirm state
   const [isConfirming, setIsConfirming] = useState(false);
 
+  // Cancel state
+  const [isCancelling, setIsCancelling] = useState(false);
+
   // Return state
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -174,6 +177,25 @@ export default function SaleDetailPage() {
       setError(message);
     } finally {
       setIsConfirming(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!confirm('Are you sure you want to cancel this sale? This cannot be undone.')) return;
+    setIsCancelling(true);
+    setError(null);
+    try {
+      await post<Sale>(`/sales/${saleId}/cancel`);
+      setSuccess('Sale cancelled.');
+      fetchSale();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail ?? 'Failed to cancel sale.')
+          : 'Failed to cancel sale.';
+      setError(message);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -309,6 +331,15 @@ export default function SaleDetailPage() {
               isLoading={isConfirming}
             >
               Confirm Sale
+            </Button>
+          )}
+          {sale.status === 'draft' && (
+            <Button
+              variant="danger"
+              onClick={handleCancel}
+              isLoading={isCancelling}
+            >
+              Cancel Sale
             </Button>
           )}
           {sale.status === 'confirmed' && (
