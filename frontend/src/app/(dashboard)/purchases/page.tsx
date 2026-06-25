@@ -336,13 +336,15 @@ export default function PurchasesPage() {
             value={selectedSupplier}
             onChange={(e) => setSelectedSupplier(e.target.value)}
             placeholder="Select a supplier"
+            required
           />
 
           <Input
             label="Notes"
             value={poNotes}
             onChange={(e) => setPoNotes(e.target.value)}
-            placeholder="Optional notes..."
+            placeholder="e.g. Urgent restock for Main Warehouse, delivery expected next week"
+            helperText="Any special instructions or reference for this order"
           />
 
           {/* Line items */}
@@ -354,6 +356,22 @@ export default function PurchasesPage() {
               <Button size="sm" variant="secondary" onClick={handleAddItem}>
                 + Add Item
               </Button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Select the parts you want to order, specify quantity and unit cost per item.
+            </p>
+            {/* Column headers */}
+            <div className="flex items-end gap-2 mb-1 px-1">
+              <div className="flex-1">
+                <span className="text-xs font-medium text-gray-500 uppercase">Part</span>
+              </div>
+              <div className="w-24">
+                <span className="text-xs font-medium text-gray-500 uppercase">Qty</span>
+              </div>
+              <div className="w-28">
+                <span className="text-xs font-medium text-gray-500 uppercase">Unit Cost</span>
+              </div>
+              <div className="w-8"></div>
             </div>
             <div className="space-y-3">
               {poItems.map((item, index) => (
@@ -372,7 +390,7 @@ export default function PurchasesPage() {
                     <Input
                       type="number"
                       min={1}
-                      placeholder="Qty"
+                      placeholder="e.g. 20"
                       value={item.quantity_ordered}
                       onChange={(e) =>
                         handleItemChange(index, 'quantity_ordered', parseInt(e.target.value) || 1)
@@ -384,7 +402,7 @@ export default function PurchasesPage() {
                       type="number"
                       min={0}
                       step={0.01}
-                      placeholder="Cost"
+                      placeholder="e.g. 5000"
                       value={item.unit_cost}
                       onChange={(e) =>
                         handleItemChange(index, 'unit_cost', parseFloat(e.target.value) || 0)
