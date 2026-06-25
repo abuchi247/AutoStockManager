@@ -91,8 +91,8 @@ export default function SaleDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<{ data: Sale }>(`/sales/${saleId}`);
-      setSale(response.data);
+      const response = await get<Sale>(`/sales/${saleId}`);
+      setSale(response);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load sale details';
       setError(message);
@@ -151,7 +151,7 @@ export default function SaleDetailPage() {
     setIsConfirming(true);
     setError(null);
     try {
-      await post<{ data: Sale }>(`/sales/${saleId}/confirm`);
+      await post<Sale>(`/sales/${saleId}/confirm`);
       setSuccess('Sale confirmed successfully. Stock has been deducted.');
       fetchSale();
     } catch (err: unknown) {
@@ -222,7 +222,7 @@ export default function SaleDetailPage() {
           reason: item.reason || undefined,
         })),
       };
-      await post<{ data: Sale }>(`/sales/${saleId}/return`, payload);
+      await post<Sale>(`/sales/${saleId}/return`, payload);
       setShowReturnModal(false);
       setSuccess('Return processed successfully. Stock has been restored.');
       fetchSale();
