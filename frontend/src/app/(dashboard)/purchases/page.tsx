@@ -184,12 +184,12 @@ export default function PurchasesPage() {
 
   const statusOptions: SelectOption[] = [
     { value: '', label: 'All Statuses' },
-    { value: 'draft', label: 'Draft' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'ordered', label: 'Ordered' },
-    { value: 'partially_received', label: 'Partially Received' },
-    { value: 'received', label: 'Received' },
-    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'DRAFT', label: 'Draft' },
+    { value: 'APPROVED', label: 'Approved' },
+    { value: 'ORDERED', label: 'Ordered' },
+    { value: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
+    { value: 'RECEIVED', label: 'Received' },
+    { value: 'CANCELLED', label: 'Cancelled' },
   ];
 
   const supplierOptions: SelectOption[] = suppliers.map((s) => ({

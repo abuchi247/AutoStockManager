@@ -26,10 +26,10 @@ import type { Sale, PaginatedResponse, SaleStatus } from '@/lib/types';
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'returned', label: 'Returned' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'RETURNED', label: 'Returned' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {

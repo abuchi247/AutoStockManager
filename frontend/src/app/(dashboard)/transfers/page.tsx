@@ -33,11 +33,11 @@ import type {
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'in_transit', label: 'In Transit' },
-  { value: 'received', label: 'Received' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'PENDING', label: 'Pending' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'IN_TRANSIT', label: 'In Transit' },
+  { value: 'RECEIVED', label: 'Received' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
 function getStatusBadge(status: TransferStatus): React.ReactNode {
