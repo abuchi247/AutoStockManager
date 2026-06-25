@@ -78,6 +78,28 @@ export default function LocationsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Location | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Stock view state
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockLocation, setStockLocation] = useState<Location | null>(null);
+  const [stockItems, setStockItems] = useState<Array<{ spare_part_id: string; spare_part_name: string; part_number: string; current_quantity: number }>>([]);
+  const [isStockLoading, setIsStockLoading] = useState(false);
+
+  const handleViewStock = async (location: Location) => {
+    setStockLocation(location);
+    setShowStockModal(true);
+    setIsStockLoading(true);
+    try {
+      const response = await get<{ location_id: string; location_name: string; data: Array<{ spare_part_id: string; spare_part_name: string; part_number: string; current_quantity: number }>; meta: { page: number; total: number; page_size: number } }>(
+        `/stock/locations/${location.id}?page_size=100`
+      );
+      setStockItems(response.data);
+    } catch {
+      setStockItems([]);
+    } finally {
+      setIsStockLoading(false);
+    }
+  };
+
   const fetchLocations = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -197,6 +219,13 @@ export default function LocationsPage() {
       header: 'Actions',
       render: (item) => (
         <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleViewStock(item)}
+          >
+            Stock
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -444,6 +473,65 @@ export default function LocationsPage() {
           Are you sure you want to delete{' '}
           <span className="font-medium text-gray-900">{deleteTarget?.name}</span>?
         </p>
+      </Modal>
+
+      {/* Stock View Modal */}
+      <Modal
+        isOpen={showStockModal}
+        onClose={() => {
+          setShowStockModal(false);
+          setStockLocation(null);
+          setStockItems([]);
+        }}
+        title={`Stock at ${stockLocation?.name || ''}`}
+        size="lg"
+        footer={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowStockModal(false);
+              setStockLocation(null);
+              setStockItems([]);
+            }}
+          >
+            Close
+          </Button>
+        }
+      >
+        {isStockLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          </div>
+        ) : stockItems.length === 0 ? (
+          <p className="text-sm text-gray-500 py-4">No stock at this location.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Part</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Part #</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Quantity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {stockItems.map((item) => (
+                  <tr key={item.spare_part_id}>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                      {item.spare_part_name}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                      {item.part_number}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-right font-medium text-gray-900">
+                      {item.current_quantity}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Modal>
     </div>
   );
