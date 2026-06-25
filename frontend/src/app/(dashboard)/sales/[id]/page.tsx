@@ -450,6 +450,78 @@ export default function SaleDetailPage() {
         </div>
       </div>
 
+      {/* Return Summary - show if any items have been returned */}
+      {sale.items && sale.items.some((item) => Number(item.returned_quantity || 0) > 0) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-amber-900">Return Summary</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-amber-200">
+              <thead className="bg-amber-100/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-amber-700">Part</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-amber-700">Sold</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-amber-700">Returned</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-amber-700">Kept</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-amber-700">Refund Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {sale.items.filter((item) => Number(item.returned_quantity || 0) > 0).map((item) => {
+                  const returned = Number(item.returned_quantity || 0);
+                  const sold = Number(item.quantity);
+                  const kept = sold - returned;
+                  const unitPrice = Number(item.unit_price);
+                  const refund = returned * unitPrice;
+                  return (
+                    <tr key={item.id}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                        {item.spare_part?.name || 'Unknown Part'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-700">{sold}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-red-600 font-medium">{returned}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-700">{kept}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-red-600 font-medium">
+                        {formatCurrency(refund)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <div className="w-full max-w-xs space-y-2 rounded-md bg-white p-4 border border-amber-200">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Original Total:</span>
+                <span>{formatCurrency(sale.total_amount)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-red-600">
+                <span>Total Refunded:</span>
+                <span>
+                  -{formatCurrency(
+                    sale.items.reduce((sum, item) => {
+                      const returned = Number(item.returned_quantity || 0);
+                      return sum + returned * Number(item.unit_price);
+                    }, 0)
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-amber-200 pt-2 text-base font-semibold text-gray-900">
+                <span>Net Amount:</span>
+                <span>
+                  {formatCurrency(
+                    Number(sale.total_amount) - sale.items.reduce((sum, item) => {
+                      const returned = Number(item.returned_quantity || 0);
+                      return sum + returned * Number(item.unit_price);
+                    }, 0)
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Invoice Section */}
       {(sale.status === 'confirmed' || sale.status === 'returned') && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
