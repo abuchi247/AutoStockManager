@@ -35,6 +35,7 @@ from app.services.sales_service import (
     SaleNotFoundError,
     SalesService,
 )
+from app.models.sale import SaleItem
 
 router = APIRouter(prefix="/api/v1/sales", tags=["Sales"])
 
@@ -176,6 +177,87 @@ async def get_sale(
             detail="Sale not found",
         )
 
+    return SaleResponse.model_validate(sale)
+
+
+@router.put(
+    "/{sale_id}",
+    response_model=SaleResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update a draft sale",
+    description="Update a sale that is still in DRAFT status. Allows changing customer, payment type, and line items.",
+    responses={
+        400: {"model": ErrorResponse, "description": "Sale is not in DRAFT status"},
+        404: {"model": ErrorResponse, "description": "Sale not found"},
+    },
+)
+async def update_sale(
+    sale_id: UUID,
+    request: SaleCreate,
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+    ),
+) -> SaleResponse:
+    """Update a draft sale's customer, payment type, and line items.
+
+    Only DRAFT sales can be edited. Once confirmed, a sale is immutable.
+    """
+    from decimal import Decimal
+
+    stmt = select(Sale).filter_by(id=sale_id)
+    result = await db.execute(stmt)
+    sale = result.scalar_one_or_none()
+
+    if sale is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sale not found",
+        )
+
+    if sale.status != SaleStatus.DRAFT.value and sale.status != "DRAFT":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft sales can be edited",
+        )
+
+    # Update basic fields
+    if request.customer_id is not None:
+        sale.customer_id = request.customer_id
+    sale.location_id = request.location_id
+    sale.payment_type = request.payment_type
+
+    # Remove existing line items
+    existing_items_stmt = select(SaleItem).filter_by(sale_id=sale_id)
+    existing_result = await db.execute(existing_items_stmt)
+    for item in existing_result.scalars().all():
+        await db.delete(item)
+
+    # Add new line items
+    subtotal = Decimal("0")
+    discount_total = Decimal("0")
+    if request.items:
+        for item_data in request.items:
+            line_total = Decimal(str(item_data.quantity)) * Decimal(str(item_data.unit_price)) - Decimal(str(item_data.discount_amount or 0))
+            new_item = SaleItem(
+                sale_id=sale_id,
+                spare_part_id=item_data.spare_part_id,
+                quantity=item_data.quantity,
+                unit_price=Decimal(str(item_data.unit_price)),
+                discount_amount=Decimal(str(item_data.discount_amount or 0)),
+                line_total=line_total,
+            )
+            db.add(new_item)
+            subtotal += line_total
+            discount_total += Decimal(str(item_data.discount_amount or 0))
+
+    sale.subtotal = subtotal
+    sale.discount_total = discount_total
+    sale.total_amount = subtotal
+    sale.updated_by = str(current_user.id)
+
+    await db.commit()
+    await db.refresh(sale)
     return SaleResponse.model_validate(sale)
 
 

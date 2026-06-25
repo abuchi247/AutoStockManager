@@ -277,6 +277,14 @@ export default function SaleDetailPage() {
         <div className="flex items-center gap-3">
           {sale.status === 'draft' && (
             <Button
+              variant="secondary"
+              onClick={() => router.push(`/sales/${saleId}/edit`)}
+            >
+              Edit Items
+            </Button>
+          )}
+          {sale.status === 'draft' && (
+            <Button
               onClick={handleConfirm}
               isLoading={isConfirming}
             >
