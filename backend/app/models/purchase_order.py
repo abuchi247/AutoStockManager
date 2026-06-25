@@ -19,13 +19,17 @@ import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.supplier import Supplier
+    from app.models.spare_part import SparePart
 
 
 class PurchaseOrderStatus(str, enum.Enum):
@@ -133,6 +137,11 @@ class PurchaseOrder(BaseModel):
         lazy="selectin",
     )
 
+    supplier: Mapped[Optional["Supplier"]] = relationship(
+        "Supplier",
+        lazy="selectin",
+    )
+
     def calculate_total(self) -> Decimal:
         """Calculate the total amount from line items.
 
@@ -222,6 +231,11 @@ class PurchaseOrderItem(BaseModel):
     purchase_order: Mapped["PurchaseOrder"] = relationship(
         "PurchaseOrder",
         back_populates="items",
+        lazy="selectin",
+    )
+
+    spare_part: Mapped[Optional["SparePart"]] = relationship(
+        "SparePart",
         lazy="selectin",
     )
 

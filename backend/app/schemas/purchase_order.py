@@ -141,6 +141,15 @@ class GoodsReceiveRequest(BaseModel):
 # =============================================================================
 
 
+class SparePartBrief(BaseModel):
+    """Brief spare part info for PO items."""
+    id: UUID
+    name: str
+    part_number: str
+    brand: Optional[str] = None
+    model_config = {"from_attributes": True}
+
+
 class PurchaseOrderItemResponse(BaseModel):
     """Response schema for a purchase order line item."""
 
@@ -150,8 +159,18 @@ class PurchaseOrderItemResponse(BaseModel):
     quantity_ordered: Decimal = Field(..., description="Quantity ordered")
     quantity_received: Decimal = Field(..., description="Quantity received so far")
     unit_cost: Decimal = Field(..., description="Unit cost for this line item")
+    spare_part: Optional[SparePartBrief] = Field(default=None, description="Spare part details")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
 
+    model_config = {"from_attributes": True}
+
+
+class SupplierBrief(BaseModel):
+    """Brief supplier info for PO response."""
+    id: UUID
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -169,6 +188,7 @@ class PurchaseOrderResponse(BaseModel):
     items: list[PurchaseOrderItemResponse] = Field(
         default_factory=list, description="Line items"
     )
+    supplier: Optional[SupplierBrief] = Field(default=None, description="Supplier details")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
     updated_at: Optional[datetime] = Field(default=None, description="Updated timestamp")
 

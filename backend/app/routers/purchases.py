@@ -15,11 +15,13 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.dependencies import DbSession
 from app.middleware.auth import require_roles
-from app.models.purchase_order import PurchaseOrderStatus
+from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
 from app.schemas.grn import GRNResponse
@@ -176,6 +178,17 @@ async def get_purchase_order(
 
     try:
         po = await service.get_po(po_id)
+        # Eagerly load supplier and spare_part for items
+        stmt = (
+            select(PurchaseOrder)
+            .filter_by(id=po_id)
+            .options(
+                selectinload(PurchaseOrder.supplier),
+                selectinload(PurchaseOrder.items).selectinload(PurchaseOrderItem.spare_part),
+            )
+        )
+        result = await db.execute(stmt)
+        po = result.scalar_one()
         return PurchaseOrderResponse.model_validate(po)
     except PurchaseOrderNotFoundError:
         raise HTTPException(
