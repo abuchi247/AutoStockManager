@@ -108,7 +108,7 @@ export default function SaleDetailPage() {
 
   // Check if invoice exists for this sale
   useEffect(() => {
-    if (sale?.status === 'confirmed') {
+    if (sale?.status === 'confirmed' || sale?.status === 'returned') {
       get<{ id: string }>(`/invoices/by-sale/${saleId}?format=${invoiceFormat}`)
         .then((inv) => setInvoiceId(inv.id))
         .catch(() => setInvoiceId(null));
@@ -431,7 +431,7 @@ export default function SaleDetailPage() {
       </div>
 
       {/* Invoice Section */}
-      {sale.status === 'confirmed' && (
+      {(sale.status === 'confirmed' || sale.status === 'returned') && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Invoice</h2>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -456,6 +456,11 @@ export default function SaleDetailPage() {
               </Button>
             )}
           </div>
+          {sale.status === 'returned' && (
+            <p className="mt-3 text-sm text-amber-600">
+              ⚠️ This sale has been returned. The original invoice remains as a record. A credit note should be issued separately.
+            </p>
+          )}
         </div>
       )}
 

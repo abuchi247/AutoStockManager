@@ -367,8 +367,12 @@ class SalesService:
                 created_by=returned_by,
             )
 
-        # Update sale status to RETURNED
-        sale.status = SaleStatus.RETURNED
+        # Update sale status — only mark as RETURNED if ALL items are fully returned
+        total_sold = sum(Decimal(str(item.quantity)) for item in sale.items)
+        total_returned = sum(qty for _, qty in items_to_return)
+        if total_returned >= total_sold:
+            sale.status = SaleStatus.RETURNED
+        # Otherwise keep as CONFIRMED (partial return)
 
         await self.db.flush()
         return sale
