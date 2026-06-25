@@ -140,12 +140,22 @@ export default function SaleDetailPage() {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!invoiceId) return;
-    // Open PDF in new tab — the backend returns the raw PDF
-    const token = localStorage.getItem('access_token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-    window.open(`${apiUrl}/invoices/${invoiceId}/pdf`, '_blank');
+    try {
+      // Use the authenticated API client to fetch the PDF as a blob
+      const { default: api } = await import('@/lib/api');
+      const response = await api.get(`/invoices/${invoiceId}/pdf`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // Clean up the blob URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      setError('Failed to download invoice PDF');
+    }
   };
 
   const handleConfirm = async () => {
