@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cost_layer import CostLayer
-from app.models.inventory_movement_ledger import MovementType
+from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType
 from app.models.sale import Sale, SaleItem, SaleStatus, PaymentType
 from app.models.stock_status_cache import StockStatusCache
 from app.utils.fifo import consume_fifo_layers
@@ -327,7 +327,34 @@ class SalesService:
             )
 
         # Determine which items and quantities to return
-        items_to_return = self._resolve_return_items(sale, return_items)
+        # First, query the ledger for previously returned quantities for this sale
+        from sqlalchemy import func as sa_func
+        prev_return_stmt = (
+            select(
+                InventoryMovementLedger.spare_part_id,
+                sa_func.sum(InventoryMovementLedger.quantity_change).label("total_returned"),
+            )
+            .filter(
+                InventoryMovementLedger.reference_id == sale_id,
+                InventoryMovementLedger.reference_type == "sale",
+                InventoryMovementLedger.movement_type == MovementType.RETURN.value,
+            )
+            .group_by(InventoryMovementLedger.spare_part_id)
+        )
+        prev_result = await self.db.execute(prev_return_stmt)
+        previously_returned = {
+            row.spare_part_id: row.total_returned
+            for row in prev_result
+        }
+
+        try:
+            items_to_return = self._resolve_return_items(sale, return_items, previously_returned)
+        except ValueError as e:
+            raise InvalidSaleStatusError(
+                sale_id=sale_id,
+                current_status="RETURN_EXCEEDED",
+                expected_status=str(e),
+            )
 
         # Process each return item
         for sale_item, return_quantity in items_to_return:
@@ -369,8 +396,10 @@ class SalesService:
 
         # Update sale status — only mark as RETURNED if ALL items are fully returned
         total_sold = sum(Decimal(str(item.quantity)) for item in sale.items)
-        total_returned = sum(qty for _, qty in items_to_return)
-        if total_returned >= total_sold:
+        total_previously_returned = sum(previously_returned.values())
+        total_returned_now = sum(qty for _, qty in items_to_return)
+        total_all_returned = total_previously_returned + total_returned_now
+        if total_all_returned >= total_sold:
             sale.status = SaleStatus.RETURNED
         # Otherwise keep as CONFIRMED (partial return)
 
@@ -396,6 +425,7 @@ class SalesService:
         self,
         sale: Sale,
         return_items: Optional[list[dict]],
+        previously_returned: dict[uuid.UUID, Decimal] = None,
     ) -> list[tuple[SaleItem, Decimal]]:
         """Resolve which sale items and quantities are being returned.
 
@@ -403,13 +433,26 @@ class SalesService:
             sale: The sale with items loaded.
             return_items: Optional explicit return specification. If None,
                 all items are returned in full.
+            previously_returned: Dict mapping sale_item spare_part_id to qty already returned.
 
         Returns:
             List of (SaleItem, return_quantity) tuples.
+
+        Raises:
+            ValueError: If return quantity exceeds remaining returnable quantity.
         """
+        if previously_returned is None:
+            previously_returned = {}
+
         if return_items is None:
-            # Return all items in full
-            return [(item, item.quantity) for item in sale.items]
+            # Return all items in full (minus already returned)
+            resolved = []
+            for item in sale.items:
+                already_returned = previously_returned.get(item.spare_part_id, Decimal("0"))
+                remaining = item.quantity - already_returned
+                if remaining > 0:
+                    resolved.append((item, remaining))
+            return resolved
 
         # Build lookup by sale_item_id
         items_by_id = {item.id: item for item in sale.items}
@@ -421,8 +464,21 @@ class SalesService:
 
             if sale_item_id in items_by_id:
                 sale_item = items_by_id[sale_item_id]
-                # Cap return quantity at original sale quantity
-                actual_return_qty = min(quantity, sale_item.quantity)
+                already_returned = previously_returned.get(sale_item.spare_part_id, Decimal("0"))
+                max_returnable = sale_item.quantity - already_returned
+
+                if max_returnable <= 0:
+                    raise ValueError(
+                        f"All units of this item have already been returned"
+                    )
+
+                # Cap return quantity at remaining returnable amount
+                actual_return_qty = min(quantity, max_returnable)
+                if quantity > max_returnable:
+                    raise ValueError(
+                        f"Cannot return {quantity} units. Only {max_returnable} remaining "
+                        f"(sold: {sale_item.quantity}, already returned: {already_returned})"
+                    )
                 resolved.append((sale_item, actual_return_qty))
 
         return resolved
