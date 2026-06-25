@@ -257,7 +257,17 @@ async def update_sale(
     sale.updated_by = str(current_user.id)
 
     await db.commit()
-    await db.refresh(sale)
+
+    # Re-fetch with eager loading for the response
+    from sqlalchemy.orm import selectinload
+    stmt = (
+        select(Sale)
+        .filter_by(id=sale_id)
+        .options(selectinload(Sale.items).selectinload(SaleItem.spare_part))
+    )
+    result = await db.execute(stmt)
+    sale = result.scalar_one()
+
     return SaleResponse.model_validate(sale)
 
 
