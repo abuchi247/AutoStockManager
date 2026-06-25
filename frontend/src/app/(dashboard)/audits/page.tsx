@@ -118,7 +118,11 @@ export default function AuditsPage() {
       const response = await get<PaginatedResponse<AuditSession>>(
         `/audits?${params.toString()}`
       );
-      setAudits(response.data);
+      setAudits(response.data.map((a: AuditSession) => ({ 
+        ...a, 
+        status: a.status?.toLowerCase() as AuditStatus,
+        audit_type: a.audit_type?.toLowerCase() as AuditType,
+      })));
       setTotalPages(response.meta.total_pages);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load audit sessions';
@@ -161,7 +165,7 @@ export default function AuditsPage() {
     try {
       const payload: Record<string, unknown> = {
         location_id: form.location_id,
-        audit_type: form.audit_type,
+        audit_type: form.audit_type.toUpperCase(),
       };
 
       // Parse optional spare_part_ids (comma-separated)
