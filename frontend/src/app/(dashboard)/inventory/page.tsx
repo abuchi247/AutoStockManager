@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
 import {
   DataTable,
@@ -44,6 +44,7 @@ function getStockBadge(part: SparePart & { total_stock?: number }): React.ReactN
 
 export default function InventoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // List state
   const [parts, setParts] = useState<(SparePart & { total_stock?: number })[]>([]);
@@ -57,7 +58,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState(searchParams.get('location') || '');
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
