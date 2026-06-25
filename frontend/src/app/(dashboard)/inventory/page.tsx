@@ -20,6 +20,7 @@ import type {
   Category,
   PaginatedResponse,
 } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 type StockLevel = 'in_stock' | 'low' | 'out_of_stock';
 
@@ -293,7 +294,7 @@ export default function InventoryPage() {
       sortable: true,
       render: (item) => (
         <span className="font-medium">
-          ${Number(item.selling_price).toFixed(2)}
+          {formatCurrency(item.selling_price)}
         </span>
       ),
     },

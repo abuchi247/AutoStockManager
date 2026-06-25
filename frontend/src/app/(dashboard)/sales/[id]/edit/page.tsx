@@ -29,6 +29,7 @@ import type {
   SaleItemCreate,
   Sale,
 } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 interface LineItem {
   id: string;
@@ -378,10 +379,7 @@ export default function EditSalePage() {
                         <span className="ml-2 text-gray-500">({part.part_number})</span>
                       </div>
                       <span className="text-gray-600">
-                        {new Intl.NumberFormat('en-NG', {
-                          style: 'currency',
-                          currency: 'NGN',
-                        }).format(part.selling_price)}
+                        {formatCurrency(part.selling_price)}
                       </span>
                     </button>
                   </li>
@@ -471,10 +469,7 @@ export default function EditSalePage() {
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
-                      {new Intl.NumberFormat('en-NG', {
-                        style: 'currency',
-                        currency: 'NGN',
-                      }).format(item.line_total)}
+                      {formatCurrency(item.line_total)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <button
@@ -506,28 +501,19 @@ export default function EditSalePage() {
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Subtotal:</span>
                 <span>
-                  {new Intl.NumberFormat('en-NG', {
-                    style: 'currency',
-                    currency: 'NGN',
-                  }).format(subtotal)}
+                  {formatCurrency(subtotal)}
                 </span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Discount:</span>
                 <span className="text-red-600">
-                  -{new Intl.NumberFormat('en-NG', {
-                    style: 'currency',
-                    currency: 'NGN',
-                  }).format(discountTotal)}
+                  -{formatCurrency(discountTotal)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
                 <span>Total:</span>
                 <span>
-                  {new Intl.NumberFormat('en-NG', {
-                    style: 'currency',
-                    currency: 'NGN',
-                  }).format(totalAmount)}
+                  {formatCurrency(totalAmount)}
                 </span>
               </div>
             </div>

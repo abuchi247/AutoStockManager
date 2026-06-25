@@ -21,15 +21,9 @@ import type {
   Sale,
   AccountStatus,
 } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 type TabKey = 'purchases' | 'ledger' | 'aging';
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', {

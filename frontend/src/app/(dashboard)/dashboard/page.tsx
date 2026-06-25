@@ -14,6 +14,7 @@ import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert } from '@/components/Alert';
+import { formatCurrency } from '@/lib/currency';
 import type { DashboardKPIs } from '@/lib/types';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -195,15 +196,4 @@ function KPICard({ title, value, borderColor }: KPICardProps) {
       </p>
     </div>
   );
-}
-
-// --- Utility Functions ---
-
-function formatCurrency(amount: number | string): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Number(amount));
 }

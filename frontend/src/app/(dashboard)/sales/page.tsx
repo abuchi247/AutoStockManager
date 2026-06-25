@@ -23,6 +23,7 @@ import {
 } from '@/components';
 import type { Column, SelectOption, BadgeVariant } from '@/components';
 import type { Sale, PaginatedResponse, SaleStatus } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
@@ -41,15 +42,6 @@ function getStatusBadge(status: SaleStatus): React.ReactNode {
   };
   const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 function formatDate(dateStr: string): string {

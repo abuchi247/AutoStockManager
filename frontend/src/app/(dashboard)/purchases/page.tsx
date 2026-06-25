@@ -22,13 +22,7 @@ import type {
   SparePart,
   PaginatedResponse,
 } from '@/lib/types';
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-}
+import { formatCurrency } from '@/lib/currency';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {

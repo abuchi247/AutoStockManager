@@ -14,6 +14,7 @@ import {
 } from '@/components';
 import type { SelectOption } from '@/components';
 import type { SparePart, SparePartUpdate, Category } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 export default function InventoryDetailPage() {
   const router = useRouter();
@@ -363,11 +364,11 @@ export default function InventoryDetailPage() {
           <dl className="space-y-3">
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Cost Price</dt>
-              <dd className="text-sm font-medium text-gray-900">${Number(part.cost_price).toFixed(2)}</dd>
+              <dd className="text-sm font-medium text-gray-900">{formatCurrency(part.cost_price)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Selling Price</dt>
-              <dd className="text-sm font-medium text-gray-900">${Number(part.selling_price).toFixed(2)}</dd>
+              <dd className="text-sm font-medium text-gray-900">{formatCurrency(part.selling_price)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Margin</dt>
@@ -547,7 +548,7 @@ export default function InventoryDetailPage() {
                         {cl.location_name || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
-                        ${cl.unit_cost.toFixed(2)}
+                        {formatCurrency(cl.unit_cost)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
                         {cl.original_quantity}

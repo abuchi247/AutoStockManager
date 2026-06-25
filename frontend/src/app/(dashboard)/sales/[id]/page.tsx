@@ -23,6 +23,7 @@ import {
 } from '@/components';
 import type { BadgeVariant, SelectOption } from '@/components';
 import type { Sale, SaleItem, SaleStatus, SaleReturnRequest } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
   const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
@@ -33,15 +34,6 @@ function getStatusBadge(status: SaleStatus): React.ReactNode {
   };
   const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 function formatDate(dateStr: string): string {
@@ -185,7 +177,7 @@ export default function SaleDetailPage() {
     setIsCancelling(true);
     setError(null);
     try {
-      await post<Sale>(`/sales/${saleId}/cancel`);
+      await post<Sale>(`/sales/${saleId}/cancel`, {});
       setSuccess('Sale cancelled.');
       fetchSale();
     } catch (err: unknown) {

@@ -21,6 +21,7 @@ import type {
   PaginatedResponse,
 } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
+import { getCurrency, setCurrency, CURRENCY_OPTIONS } from '@/lib/currency';
 
 function getRoleBadge(role: UserRole): React.ReactNode {
   const variants: Record<UserRole, 'info' | 'success' | 'warning' | 'default'> = {
@@ -300,6 +301,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* System Settings Section */}
+      <SystemSettingsSection />
+
       {/* User Management Section */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
         <div className="mb-6 flex items-center justify-between">
@@ -480,6 +484,54 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// --- System Settings Component ---
+
+function SystemSettingsSection() {
+  const [currency, setCurrencyState] = useState(getCurrency());
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setCurrency(value);
+    setCurrencyState(value);
+    setSuccessMsg('Currency updated successfully');
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  const currencyOptions: SelectOption[] = CURRENCY_OPTIONS.map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+  }));
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900">System Settings</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Configure application-wide settings
+        </p>
+      </div>
+
+      {successMsg && (
+        <div className="mb-4">
+          <Alert variant="success" onClose={() => setSuccessMsg(null)}>
+            {successMsg}
+          </Alert>
+        </div>
+      )}
+
+      <div className="max-w-sm">
+        <Select
+          label="Currency"
+          options={currencyOptions}
+          value={currency}
+          onChange={handleCurrencyChange}
+        />
+      </div>
     </div>
   );
 }

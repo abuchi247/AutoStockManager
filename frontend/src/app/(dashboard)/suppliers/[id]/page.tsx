@@ -20,6 +20,7 @@ import type {
   PaginatedResponse,
   AccountStatus,
 } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 interface SupplierBalance {
   supplier_id: string;
@@ -62,13 +63,6 @@ function formatDate(dateStr: string): string {
     month: 'short',
     day: 'numeric',
   });
-}
-
-function formatCurrency(amount: number, currency?: string): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency || 'NGN',
-  }).format(amount);
 }
 
 export default function SupplierDetailPage() {
@@ -281,7 +275,7 @@ export default function SupplierDetailPage() {
           ) : balance ? (
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-900">
-                {formatCurrency(balance.balance, balance.currency)}
+                {formatCurrency(balance.balance)}
               </p>
               <p className="mt-1 text-sm text-gray-500">
                 Outstanding balance

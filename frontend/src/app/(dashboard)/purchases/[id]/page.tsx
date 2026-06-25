@@ -6,13 +6,7 @@ import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { BadgeVariant } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-}
+import { formatCurrency } from '@/lib/currency';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {

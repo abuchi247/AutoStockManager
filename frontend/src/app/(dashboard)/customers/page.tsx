@@ -19,6 +19,7 @@ import type {
   PaginatedResponse,
   AccountStatus,
 } from '@/lib/types';
+import { formatCurrency } from '@/lib/currency';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -34,12 +35,7 @@ function getStatusBadge(status: AccountStatus): React.ReactNode {
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-}
+
 
 export default function CustomersPage() {
   const router = useRouter();
