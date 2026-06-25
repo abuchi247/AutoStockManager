@@ -139,6 +139,16 @@ class SaleReturnRequest(BaseModel):
 # =============================================================================
 
 
+class SparePartBrief(BaseModel):
+    """Brief spare part info for embedding in sale items."""
+    id: UUID
+    name: str
+    part_number: str
+    brand: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class SaleItemResponse(BaseModel):
     """Response body for a single sale line item."""
 
@@ -152,6 +162,7 @@ class SaleItemResponse(BaseModel):
     cost_of_goods_sold: Optional[Decimal] = Field(
         default=None, description="COGS from FIFO layers (filled on confirm)"
     )
+    spare_part: Optional[SparePartBrief] = Field(default=None, description="Spare part details")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
 
     model_config = {"from_attributes": True}

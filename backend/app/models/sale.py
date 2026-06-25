@@ -12,13 +12,16 @@ one or more Sale_Items (spare part, quantity, unit price, optional discount).
 import enum
 import uuid
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, Numeric, String, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, SoftDeleteMixin
+
+if TYPE_CHECKING:
+    from app.models.spare_part import SparePart
 
 
 class SaleStatus(str, enum.Enum):
@@ -242,6 +245,11 @@ class SaleItem(BaseModel):
     sale: Mapped["Sale"] = relationship(
         "Sale",
         back_populates="items",
+        lazy="selectin",
+    )
+
+    spare_part: Mapped[Optional["SparePart"]] = relationship(
+        "SparePart",
         lazy="selectin",
     )
 
