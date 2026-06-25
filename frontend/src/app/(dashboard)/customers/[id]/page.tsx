@@ -106,8 +106,8 @@ export default function CustomerDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<{ data: Customer }>(`/customers/${customerId}`);
-      setCustomer(response.data);
+      const response = await get<Customer>(`/customers/${customerId}`);
+      setCustomer(response);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load customer';
       setError(message);
@@ -147,10 +147,10 @@ export default function CustomerDetailPage() {
   const fetchAging = useCallback(async () => {
     setIsAgingLoading(true);
     try {
-      const response = await get<{ data: AgingBucket }>(
+      const response = await get<AgingBucket>(
         `/customers/${customerId}/aging`
       );
-      setAging(response.data);
+      setAging(response);
     } catch {
       // Silently handle
     } finally {
@@ -186,11 +186,11 @@ export default function CustomerDetailPage() {
     setIsSaving(true);
     setError(null);
     try {
-      const response = await put<{ data: Customer }>(
+      const response = await put<Customer>(
         `/customers/${customerId}`,
         editForm
       );
-      setCustomer(response.data);
+      setCustomer(response);
       setIsEditing(false);
       setSuccessMessage('Customer updated successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
