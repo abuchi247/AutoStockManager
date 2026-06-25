@@ -61,21 +61,48 @@ async def list_spare_parts(
     current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    location_id: Optional[str] = Query(default=None, description="Filter by location ID (only show parts with stock at this location)"),
+    location_id: Optional[str] = Query(default=None, description="Filter by location ID"),
+    search: Optional[str] = Query(default=None, description="Search by name, part number, or barcode"),
+    brand: Optional[str] = Query(default=None, description="Filter by brand"),
+    category_id: Optional[str] = Query(default=None, description="Filter by category ID"),
 ) -> SparePartListResponse:
-    """List all active spare parts with pagination.
+    """List all active spare parts with pagination and filters.
 
     Accessible by all authenticated users.
-    Optionally filter to only parts with stock at a specific location.
     """
     from uuid import UUID as UUIDType
+    from app.models.spare_part import SparePart as SP
+
+    # Build base query with filters
+    base_filter = [SP.deleted_at.is_(None)]
+
+    if search:
+        search_term = f"%{search}%"
+        from sqlalchemy import or_
+        base_filter.append(
+            or_(
+                SP.name.ilike(search_term),
+                SP.part_number.ilike(search_term),
+                SP.barcode.ilike(search_term),
+            )
+        )
+
+    if brand:
+        base_filter.append(SP.brand.ilike(f"%{brand}%"))
+
+    if category_id:
+        cat_uuid = UUIDType(category_id)
+        base_filter.append(SP.category_id == cat_uuid)
 
     if location_id:
-        # Filter to parts that have stock at this location
+        # Join with stock cache to filter by location
         loc_uuid = UUIDType(location_id)
+
         count_stmt = (
-            select(func.count(StockStatusCache.spare_part_id.distinct()))
+            select(func.count(SP.id.distinct()))
+            .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
             .filter(
+                *base_filter,
                 StockStatusCache.location_id == loc_uuid,
                 StockStatusCache.current_quantity > 0,
             )
@@ -84,12 +111,11 @@ async def list_spare_parts(
         total = total_result.scalar() or 0
 
         offset = (page - 1) * page_size
-        from app.models.spare_part import SparePart as SP
         stmt = (
             select(SP)
             .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
             .filter(
-                SP.deleted_at.is_(None),
+                *base_filter,
                 StockStatusCache.location_id == loc_uuid,
                 StockStatusCache.current_quantity > 0,
             )
@@ -117,8 +143,21 @@ async def list_spare_parts(
             stock_result = await db.execute(stock_stmt)
             stock_map = {row.spare_part_id: row.current_quantity for row in stock_result}
     else:
-        service = _get_inventory_service(db)
-        spare_parts, total = await service.list_spare_parts(page=page, page_size=page_size)
+        # No location filter — standard list with optional search/brand/category
+        count_stmt = select(func.count(SP.id)).filter(*base_filter)
+        total_result = await db.execute(count_stmt)
+        total = total_result.scalar() or 0
+
+        offset = (page - 1) * page_size
+        stmt = (
+            select(SP)
+            .filter(*base_filter)
+            .order_by(SP.name.asc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        result = await db.execute(stmt)
+        spare_parts = list(result.scalars().all())
 
         # Get total stock for each part from cache
         part_ids = [sp.id for sp in spare_parts]
