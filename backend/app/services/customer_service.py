@@ -266,10 +266,11 @@ class CustomerService:
         # Verify customer exists
         await self.get_customer(customer_id)
 
-        # Count total sales for this customer
+        # Count total sales for this customer (exclude drafts - not completed transactions)
         count_stmt = select(func.count(Sale.id)).filter(
             Sale.customer_id == customer_id,
             Sale.deleted_at.is_(None),
+            Sale.status != "DRAFT",
         )
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar() or 0
@@ -281,6 +282,7 @@ class CustomerService:
             .filter(
                 Sale.customer_id == customer_id,
                 Sale.deleted_at.is_(None),
+                Sale.status != "DRAFT",
             )
             .order_by(Sale.created_at.desc())
             .offset(offset)

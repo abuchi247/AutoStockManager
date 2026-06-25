@@ -216,17 +216,30 @@ export default function CreateSalePage() {
       const saleId = sale.id;
 
       // Then confirm it
-      await post<Sale>(`/sales/${saleId}/confirm`);
-      setSuccess('Sale confirmed successfully. Stock has been deducted.');
-      setTimeout(() => {
-        router.push(`/sales/${saleId}`);
-      }, 1000);
+      try {
+        await post<Sale>(`/sales/${saleId}/confirm`);
+        setSuccess('Sale confirmed successfully. Stock has been deducted.');
+        setTimeout(() => {
+          router.push(`/sales/${saleId}`);
+        }, 1000);
+      } catch (confirmErr: unknown) {
+        // Confirm failed but sale was created as draft — redirect to it
+        const message =
+          confirmErr && typeof confirmErr === 'object' && 'response' in confirmErr
+            ? ((confirmErr as { response?: { data?: { detail?: string } } }).response?.data
+                ?.detail ?? 'Failed to confirm sale. Saved as draft instead.')
+            : 'Failed to confirm sale. Saved as draft instead.';
+        setError(message);
+        setTimeout(() => {
+          router.push(`/sales/${saleId}`);
+        }, 2000);
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to confirm sale. Stock may be insufficient.')
-          : 'Failed to confirm sale. Stock may be insufficient.';
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data
+              ?.detail ?? 'Failed to create sale.')
+          : 'Failed to create sale.';
       setError(message);
     } finally {
       setIsConfirming(false);
