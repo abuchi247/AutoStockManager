@@ -404,6 +404,12 @@ export default function InventoryDetailPage() {
         </div>
       </div>
 
+      {/* Stock by Location */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Stock by Location</h2>
+        <StockByLocation partId={partId} />
+      </div>
+
       {/* Metadata */}
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Record Info</h2>
@@ -788,6 +794,61 @@ export default function InventoryDetailPage() {
           />
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// Stock by Location sub-component
+function StockByLocation({ partId }: { partId: string }) {
+  const [items, setItems] = useState<Array<{ location_id: string; location_name: string | null; current_quantity: number }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetch() {
+      try {
+        const response = await get<{ spare_part_id: string; data: Array<{ location_id: string; location_name: string | null; current_quantity: number }> }>(
+          `/stock/by-part/${partId}`
+        );
+        setItems(response.data);
+      } catch {
+        setItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetch();
+  }, [partId]);
+
+  if (isLoading) {
+    return <p className="text-sm text-gray-500">Loading...</p>;
+  }
+
+  if (items.length === 0) {
+    return <p className="text-sm text-gray-500">No stock at any location.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Location</th>
+            <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Quantity</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {items.map((item) => (
+            <tr key={item.location_id}>
+              <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+                {item.location_name || '—'}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-right font-medium text-gray-900">
+                {item.current_quantity}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

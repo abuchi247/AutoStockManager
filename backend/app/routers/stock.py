@@ -358,6 +358,59 @@ async def get_movement_history(
 
 
 # =============================================================================
+# Stock By Location Endpoint (per spare part)
+# =============================================================================
+
+
+class StockByLocationItem(BaseModel):
+    """Stock at a single location for a spare part."""
+    location_id: UUID
+    location_name: Optional[str] = None
+    current_quantity: float
+
+
+class StockByLocationResponse(BaseModel):
+    """All locations and quantities for a spare part."""
+    spare_part_id: UUID
+    data: list[StockByLocationItem]
+
+
+@router.get(
+    "/by-part/{spare_part_id}",
+    response_model=StockByLocationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get stock breakdown by location for a spare part",
+    description="Returns all locations where this spare part has stock, with quantities.",
+)
+async def get_stock_by_part(
+    spare_part_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> StockByLocationResponse:
+    """Get stock quantity at each location for a specific spare part."""
+    stmt = (
+        select(StockStatusCache, Location.name.label("location_name"))
+        .outerjoin(Location, StockStatusCache.location_id == Location.id)
+        .where(StockStatusCache.spare_part_id == spare_part_id)
+        .where(StockStatusCache.current_quantity > 0)
+        .order_by(Location.name.asc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items = [
+        StockByLocationItem(
+            location_id=row.StockStatusCache.location_id,
+            location_name=row.location_name,
+            current_quantity=float(row.StockStatusCache.current_quantity),
+        )
+        for row in rows
+    ]
+
+    return StockByLocationResponse(spare_part_id=spare_part_id, data=items)
+
+
+# =============================================================================
 # Cost Layers Endpoint
 # =============================================================================
 

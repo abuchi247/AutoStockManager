@@ -61,28 +61,79 @@ async def list_spare_parts(
     current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    location_id: Optional[str] = Query(default=None, description="Filter by location ID (only show parts with stock at this location)"),
 ) -> SparePartListResponse:
     """List all active spare parts with pagination.
 
     Accessible by all authenticated users.
+    Optionally filter to only parts with stock at a specific location.
     """
-    service = _get_inventory_service(db)
-    spare_parts, total = await service.list_spare_parts(page=page, page_size=page_size)
+    from uuid import UUID as UUIDType
 
-    # Get total stock for each part from cache
-    part_ids = [sp.id for sp in spare_parts]
-    stock_map: dict = {}
-    if part_ids:
-        stock_stmt = (
-            select(
-                StockStatusCache.spare_part_id,
-                func.sum(StockStatusCache.current_quantity).label("total_stock"),
+    if location_id:
+        # Filter to parts that have stock at this location
+        loc_uuid = UUIDType(location_id)
+        count_stmt = (
+            select(func.count(StockStatusCache.spare_part_id.distinct()))
+            .filter(
+                StockStatusCache.location_id == loc_uuid,
+                StockStatusCache.current_quantity > 0,
             )
-            .filter(StockStatusCache.spare_part_id.in_(part_ids))
-            .group_by(StockStatusCache.spare_part_id)
         )
-        stock_result = await db.execute(stock_stmt)
-        stock_map = {row.spare_part_id: row.total_stock for row in stock_result}
+        total_result = await db.execute(count_stmt)
+        total = total_result.scalar() or 0
+
+        offset = (page - 1) * page_size
+        from app.models.spare_part import SparePart as SP
+        stmt = (
+            select(SP)
+            .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
+            .filter(
+                SP.deleted_at.is_(None),
+                StockStatusCache.location_id == loc_uuid,
+                StockStatusCache.current_quantity > 0,
+            )
+            .order_by(SP.name.asc())
+            .offset(offset)
+            .limit(page_size)
+        )
+        result = await db.execute(stmt)
+        spare_parts = list(result.scalars().all())
+
+        # Get stock at this specific location
+        stock_map = {}
+        part_ids = [sp.id for sp in spare_parts]
+        if part_ids:
+            stock_stmt = (
+                select(
+                    StockStatusCache.spare_part_id,
+                    StockStatusCache.current_quantity,
+                )
+                .filter(
+                    StockStatusCache.spare_part_id.in_(part_ids),
+                    StockStatusCache.location_id == loc_uuid,
+                )
+            )
+            stock_result = await db.execute(stock_stmt)
+            stock_map = {row.spare_part_id: row.current_quantity for row in stock_result}
+    else:
+        service = _get_inventory_service(db)
+        spare_parts, total = await service.list_spare_parts(page=page, page_size=page_size)
+
+        # Get total stock for each part from cache
+        part_ids = [sp.id for sp in spare_parts]
+        stock_map: dict = {}
+        if part_ids:
+            stock_stmt = (
+                select(
+                    StockStatusCache.spare_part_id,
+                    func.sum(StockStatusCache.current_quantity).label("total_stock"),
+                )
+                .filter(StockStatusCache.spare_part_id.in_(part_ids))
+                .group_by(StockStatusCache.spare_part_id)
+            )
+            stock_result = await db.execute(stock_stmt)
+            stock_map = {row.spare_part_id: row.total_stock for row in stock_result}
 
     data = []
     for sp in spare_parts:

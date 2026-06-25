@@ -57,8 +57,10 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -96,6 +98,7 @@ export default function InventoryPage() {
       if (search) params.set('search', search);
       if (brandFilter) params.set('brand', brandFilter);
       if (categoryFilter) params.set('category_id', categoryFilter);
+      if (locationFilter) params.set('location_id', locationFilter);
       if (sortField) params.set('sort_by', sortField);
       if (sortDirection) params.set('sort_direction', sortDirection);
 
@@ -110,7 +113,7 @@ export default function InventoryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, brandFilter, categoryFilter, sortField, sortDirection]);
+  }, [page, search, brandFilter, categoryFilter, locationFilter, sortField, sortDirection]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -141,6 +144,15 @@ export default function InventoryPage() {
     }
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    try {
+      const response = await get<{ data: Array<{ id: string; name: string }>; meta: { page: number; total: number; page_size: number } }>('/locations?page_size=100');
+      setLocations(response.data);
+    } catch {
+      // Locations are optional for filtering
+    }
+  }, []);
+
   useEffect(() => {
     fetchParts();
   }, [fetchParts]);
@@ -148,7 +160,8 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchCategories();
     fetchBrands();
-  }, [fetchCategories, fetchBrands]);
+    fetchLocations();
+  }, [fetchCategories, fetchBrands, fetchLocations]);
 
   // Debounced search
   useEffect(() => {
@@ -226,6 +239,11 @@ export default function InventoryPage() {
   const brandOptions: SelectOption[] = [
     { value: '', label: 'All Brands' },
     ...brands.map((b) => ({ value: b, label: b })),
+  ];
+
+  const locationOptions: SelectOption[] = [
+    { value: '', label: 'All Locations' },
+    ...locations.map((l) => ({ value: l.id, label: l.name })),
   ];
 
   const columns: Column<SparePart & { total_stock?: number }>[] = [
@@ -333,6 +351,17 @@ export default function InventoryPage() {
               setPage(1);
             }}
             aria-label="Filter by category"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <Select
+            options={locationOptions}
+            value={locationFilter}
+            onChange={(e) => {
+              setLocationFilter(e.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by location"
           />
         </div>
       </div>
