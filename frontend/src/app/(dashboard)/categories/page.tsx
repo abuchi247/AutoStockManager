@@ -42,7 +42,7 @@ export default function CategoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 20;
+  const pageSize = 10;
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -77,7 +77,7 @@ export default function CategoriesPage() {
     setError(null);
     try {
       const response = await get<CategoryListResponse>(
-        `/categories?parent_only=true&page=${page}&page_size=${pageSize}`
+        `/categories?page=${page}&page_size=${pageSize}`
       );
       setCategories(response.data);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
@@ -173,11 +173,12 @@ export default function CategoriesPage() {
     setShowDeleteModal(true);
   };
 
-  // Render category row with indentation
-  const renderCategoryRow = (cat: CategoryItem, level: number = 0) => {
-    const rows: React.ReactNode[] = [];
+  // Render category row with indentation based on parent_id
+  const renderCategoryRow = (cat: CategoryItem) => {
+    const level = cat.parent_id ? 1 : 0;
+    const childrenCount = cat.children ? cat.children.length : 0;
 
-    rows.push(
+    return (
       <tr key={cat.id} className={level > 0 ? 'bg-gray-50/50' : 'bg-white'}>
         <td className="px-6 py-4 whitespace-nowrap">
           <div style={{ paddingLeft: `${level * 24}px` }} className="flex items-center gap-2">
@@ -187,6 +188,9 @@ export default function CategoriesPage() {
             <span className={`font-medium ${level === 0 ? 'text-gray-900' : 'text-gray-700'}`}>
               {cat.name}
             </span>
+            {childrenCount > 0 && (
+              <span className="text-xs text-gray-400">({childrenCount} sub)</span>
+            )}
           </div>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -222,19 +226,10 @@ export default function CategoriesPage() {
         </td>
       </tr>
     );
-
-    // Render children
-    if (cat.children && cat.children.length > 0) {
-      for (const child of cat.children) {
-        rows.push(...renderCategoryRow(child, level + 1) as unknown as React.ReactNode[]);
-      }
-    }
-
-    return rows;
   };
 
-  // Build tree: only show top-level categories with their children nested
-  const topLevelCategories = categories.filter((c) => !c.parent_id);
+  // Build tree: show all categories, indent those with parent_id
+  const topLevelCategories = categories;
 
   // Also fetch all categories (unpaginated) for the parent dropdown in create/edit
   const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
@@ -322,7 +317,7 @@ export default function CategoriesPage() {
                 </td>
               </tr>
             ) : (
-              topLevelCategories.map((cat) => renderCategoryRow(cat, 0))
+              topLevelCategories.map((cat) => renderCategoryRow(cat))
             )}
           </tbody>
         </table>
