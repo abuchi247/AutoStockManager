@@ -40,6 +40,9 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 20;
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -74,28 +77,21 @@ export default function CategoriesPage() {
     setError(null);
     try {
       const response = await get<CategoryListResponse>(
-        '/categories?page_size=500'
+        `/categories?parent_only=true&page=${page}&page_size=${pageSize}`
       );
       setCategories(response.data);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load categories';
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
-
-  // Get flat list of top-level categories for parent dropdown
-  const parentOptions: SelectOption[] = [
-    { value: '', label: 'None (Top-level)' },
-    ...categories
-      .filter((c) => !c.parent_id)
-      .map((c) => ({ value: c.id, label: c.name })),
-  ];
 
   const handleCreateCategory = async () => {
     setIsCreating(true);
@@ -240,6 +236,29 @@ export default function CategoriesPage() {
   // Build tree: only show top-level categories with their children nested
   const topLevelCategories = categories.filter((c) => !c.parent_id);
 
+  // Also fetch all categories (unpaginated) for the parent dropdown in create/edit
+  const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
+  const fetchAllCategories = useCallback(async () => {
+    try {
+      const response = await get<CategoryListResponse>('/categories?page_size=500&parent_only=true');
+      setAllCategories(response.data);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllCategories();
+  }, [fetchAllCategories]);
+
+  // Get flat list of top-level categories for parent dropdown
+  const parentOptions: SelectOption[] = [
+    { value: '', label: 'None (Top-level)' },
+    ...allCategories
+      .filter((c) => !c.parent_id)
+      .map((c) => ({ value: c.id, label: c.name })),
+  ];
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -262,6 +281,7 @@ export default function CategoriesPage() {
 
       {/* Categories table */}
       <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -306,6 +326,35 @@ export default function CategoriesPage() {
             )}
           </tbody>
         </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
+            <div className="text-sm text-gray-500">
+              Page <span className="font-medium text-gray-900">{page}</span> of{' '}
+              <span className="font-medium text-gray-900">{totalPages}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Category Modal */}
