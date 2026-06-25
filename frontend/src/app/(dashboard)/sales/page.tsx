@@ -93,7 +93,7 @@ export default function SalesPage() {
       const response = await get<PaginatedResponse<Sale>>(
         `/sales?${params.toString()}`
       );
-      setSales(response.data);
+      setSales(response.data.map((s: Sale) => ({ ...s, status: s.status?.toLowerCase() as SaleStatus })));
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load sales';

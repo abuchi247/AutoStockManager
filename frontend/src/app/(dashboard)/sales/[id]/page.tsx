@@ -92,7 +92,8 @@ export default function SaleDetailPage() {
     setError(null);
     try {
       const response = await get<Sale>(`/sales/${saleId}`);
-      setSale(response);
+      // Backend returns uppercase status (DRAFT, CONFIRMED), normalize to lowercase
+      setSale({ ...response, status: response.status?.toLowerCase() as SaleStatus });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load sale details';
       setError(message);
