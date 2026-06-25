@@ -166,8 +166,17 @@ async def get_sale(
     """Get a single sale by its ID.
 
     Accessible by Salesperson, Manager, and Admin roles.
+    Includes returned_quantity per item from the movement ledger.
     """
-    stmt = select(Sale).filter_by(id=sale_id)
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import func as sa_func
+    from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType
+
+    stmt = (
+        select(Sale)
+        .filter_by(id=sale_id)
+        .options(selectinload(Sale.items).selectinload(SaleItem.spare_part))
+    )
     result = await db.execute(stmt)
     sale = result.scalar_one_or_none()
 
@@ -177,7 +186,33 @@ async def get_sale(
             detail="Sale not found",
         )
 
-    return SaleResponse.model_validate(sale)
+    # Query returned quantities per spare_part_id from the ledger
+    return_stmt = (
+        select(
+            InventoryMovementLedger.spare_part_id,
+            sa_func.sum(InventoryMovementLedger.quantity_change).label("total_returned"),
+        )
+        .filter(
+            InventoryMovementLedger.reference_id == sale_id,
+            InventoryMovementLedger.reference_type == "sale",
+            InventoryMovementLedger.movement_type == MovementType.RETURN.value,
+        )
+        .group_by(InventoryMovementLedger.spare_part_id)
+    )
+    return_result = await db.execute(return_stmt)
+    returned_map = {row.spare_part_id: row.total_returned for row in return_result}
+
+    # Build response with returned_quantity
+    from app.schemas.sale import SaleItemResponse, SaleResponse as SR
+    items_response = []
+    for item in sale.items:
+        item_resp = SaleItemResponse.model_validate(item)
+        item_resp.returned_quantity = returned_map.get(item.spare_part_id, 0)
+        items_response.append(item_resp)
+
+    resp = SaleResponse.model_validate(sale)
+    resp.items = items_response
+    return resp
 
 
 @router.put(

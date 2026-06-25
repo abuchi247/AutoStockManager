@@ -162,6 +162,9 @@ class SaleItemResponse(BaseModel):
     cost_of_goods_sold: Optional[Decimal] = Field(
         default=None, description="COGS from FIFO layers (filled on confirm)"
     )
+    returned_quantity: Decimal = Field(
+        default=Decimal("0"), description="Total quantity already returned for this item"
+    )
     spare_part: Optional[SparePartBrief] = Field(default=None, description="Spare part details")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
 

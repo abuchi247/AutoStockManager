@@ -169,14 +169,24 @@ export default function SaleDetailPage() {
 
   const openReturnModal = () => {
     if (!sale?.items) return;
-    const items: ReturnItem[] = sale.items.map((item) => ({
-      sale_item_id: item.id,
-      quantity: item.quantity,
-      max_quantity: item.quantity,
-      part_name: item.spare_part?.name || `Item ${item.id.slice(0, 8)}`,
-      reason: '',
-      selected: false,
-    }));
+    const items: ReturnItem[] = sale.items
+      .filter((item) => {
+        const returned = Number(item.returned_quantity || 0);
+        const remaining = Number(item.quantity) - returned;
+        return remaining > 0;
+      })
+      .map((item) => {
+        const returned = Number(item.returned_quantity || 0);
+        const remaining = Number(item.quantity) - returned;
+        return {
+          sale_item_id: item.id,
+          quantity: remaining,
+          max_quantity: remaining,
+          part_name: item.spare_part?.name || `Item ${item.id.slice(0, 8)}`,
+          reason: '',
+          selected: false,
+        };
+      });
     setReturnItems(items);
     setReturnError(null);
     setShowReturnModal(true);

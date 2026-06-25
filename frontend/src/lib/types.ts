@@ -345,6 +345,7 @@ export interface SaleItem {
   discount_amount: number;
   line_total: number;
   cost_of_goods_sold?: number;
+  returned_quantity?: number;
   spare_part?: SparePart;
 }
 
