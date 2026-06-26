@@ -62,21 +62,9 @@ This system digitizes and streamlines operations for auto spare parts businesses
    ```
    This starts PostgreSQL, Redis, the FastAPI backend, and the Next.js frontend.
 
-4. **Run database migrations**
+4. **Database tables are created automatically** on first startup. If you prefer to run migrations manually:
    ```bash
    docker exec autostockmanager-backend alembic upgrade head
-   ```
-   Or create tables directly from models:
-   ```bash
-   docker exec autostockmanager-backend python -c "
-   import asyncio
-   from app.database import engine, Base
-   from app.models import *
-   async def create():
-       async with engine.begin() as conn:
-           await conn.run_sync(Base.metadata.create_all)
-   asyncio.run(create())
-   "
    ```
 
 5. **Create admin user**
@@ -317,7 +305,7 @@ railway redeploy -y
 
 | Issue | Solution |
 |-------|----------|
-| Backend returns 502 | Ensure the Dockerfile uses `${PORT:-8000}` — Railway injects its own PORT |
+| Backend returns 502 | Ensure `PORT=8000` is set as a Railway service variable. The Dockerfile hardcodes port 8000. |
 | Login fails | Run `cd backend && railway run python3 scripts/setup_db.py` to initialize tables and create admin |
 | Frontend can't reach backend | Verify `NEXT_PUBLIC_API_URL` uses `https://` (not `http://`) and includes `/api/v1` |
 | CORS errors in browser | Set `CORS_ORIGINS=["*"]` on the backend service, or add the frontend URL specifically |
@@ -378,7 +366,7 @@ docker exec autostockmanager-backend pytest tests/unit/test_sales_service.py
 | `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token TTL |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
 | `ENVIRONMENT` | `development` | development, staging, or production |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend URL for frontend |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Backend URL for frontend (must include /api/v1) |
 
 ## Scale Targets
 
