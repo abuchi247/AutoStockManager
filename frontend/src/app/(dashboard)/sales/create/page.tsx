@@ -76,7 +76,7 @@ export default function CreateSalePage() {
           get<{ data: Customer[]; meta: { page: number; total: number; page_size: number } }>('/customers'),
           get<{ data: Location[]; meta: { page: number; total: number; page_size: number } }>('/locations'),
         ]);
-        setCustomers(customersRes.data);
+        setCustomers(customersRes.data.filter((c: Customer) => c.account_status !== 'closed'));
         setLocations(locationsRes.data);
       } catch {
         // Non-critical; dropdowns will be empty

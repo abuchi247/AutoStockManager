@@ -199,6 +199,18 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const handleCloseAccount = async () => {
+    if (!confirm('Are you sure you want to close this account? This is permanent.')) return;
+    try {
+      const response = await put<Customer>(`/customers/${customerId}`, { account_status: 'closed' });
+      setCustomer(response);
+      setSuccessMessage('Customer account closed');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch {
+      setError('Failed to close customer account');
+    }
+  };
+
   const handleSaveEdit = async () => {
     setIsSaving(true);
     setError(null);
@@ -317,9 +329,14 @@ export default function CustomerDetailPage() {
             </Button>
           )}
           {customer.account_status === 'suspended' && (
-            <Button variant="secondary" onClick={handleActivate}>
-              Activate
-            </Button>
+            <>
+              <Button variant="secondary" onClick={handleActivate}>
+                Activate
+              </Button>
+              <Button variant="danger" onClick={handleCloseAccount}>
+                Close Account
+              </Button>
+            </>
           )}
           <Button variant="secondary" onClick={handleStartEdit}>
             Edit

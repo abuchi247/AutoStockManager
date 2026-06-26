@@ -82,7 +82,7 @@ export default function EditSalePage() {
           get<{ data: Location[]; meta: { page: number; total: number; page_size: number } }>('/locations'),
           get<Sale>(`/sales/${saleId}`),
         ]);
-        setCustomers(customersRes.data);
+        setCustomers(customersRes.data.filter((c: Customer) => c.account_status !== 'closed'));
         setLocations(locationsRes.data);
 
         // Redirect if not draft

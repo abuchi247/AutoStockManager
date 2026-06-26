@@ -120,6 +120,17 @@ async def create_sale(
     Requirements:
     - 5.1: Create a sale with customer, location, line items, payment type
     """
+    # Block credit sales for suspended/closed customer accounts
+    if request.payment_type.upper() == 'CREDIT' and request.customer_id:
+        from app.models.customer import Customer
+        cust_result = await db.execute(select(Customer).filter_by(id=request.customer_id))
+        customer = cust_result.scalar_one_or_none()
+        if customer and customer.account_status != 'active':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Credit sales not allowed for suspended or closed customer accounts. Use cash payment instead.",
+            )
+
     service = _get_sales_service(db, current_user.id)
 
     # Prepare items for the service
@@ -239,6 +250,17 @@ async def update_sale(
     Only DRAFT sales can be edited. Once confirmed, a sale is immutable.
     """
     from decimal import Decimal
+
+    # Block credit sales for suspended/closed customer accounts
+    if request.payment_type.upper() == 'CREDIT' and request.customer_id:
+        from app.models.customer import Customer
+        cust_result = await db.execute(select(Customer).filter_by(id=request.customer_id))
+        customer = cust_result.scalar_one_or_none()
+        if customer and customer.account_status != 'active':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Credit sales not allowed for suspended or closed customer accounts. Use cash payment instead.",
+            )
 
     stmt = select(Sale).filter_by(id=sale_id)
     result = await db.execute(stmt)
