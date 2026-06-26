@@ -299,16 +299,16 @@ export default function SaleDetailPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             Sale {sale.invoice_number || `DRAFT-${sale.id.slice(0, 8)}`}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Created {formatDate(sale.created_at)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {sale.status === 'draft' && (
             <Button
               variant="secondary"
