@@ -73,9 +73,9 @@ export default function InventoryPage() {
     name: '',
     brand: '',
     unit_of_measure: 'pcs',
-    cost_price: 0,
-    selling_price: 0,
-    min_stock_level: 0,
+    cost_price: '' as unknown as number,
+    selling_price: '' as unknown as number,
+    min_stock_level: '' as unknown as number,
     max_stock_level: 0,
     reorder_quantity: 0,
   });
@@ -211,16 +211,25 @@ export default function InventoryPage() {
     setIsCreating(true);
     setCreateError(null);
     try {
-      await post('/spare-parts', newPart);
+      // Ensure numeric fields are numbers (not empty strings)
+      const payload = {
+        ...newPart,
+        cost_price: Number(newPart.cost_price) || 0,
+        selling_price: Number(newPart.selling_price) || 0,
+        min_stock_level: Number(newPart.min_stock_level) || 0,
+        max_stock_level: Number(newPart.max_stock_level) || 0,
+        reorder_quantity: Number(newPart.reorder_quantity) || 0,
+      };
+      await post('/spare-parts', payload);
       setShowCreateModal(false);
       setNewPart({
         part_number: '',
         name: '',
         brand: '',
         unit_of_measure: 'pcs',
-        cost_price: 0,
-        selling_price: 0,
-        min_stock_level: 0,
+        cost_price: '' as unknown as number,
+        selling_price: '' as unknown as number,
+        min_stock_level: '' as unknown as number,
         max_stock_level: 0,
         reorder_quantity: 0,
       });
@@ -517,32 +526,32 @@ export default function InventoryPage() {
               type="number"
               min={0}
               step={0.01}
-              value={newPart.cost_price}
+              value={newPart.cost_price === ('' as unknown as number) ? '' : newPart.cost_price}
               onChange={(e) =>
-                setNewPart({ ...newPart, cost_price: parseFloat(e.target.value) || 0 })
+                setNewPart({ ...newPart, cost_price: e.target.value === '' ? ('' as unknown as number) : parseFloat(e.target.value) })
               }
               required
-              placeholder="e.g. 25.00"
+              placeholder="e.g. 5000"
             />
             <Input
               label="Selling Price"
               type="number"
               min={0}
               step={0.01}
-              value={newPart.selling_price}
+              value={newPart.selling_price === ('' as unknown as number) ? '' : newPart.selling_price}
               onChange={(e) =>
-                setNewPart({ ...newPart, selling_price: parseFloat(e.target.value) || 0 })
+                setNewPart({ ...newPart, selling_price: e.target.value === '' ? ('' as unknown as number) : parseFloat(e.target.value) })
               }
               required
-              placeholder="e.g. 45.00"
+              placeholder="e.g. 8000"
             />
             <Input
               label="Min Stock Level"
               type="number"
               min={0}
-              value={newPart.min_stock_level}
+              value={newPart.min_stock_level === ('' as unknown as number) ? '' : newPart.min_stock_level}
               onChange={(e) =>
-                setNewPart({ ...newPart, min_stock_level: parseInt(e.target.value) || 0 })
+                setNewPart({ ...newPart, min_stock_level: e.target.value === '' ? ('' as unknown as number) : parseInt(e.target.value) })
               }
               placeholder="e.g. 10"
               helperText="Get alerted when stock drops below this"
