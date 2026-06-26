@@ -88,12 +88,26 @@ export default function InventoryPage() {
 
   const openCreateModal = async () => {
     setShowCreateModal(true);
-    // Auto-generate part number
+    // Auto-generate part number (no category selected yet)
     try {
       const result = await get<{ part_number: string }>('/spare-parts/next-part-number');
       setNewPart((prev) => ({ ...prev, part_number: result.part_number }));
     } catch {
       // If it fails, user can type manually
+    }
+  };
+
+  const handleCategoryChange = async (categoryId: string) => {
+    setNewPart((prev) => ({ ...prev, category_id: categoryId || undefined }));
+    // Re-generate part number based on selected category
+    try {
+      const url = categoryId
+        ? `/spare-parts/next-part-number?category_id=${categoryId}`
+        : '/spare-parts/next-part-number';
+      const result = await get<{ part_number: string }>(url);
+      setNewPart((prev) => ({ ...prev, part_number: result.part_number }));
+    } catch {
+      // Keep existing part number if generation fails
     }
   };
 
@@ -476,12 +490,7 @@ export default function InventoryPage() {
                 ...categories.map((c) => ({ value: c.id, label: c.name })),
               ]}
               value={newPart.category_id || ''}
-              onChange={(e) =>
-                setNewPart({
-                  ...newPart,
-                  category_id: e.target.value || undefined,
-                })
-              }
+              onChange={(e) => handleCategoryChange(e.target.value)}
             />
             <Select
               label="Unit of Measure"

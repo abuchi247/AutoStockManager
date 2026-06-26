@@ -190,25 +190,45 @@ async def list_spare_parts(
     "/next-part-number",
     status_code=status.HTTP_200_OK,
     summary="Get next available part number",
-    description="Generates the next sequential part number in the format ASM-XXXXX.",
+    description="Generates the next sequential part number. If category_id is provided, uses category prefix (e.g., BRK-00012).",
 )
 async def get_next_part_number(
     db: DbSession,
     current_user: CurrentUser,
+    category_id: Optional[str] = Query(default=None, description="Category ID for prefix-based numbering"),
 ) -> dict:
-    """Generate the next available part number."""
+    """Generate the next available part number.
+    
+    If category_id is provided, generates a category-based number like BRK-00012.
+    Otherwise falls back to ASM-XXXXX.
+    """
     from app.models.spare_part import SparePart as SP
+    from app.models.category import Category
 
-    # Find the highest existing ASM-XXXXX number
-    stmt = (
+    prefix = "ASM"
+
+    if category_id:
+        from uuid import UUID as UUIDType
+        cat_uuid = UUIDType(category_id)
+        cat_stmt = select(Category).filter_by(id=cat_uuid)
+        cat_result = await db.execute(cat_stmt)
+        category = cat_result.scalar_one_or_none()
+        if category:
+            # Use first 3 characters of category name, uppercase
+            name = category.name.upper().replace(" ", "")
+            prefix = name[:3]
+
+    # Count existing parts with this prefix
+    like_pattern = f"{prefix}-%"
+    count_stmt = (
         select(func.count(SP.id))
-        .filter(SP.deleted_at.is_(None))
+        .filter(SP.part_number.ilike(like_pattern))
     )
-    result = await db.execute(stmt)
+    result = await db.execute(count_stmt)
     count = (result.scalar() or 0) + 1
 
-    # Generate next number with zero-padding
-    next_number = f"ASM-{count:05d}"
+    # Generate next number
+    next_number = f"{prefix}-{count:05d}"
 
     # Make sure it doesn't already exist
     while True:
@@ -217,7 +237,7 @@ async def get_next_part_number(
         if (check_result.scalar() or 0) == 0:
             break
         count += 1
-        next_number = f"ASM-{count:05d}"
+        next_number = f"{prefix}-{count:05d}"
 
     return {"part_number": next_number}
 
