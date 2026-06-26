@@ -129,7 +129,7 @@ export default function CreateSalePage() {
       part_number: part.part_number,
       quantity: 1,
       unit_price: part.selling_price,
-      discount_amount: 0,
+      discount_amount: '',
       line_total: part.selling_price,
     };
 

@@ -105,7 +105,7 @@ export default function EditSalePage() {
             part_number: item.spare_part?.part_number || '',
             quantity: item.quantity,
             unit_price: item.unit_price,
-            discount_amount: item.discount_amount || 0,
+            discount_amount: item.discount_amount || '',
             line_total: item.line_total,
           }));
           setLineItems(mappedItems);
@@ -163,7 +163,7 @@ export default function EditSalePage() {
       part_number: part.part_number,
       quantity: 1,
       unit_price: part.selling_price,
-      discount_amount: 0,
+      discount_amount: '',
       line_total: part.selling_price,
     };
 
