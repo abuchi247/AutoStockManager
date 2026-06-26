@@ -73,7 +73,7 @@ export default function PurchasesPage() {
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [poNotes, setPoNotes] = useState('');
   const [poItems, setPoItems] = useState<PurchaseOrderItemCreate[]>([
-    { spare_part_id: '', quantity_ordered: 1, unit_cost: 0 },
+    { spare_part_id: '', quantity_ordered: '' as unknown as number, unit_cost: '' as unknown as number },
   ]);
 
   const fetchOrders = useCallback(async () => {
@@ -133,7 +133,7 @@ export default function PurchasesPage() {
   };
 
   const handleAddItem = () => {
-    setPoItems([...poItems, { spare_part_id: '', quantity_ordered: 1, unit_cost: 0 }]);
+    setPoItems([...poItems, { spare_part_id: '', quantity_ordered: '' as unknown as number, unit_cost: '' as unknown as number }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -155,7 +155,13 @@ export default function PurchasesPage() {
       const payload: PurchaseOrderCreate = {
         supplier_id: selectedSupplier,
         notes: poNotes || undefined,
-        items: poItems.filter((item) => item.spare_part_id),
+        items: poItems
+          .filter((item) => item.spare_part_id)
+          .map((item) => ({
+            ...item,
+            quantity_ordered: item.quantity_ordered === ('' as unknown as number) ? 1 : (item.quantity_ordered || 1),
+            unit_cost: item.unit_cost === ('' as unknown as number) ? 0 : (item.unit_cost || 0),
+          })),
       };
       await post('/purchase-orders', payload);
       setShowCreateModal(false);
@@ -172,7 +178,7 @@ export default function PurchasesPage() {
   const resetCreateForm = () => {
     setSelectedSupplier('');
     setPoNotes('');
-    setPoItems([{ spare_part_id: '', quantity_ordered: 1, unit_cost: 0 }]);
+    setPoItems([{ spare_part_id: '', quantity_ordered: '' as unknown as number, unit_cost: '' as unknown as number }]);
     setCreateError(null);
   };
 
@@ -387,7 +393,7 @@ export default function PurchasesPage() {
                       placeholder="e.g. 20"
                       value={item.quantity_ordered}
                       onChange={(e) =>
-                        handleItemChange(index, 'quantity_ordered', parseInt(e.target.value) || 1)
+                        handleItemChange(index, 'quantity_ordered', e.target.value === '' ? '' : parseInt(e.target.value))
                       }
                     />
                   </div>
@@ -399,7 +405,7 @@ export default function PurchasesPage() {
                       placeholder="e.g. 5000"
                       value={item.unit_cost}
                       onChange={(e) =>
-                        handleItemChange(index, 'unit_cost', parseFloat(e.target.value) || 0)
+                        handleItemChange(index, 'unit_cost', e.target.value === '' ? '' : parseFloat(e.target.value))
                       }
                     />
                   </div>

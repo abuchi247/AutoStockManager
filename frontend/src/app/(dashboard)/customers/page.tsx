@@ -66,7 +66,7 @@ export default function CustomersPage() {
     email: '',
     address: '',
     tax_id: '',
-    credit_limit: 0,
+    credit_limit: '' as unknown as number,
   });
 
   const fetchCustomers = useCallback(async () => {
@@ -119,7 +119,11 @@ export default function CustomersPage() {
     setIsCreating(true);
     setCreateError(null);
     try {
-      await post('/customers', newCustomer);
+      const payload = {
+        ...newCustomer,
+        credit_limit: newCustomer.credit_limit === ('' as unknown as number) ? 0 : (newCustomer.credit_limit || 0),
+      };
+      await post('/customers', payload);
       setShowCreateModal(false);
       setNewCustomer({
         name: '',
@@ -127,7 +131,7 @@ export default function CustomersPage() {
         email: '',
         address: '',
         tax_id: '',
-        credit_limit: 0,
+        credit_limit: '' as unknown as number,
       });
       fetchCustomers();
     } catch (err: unknown) {
@@ -328,7 +332,7 @@ export default function CustomersPage() {
               onChange={(e) =>
                 setNewCustomer({
                   ...newCustomer,
-                  credit_limit: parseFloat(e.target.value) || 0,
+                  credit_limit: e.target.value === '' ? '' as unknown as number : parseFloat(e.target.value),
                 })
               }
               required

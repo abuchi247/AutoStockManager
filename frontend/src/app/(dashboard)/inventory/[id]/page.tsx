@@ -36,9 +36,13 @@ export default function InventoryDetailPage() {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [adjustError, setAdjustError] = useState<string | null>(null);
-  const [adjustData, setAdjustData] = useState({
+  const [adjustData, setAdjustData] = useState<{
+    location_id: string;
+    quantity: number | '';
+    reason: string;
+  }>({
     location_id: '',
-    quantity: 0,
+    quantity: '',
     reason: 'Initial stock entry',
   });
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
@@ -190,7 +194,15 @@ export default function InventoryDetailPage() {
     setIsEditing(true);
     setEditError(null);
     try {
-      await put(`/spare-parts/${partId}`, editData);
+      const payload = {
+        ...editData,
+        cost_price: editData.cost_price ?? 0,
+        selling_price: editData.selling_price ?? 0,
+        min_stock_level: editData.min_stock_level ?? 0,
+        max_stock_level: editData.max_stock_level ?? 0,
+        reorder_quantity: editData.reorder_quantity ?? 0,
+      };
+      await put(`/spare-parts/${partId}`, payload);
       setShowEditModal(false);
       fetchPart();
     } catch (err: unknown) {
@@ -219,11 +231,11 @@ export default function InventoryDetailPage() {
       await post('/stock/adjust', {
         spare_part_id: partId,
         location_id: adjustData.location_id,
-        quantity: adjustData.quantity,
+        quantity: adjustData.quantity === '' ? 0 : adjustData.quantity,
         reason: adjustData.reason,
       });
       setShowAdjustModal(false);
-      setAdjustData({ location_id: '', quantity: 0, reason: 'Initial stock entry' });
+      setAdjustData({ location_id: '', quantity: '', reason: 'Initial stock entry' });
       fetchPart();
     } catch (err: unknown) {
       let message = 'Failed to adjust stock';
@@ -683,8 +695,8 @@ export default function InventoryDetailPage() {
               type="number"
               min={0}
               step={0.01}
-              value={editData.cost_price ?? 0}
-              onChange={(e) => setEditData({ ...editData, cost_price: parseFloat(e.target.value) || 0 })}
+              value={editData.cost_price ?? ''}
+              onChange={(e) => setEditData({ ...editData, cost_price: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
               required
               placeholder="e.g. 25.00"
             />
@@ -693,8 +705,8 @@ export default function InventoryDetailPage() {
               type="number"
               min={0}
               step={0.01}
-              value={editData.selling_price ?? 0}
-              onChange={(e) => setEditData({ ...editData, selling_price: parseFloat(e.target.value) || 0 })}
+              value={editData.selling_price ?? ''}
+              onChange={(e) => setEditData({ ...editData, selling_price: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
               required
               placeholder="e.g. 45.00"
             />
@@ -702,24 +714,24 @@ export default function InventoryDetailPage() {
               label="Min Stock Level"
               type="number"
               min={0}
-              value={editData.min_stock_level ?? 0}
-              onChange={(e) => setEditData({ ...editData, min_stock_level: parseInt(e.target.value) || 0 })}
+              value={editData.min_stock_level ?? ''}
+              onChange={(e) => setEditData({ ...editData, min_stock_level: e.target.value === '' ? undefined : parseInt(e.target.value) })}
               placeholder="e.g. 10"
             />
             <Input
               label="Max Stock Level"
               type="number"
               min={0}
-              value={editData.max_stock_level ?? 0}
-              onChange={(e) => setEditData({ ...editData, max_stock_level: parseInt(e.target.value) || 0 })}
+              value={editData.max_stock_level ?? ''}
+              onChange={(e) => setEditData({ ...editData, max_stock_level: e.target.value === '' ? undefined : parseInt(e.target.value) })}
               placeholder="e.g. 100"
             />
             <Input
               label="Reorder Quantity"
               type="number"
               min={0}
-              value={editData.reorder_quantity ?? 0}
-              onChange={(e) => setEditData({ ...editData, reorder_quantity: parseInt(e.target.value) || 0 })}
+              value={editData.reorder_quantity ?? ''}
+              onChange={(e) => setEditData({ ...editData, reorder_quantity: e.target.value === '' ? undefined : parseInt(e.target.value) })}
               placeholder="e.g. 20"
             />
           </div>
@@ -753,7 +765,7 @@ export default function InventoryDetailPage() {
             <Button
               onClick={handleStockAdjust}
               isLoading={isAdjusting}
-              disabled={!adjustData.location_id || adjustData.quantity === 0}
+              disabled={!adjustData.location_id || adjustData.quantity === '' || adjustData.quantity === 0}
             >
               Apply Adjustment
             </Button>
@@ -783,7 +795,7 @@ export default function InventoryDetailPage() {
             label="Quantity"
             type="number"
             value={adjustData.quantity}
-            onChange={(e) => setAdjustData({ ...adjustData, quantity: parseInt(e.target.value) || 0 })}
+            onChange={(e) => setAdjustData({ ...adjustData, quantity: e.target.value === '' ? '' : parseInt(e.target.value) })}
             required
             placeholder="e.g. 50 (positive to add, negative to remove)"
           />

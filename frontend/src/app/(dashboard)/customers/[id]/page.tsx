@@ -180,9 +180,13 @@ export default function CustomerDetailPage() {
     setIsSaving(true);
     setError(null);
     try {
+      const payload = {
+        ...editForm,
+        credit_limit: editForm.credit_limit ?? 0,
+      };
       const response = await put<Customer>(
         `/customers/${customerId}`,
-        editForm
+        payload
       );
       setCustomer(response);
       setIsEditing(false);
@@ -333,9 +337,9 @@ export default function CustomerDetailPage() {
                 type="number"
                 min={0}
                 step={0.01}
-                value={editForm.credit_limit ?? 0}
+                value={editForm.credit_limit ?? ''}
                 onChange={(e) =>
-                  setEditForm({ ...editForm, credit_limit: parseFloat(e.target.value) || 0 })
+                  setEditForm({ ...editForm, credit_limit: e.target.value === '' ? undefined : parseFloat(e.target.value) })
                 }
                 required
               />
