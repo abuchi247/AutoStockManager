@@ -36,9 +36,9 @@ interface LineItem {
   spare_part_id: string;
   spare_part_name: string;
   part_number: string;
-  quantity: number;
-  unit_price: number;
-  discount_amount: number;
+  quantity: number | '';
+  unit_price: number | '';
+  discount_amount: number | '';
   line_total: number;
   available_stock?: number;
 }
@@ -172,13 +172,13 @@ export default function EditSalePage() {
     setShowPartDropdown(false);
   };
 
-  const updateLineItem = (id: string, field: keyof LineItem, value: number) => {
+  const updateLineItem = (id: string, field: keyof LineItem, value: number | '') => {
     setLineItems((items) =>
       items.map((item) => {
         if (item.id !== id) return item;
         const updated = { ...item, [field]: value };
         updated.line_total =
-          updated.quantity * updated.unit_price - updated.discount_amount;
+          (updated.quantity || 0) * (updated.unit_price || 0) - (updated.discount_amount || 0);
         return updated;
       })
     );
@@ -189,8 +189,8 @@ export default function EditSalePage() {
   };
 
   // Totals
-  const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
-  const discountTotal = lineItems.reduce((sum, item) => sum + item.discount_amount, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0);
+  const discountTotal = lineItems.reduce((sum, item) => sum + (item.discount_amount || 0), 0);
   const totalAmount = subtotal - discountTotal;
 
   const buildSalePayload = (): SaleCreate => ({
@@ -199,9 +199,9 @@ export default function EditSalePage() {
     payment_type: paymentType as SaleCreate['payment_type'],
     items: lineItems.map((li): SaleItemCreate => ({
       spare_part_id: li.spare_part_id,
-      quantity: li.quantity,
-      unit_price: li.unit_price,
-      discount_amount: li.discount_amount || undefined,
+      quantity: li.quantity || 1,
+      unit_price: li.unit_price || 0,
+      discount_amount: (li.discount_amount || 0) || undefined,
     })),
   });
 
@@ -437,7 +437,7 @@ export default function EditSalePage() {
                         className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={item.quantity}
                         onChange={(e) =>
-                          updateLineItem(item.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))
+                          updateLineItem(item.id, 'quantity', e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))
                         }
                         aria-label={`Quantity for ${item.spare_part_name}`}
                       />
@@ -450,7 +450,7 @@ export default function EditSalePage() {
                         className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={item.unit_price}
                         onChange={(e) =>
-                          updateLineItem(item.id, 'unit_price', Math.max(0, parseFloat(e.target.value) || 0))
+                          updateLineItem(item.id, 'unit_price', e.target.value === '' ? '' : parseFloat(e.target.value))
                         }
                         aria-label={`Unit price for ${item.spare_part_name}`}
                       />
@@ -463,7 +463,7 @@ export default function EditSalePage() {
                         className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={item.discount_amount}
                         onChange={(e) =>
-                          updateLineItem(item.id, 'discount_amount', Math.max(0, parseFloat(e.target.value) || 0))
+                          updateLineItem(item.id, 'discount_amount', e.target.value === '' ? '' : parseFloat(e.target.value))
                         }
                         aria-label={`Discount for ${item.spare_part_name}`}
                       />

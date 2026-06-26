@@ -48,7 +48,7 @@ function formatDate(dateStr: string): string {
 
 interface ReturnItem {
   sale_item_id: string;
-  quantity: number;
+  quantity: number | '';
   max_quantity: number;
   part_name: string;
   reason: string;
@@ -224,10 +224,10 @@ export default function SaleDetailPage() {
     );
   };
 
-  const updateReturnQuantity = (index: number, qty: number) => {
+  const updateReturnQuantity = (index: number, qty: number | '') => {
     setReturnItems((items) =>
       items.map((item, i) =>
-        i === index ? { ...item, quantity: Math.min(Math.max(1, qty), item.max_quantity) } : item
+        i === index ? { ...item, quantity: qty === '' ? '' : Math.min(Math.max(1, qty), item.max_quantity) } : item
       )
     );
   };
@@ -253,7 +253,7 @@ export default function SaleDetailPage() {
       const payload: SaleReturnRequest = {
         items: selectedItems.map((item) => ({
           sale_item_id: item.sale_item_id,
-          quantity: item.quantity,
+          quantity: item.quantity || 1,
           reason: item.reason || undefined,
         })),
       };
@@ -640,7 +640,7 @@ export default function SaleDetailPage() {
                         max={item.max_quantity}
                         value={item.quantity}
                         onChange={(e) =>
-                          updateReturnQuantity(index, parseInt(e.target.value) || 1)
+                          updateReturnQuantity(index, e.target.value === '' ? '' : parseInt(e.target.value) || 1)
                         }
                         className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         aria-label={`Return quantity for ${item.part_name}`}
