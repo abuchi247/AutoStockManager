@@ -471,14 +471,25 @@ export default function InventoryPage() {
                 })
               }
             />
-            <Input
+            <Select
               label="Unit of Measure"
+              options={[
+                { value: 'pcs', label: 'Pieces (pcs)' },
+                { value: 'set', label: 'Set' },
+                { value: 'pair', label: 'Pair' },
+                { value: 'litre', label: 'Litre' },
+                { value: 'kg', label: 'Kilogram (kg)' },
+                { value: 'metre', label: 'Metre' },
+                { value: 'box', label: 'Box' },
+                { value: 'pack', label: 'Pack' },
+                { value: 'roll', label: 'Roll' },
+                { value: 'bottle', label: 'Bottle' },
+              ]}
               value={newPart.unit_of_measure}
               onChange={(e) =>
                 setNewPart({ ...newPart, unit_of_measure: e.target.value })
               }
               required
-              placeholder="e.g. pcs, set, litre, kg"
             />
             <Input
               label="Cost Price"
@@ -513,26 +524,7 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, min_stock_level: parseInt(e.target.value) || 0 })
               }
               placeholder="e.g. 10"
-            />
-            <Input
-              label="Max Stock Level"
-              type="number"
-              min={0}
-              value={newPart.max_stock_level}
-              onChange={(e) =>
-                setNewPart({ ...newPart, max_stock_level: parseInt(e.target.value) || 0 })
-              }
-              placeholder="e.g. 100"
-            />
-            <Input
-              label="Reorder Quantity"
-              type="number"
-              min={0}
-              value={newPart.reorder_quantity}
-              onChange={(e) =>
-                setNewPart({ ...newPart, reorder_quantity: parseInt(e.target.value) || 0 })
-              }
-              placeholder="e.g. 20"
+              helperText="Get alerted when stock drops below this"
             />
           </div>
           <div>
