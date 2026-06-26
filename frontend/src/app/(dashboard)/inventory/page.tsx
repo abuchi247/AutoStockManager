@@ -86,6 +86,17 @@ export default function InventoryPage() {
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
+  const openCreateModal = async () => {
+    setShowCreateModal(true);
+    // Auto-generate part number
+    try {
+      const result = await get<{ part_number: string }>('/spare-parts/next-part-number');
+      setNewPart((prev) => ({ ...prev, part_number: result.part_number }));
+    } catch {
+      // If it fails, user can type manually
+    }
+  };
+
   // Sort
   const [sortField, setSortField] = useState<string>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -319,7 +330,7 @@ export default function InventoryPage() {
           <Button variant="secondary" onClick={() => setShowBarcodeModal(true)}>
             Barcode Lookup
           </Button>
-          <Button onClick={() => setShowCreateModal(true)}>Add Part</Button>
+          <Button onClick={openCreateModal}>Add Part</Button>
         </div>
       </div>
 
@@ -429,7 +440,8 @@ export default function InventoryPage() {
                 setNewPart({ ...newPart, part_number: e.target.value })
               }
               required
-              placeholder="e.g. BRK-PAD-001"
+              placeholder="e.g. ASM-00001"
+              helperText="Auto-generated. You can edit to use your own."
             />
             <Input
               label="Barcode"

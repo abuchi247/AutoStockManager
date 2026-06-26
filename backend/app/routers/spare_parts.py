@@ -186,6 +186,42 @@ async def list_spare_parts(
     )
 
 
+@router.get(
+    "/next-part-number",
+    status_code=status.HTTP_200_OK,
+    summary="Get next available part number",
+    description="Generates the next sequential part number in the format ASM-XXXXX.",
+)
+async def get_next_part_number(
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Generate the next available part number."""
+    from app.models.spare_part import SparePart as SP
+
+    # Find the highest existing ASM-XXXXX number
+    stmt = (
+        select(func.count(SP.id))
+        .filter(SP.deleted_at.is_(None))
+    )
+    result = await db.execute(stmt)
+    count = (result.scalar() or 0) + 1
+
+    # Generate next number with zero-padding
+    next_number = f"ASM-{count:05d}"
+
+    # Make sure it doesn't already exist
+    while True:
+        check_stmt = select(func.count(SP.id)).filter(SP.part_number == next_number)
+        check_result = await db.execute(check_stmt)
+        if (check_result.scalar() or 0) == 0:
+            break
+        count += 1
+        next_number = f"ASM-{count:05d}"
+
+    return {"part_number": next_number}
+
+
 @router.post(
     "",
     response_model=SparePartResponse,
