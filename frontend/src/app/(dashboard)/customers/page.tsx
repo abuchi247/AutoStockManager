@@ -300,6 +300,7 @@ export default function CustomersPage() {
                 setNewCustomer({ ...newCustomer, name: e.target.value })
               }
               required
+              placeholder="e.g. Chidi Motors"
             />
             <Input
               label="Phone"
@@ -307,6 +308,7 @@ export default function CustomersPage() {
               onChange={(e) =>
                 setNewCustomer({ ...newCustomer, phone: e.target.value || undefined })
               }
+              placeholder="e.g. 08012345678"
             />
             <Input
               label="Email"
@@ -315,13 +317,7 @@ export default function CustomersPage() {
               onChange={(e) =>
                 setNewCustomer({ ...newCustomer, email: e.target.value || undefined })
               }
-            />
-            <Input
-              label="Tax ID"
-              value={newCustomer.tax_id || ''}
-              onChange={(e) =>
-                setNewCustomer({ ...newCustomer, tax_id: e.target.value || undefined })
-              }
+              placeholder="e.g. chidi@motors.com"
             />
             <Input
               label="Credit Limit"
@@ -336,6 +332,8 @@ export default function CustomersPage() {
                 })
               }
               required
+              placeholder="e.g. 500000"
+              helperText="Set to 0 for cash-only customers"
             />
           </div>
           <div>
