@@ -176,6 +176,29 @@ export default function CustomerDetailPage() {
     setIsEditing(true);
   };
 
+  const handleSuspend = async () => {
+    if (!confirm('Are you sure you want to suspend this customer? They will not be able to make credit purchases.')) return;
+    try {
+      const response = await put<Customer>(`/customers/${customerId}`, { account_status: 'suspended' });
+      setCustomer(response);
+      setSuccessMessage('Customer suspended');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch {
+      setError('Failed to suspend customer');
+    }
+  };
+
+  const handleActivate = async () => {
+    try {
+      const response = await put<Customer>(`/customers/${customerId}`, { account_status: 'active' });
+      setCustomer(response);
+      setSuccessMessage('Customer activated');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch {
+      setError('Failed to activate customer');
+    }
+  };
+
   const handleSaveEdit = async () => {
     setIsSaving(true);
     setError(null);
@@ -287,9 +310,21 @@ export default function CustomerDetailPage() {
             </span>
           </div>
         </div>
-        <Button variant="secondary" onClick={handleStartEdit}>
-          Edit
-        </Button>
+        <div className="flex gap-2">
+          {customer.account_status === 'active' && (
+            <Button variant="danger" onClick={handleSuspend}>
+              Suspend
+            </Button>
+          )}
+          {customer.account_status === 'suspended' && (
+            <Button variant="secondary" onClick={handleActivate}>
+              Activate
+            </Button>
+          )}
+          <Button variant="secondary" onClick={handleStartEdit}>
+            Edit
+          </Button>
+        </div>
       </div>
 
       {/* Success / Error messages */}
