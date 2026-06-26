@@ -313,13 +313,22 @@ export default function SuppliersPage() {
                 setNewSupplier({ ...newSupplier, tax_id: e.target.value || undefined })
               }
             />
-            <Input
+            <Select
               label="Payment Terms"
+              options={[
+                { value: '', label: 'Select payment terms' },
+                { value: 'COD', label: 'COD — Cash on Delivery' },
+                { value: 'Net 7', label: 'Net 7 — Pay within 7 days' },
+                { value: 'Net 14', label: 'Net 14 — Pay within 14 days' },
+                { value: 'Net 30', label: 'Net 30 — Pay within 30 days' },
+                { value: 'Net 60', label: 'Net 60 — Pay within 60 days' },
+                { value: 'Net 90', label: 'Net 90 — Pay within 90 days' },
+                { value: 'Prepaid', label: 'Prepaid — Pay before delivery' },
+              ]}
               value={newSupplier.payment_terms || ''}
               onChange={(e) =>
                 setNewSupplier({ ...newSupplier, payment_terms: e.target.value || undefined })
               }
-              placeholder="e.g., Net 30"
             />
           </div>
           <div>
