@@ -73,6 +73,9 @@ async def list_customers(
     search: Optional[str] = Query(
         default=None, description="Search by name, phone, or email"
     ),
+    account_status: Optional[str] = Query(
+        default=None, description="Filter by account status (active, suspended, closed)"
+    ),
 ) -> CustomerListResponse:
     """List all active customers with pagination.
 
@@ -80,7 +83,7 @@ async def list_customers(
     """
     service = _get_customer_service(db)
     customers, total = await service.list_customers(
-        page=page, page_size=page_size, search=search
+        page=page, page_size=page_size, search=search, account_status=account_status
     )
 
     return CustomerListResponse(

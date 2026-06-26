@@ -127,6 +127,7 @@ class CustomerService:
         page: int = 1,
         page_size: int = 20,
         search: Optional[str] = None,
+        account_status: Optional[str] = None,
     ) -> tuple[list[Customer], int]:
         """List customers with pagination and optional search.
 
@@ -134,6 +135,7 @@ class CustomerService:
             page: Page number (1-indexed).
             page_size: Number of items per page.
             search: Optional search term to filter by name, phone, or email.
+            account_status: Optional filter by account status.
 
         Returns:
             Tuple of (list of customers, total count).
@@ -150,6 +152,9 @@ class CustomerService:
                     Customer.email.ilike(search_term),
                 )
             )
+
+        if account_status:
+            filters.append(Customer.account_status == account_status)
 
         # Count total
         count_stmt = select(func.count(Customer.id)).filter(*filters)
