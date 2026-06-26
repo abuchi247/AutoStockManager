@@ -87,6 +87,12 @@ const navItems: NavItem[] = [
     roles: ['admin'],
     icon: '⚙️',
   },
+  {
+    label: 'User Guide',
+    href: '/guide',
+    roles: ['admin', 'manager', 'salesperson', 'storekeeper'],
+    icon: '📖',
+  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
