@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { get, post } from '@/lib/api';
-import { Button, Badge, Alert, LoadingSpinner } from '@/components';
-import type { BadgeVariant } from '@/components';
+import { Button, Badge, Alert, LoadingSpinner, Modal, Input, Select } from '@/components';
+import type { BadgeVariant, SelectOption } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 
@@ -28,6 +28,11 @@ function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
 }
 
+interface ReceiveItem {
+  po_item_id: string;
+  quantity_received: number | '';
+}
+
 export default function PurchaseOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -37,6 +42,18 @@ export default function PurchaseOrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Cancel modal state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  // Receive modal state
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receiveLocationId, setReceiveLocationId] = useState('');
+  const [receiveItems, setReceiveItems] = useState<ReceiveItem[]>([]);
+  const [receiveNotes, setReceiveNotes] = useState('');
+  const [locations, setLocations] = useState<SelectOption[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     setIsLoading(true);
@@ -52,22 +69,120 @@ export default function PurchaseOrderDetailPage() {
     }
   }, [id]);
 
+  const fetchLocations = useCallback(async () => {
+    setLocationsLoading(true);
+    try {
+      const response = await get<{ data: Array<{ id: string; name: string }> }>('/locations?page_size=100');
+      setLocations(
+        response.data.map((loc) => ({ value: loc.id, label: loc.name }))
+      );
+    } catch {
+      // Locations fetch failure is non-critical, user will see empty dropdown
+    } finally {
+      setLocationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
 
-  const handleAction = async (action: 'approve' | 'receive' | 'cancel') => {
-    setActionLoading(action);
+  const handleApprove = async () => {
+    setActionLoading('approve');
     setError(null);
     try {
-      await post(`/purchase-orders/${id}/${action}`);
+      await post(`/purchase-orders/${id}/approve`, {});
       fetchOrder();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : `Failed to ${action} purchase order`;
+      const message = err instanceof Error ? err.message : 'Failed to approve purchase order';
       setError(message);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const handleCancelClick = () => {
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (order?.status === 'approved' && !cancelReason.trim()) {
+      setError('A reason is required to cancel an approved purchase order.');
+      return;
+    }
+    setActionLoading('cancel');
+    setError(null);
+    try {
+      await post(`/purchase-orders/${id}/cancel`, { reason: cancelReason.trim() || null });
+      setShowCancelModal(false);
+      fetchOrder();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to cancel purchase order';
+      setError(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReceiveClick = async () => {
+    // Initialize receive items from the order items
+    if (order?.items) {
+      setReceiveItems(
+        order.items.map((item) => ({
+          po_item_id: item.id,
+          quantity_received: item.quantity_ordered - item.quantity_received,
+        }))
+      );
+    }
+    setReceiveLocationId('');
+    setReceiveNotes('');
+    setShowReceiveModal(true);
+    await fetchLocations();
+  };
+
+  const handleReceiveConfirm = async () => {
+    if (!receiveLocationId) {
+      setError('Please select a receiving location.');
+      return;
+    }
+
+    const items = receiveItems
+      .filter((item) => item.quantity_received !== '' && item.quantity_received > 0)
+      .map((item) => ({
+        po_item_id: item.po_item_id,
+        quantity_received: Number(item.quantity_received),
+      }));
+
+    if (items.length === 0) {
+      setError('Please enter a quantity for at least one item.');
+      return;
+    }
+
+    setActionLoading('receive');
+    setError(null);
+    try {
+      await post(`/purchase-orders/${id}/receive`, {
+        location_id: receiveLocationId,
+        items,
+        notes: receiveNotes.trim() || undefined,
+      });
+      setShowReceiveModal(false);
+      fetchOrder();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to receive purchase order';
+      setError(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const updateReceiveItemQuantity = (poItemId: string, value: number | '') => {
+    setReceiveItems((prev) =>
+      prev.map((item) =>
+        item.po_item_id === poItemId ? { ...item, quantity_received: value } : item
+      )
+    );
   };
 
   if (isLoading) {
@@ -96,7 +211,7 @@ export default function PurchaseOrderDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <button
             type="button"
@@ -112,10 +227,10 @@ export default function PurchaseOrderDetailPage() {
             {getStatusBadge(order.status)}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canApprove && (
             <Button
-              onClick={() => handleAction('approve')}
+              onClick={handleApprove}
               isLoading={actionLoading === 'approve'}
             >
               Approve
@@ -124,7 +239,7 @@ export default function PurchaseOrderDetailPage() {
           {canReceive && (
             <Button
               variant="secondary"
-              onClick={() => handleAction('receive')}
+              onClick={handleReceiveClick}
               isLoading={actionLoading === 'receive'}
             >
               Mark Received
@@ -133,7 +248,7 @@ export default function PurchaseOrderDetailPage() {
           {canCancel && (
             <Button
               variant="danger"
-              onClick={() => handleAction('cancel')}
+              onClick={handleCancelClick}
               isLoading={actionLoading === 'cancel'}
             >
               Cancel
@@ -305,6 +420,154 @@ export default function PurchaseOrderDetailPage() {
           </table>
         </div>
       </div>
+
+      {/* Cancel Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        title="Cancel Purchase Order"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCancelModal(false)}>
+              Back
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleCancelConfirm}
+              isLoading={actionLoading === 'cancel'}
+            >
+              Confirm Cancel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to cancel this purchase order?
+            {order.status === 'approved' && ' A reason is required for approved orders.'}
+          </p>
+          <div className="w-full">
+            <label
+              htmlFor="cancel-reason"
+              className="mb-1.5 block text-sm font-medium text-foreground"
+            >
+              Reason for cancellation
+              {order.status === 'approved' && <span className="ml-0.5 text-destructive">*</span>}
+            </label>
+            <textarea
+              id="cancel-reason"
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              rows={3}
+              placeholder="Enter reason for cancellation..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Receive Modal */}
+      <Modal
+        isOpen={showReceiveModal}
+        onClose={() => setShowReceiveModal(false)}
+        title="Receive Items"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowReceiveModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReceiveConfirm}
+              isLoading={actionLoading === 'receive'}
+            >
+              Confirm Receipt
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select
+            label="Receiving Location"
+            required
+            placeholder="Select a location"
+            options={locations}
+            value={receiveLocationId}
+            onChange={(e) => setReceiveLocationId(e.target.value)}
+            disabled={locationsLoading}
+          />
+
+          {/* Items to receive */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Items to Receive
+            </label>
+            <div className="divide-y divide-border rounded-md border border-input">
+              {order.items && order.items.length > 0 ? (
+                order.items.map((item) => {
+                  const remaining = item.quantity_ordered - item.quantity_received;
+                  const receiveItem = receiveItems.find((ri) => ri.po_item_id === item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {item.spare_part?.name || item.spare_part_id.slice(0, 8)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.spare_part?.part_number && `${item.spare_part.part_number} · `}
+                          Ordered: {item.quantity_ordered} · Received: {item.quantity_received} · Remaining: {remaining}
+                        </p>
+                      </div>
+                      <div className="w-full sm:w-28">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={remaining}
+                          placeholder="0"
+                          value={receiveItem?.quantity_received ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateReceiveItemQuantity(
+                              item.id,
+                              val === '' ? '' : Number(val)
+                            );
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="p-3 text-center text-sm text-muted-foreground">
+                  No items to receive.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="w-full">
+            <label
+              htmlFor="receive-notes"
+              className="mb-1.5 block text-sm font-medium text-foreground"
+            >
+              Notes
+            </label>
+            <textarea
+              id="receive-notes"
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              rows={2}
+              placeholder="Optional notes about this receipt..."
+              value={receiveNotes}
+              onChange={(e) => setReceiveNotes(e.target.value)}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
