@@ -80,6 +80,10 @@ export default function InventoryPage() {
     reorder_quantity: 0,
   });
 
+  // Initial stock (added during part creation)
+  const [initialStockLocation, setInitialStockLocation] = useState('');
+  const [initialStockQty, setInitialStockQty] = useState<number | ''>('');
+
   // Barcode lookup modal
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -220,7 +224,22 @@ export default function InventoryPage() {
         max_stock_level: Number(newPart.max_stock_level) || 0,
         reorder_quantity: Number(newPart.reorder_quantity) || 0,
       };
-      await post('/spare-parts', payload);
+      const created = await post<{ id: string }>('/spare-parts', payload);
+
+      // Add initial stock if location and quantity provided
+      if (initialStockLocation && initialStockQty && Number(initialStockQty) > 0) {
+        try {
+          await post('/stock/adjust', {
+            spare_part_id: created.id,
+            location_id: initialStockLocation,
+            quantity: Number(initialStockQty),
+            reason: 'Initial stock on part creation',
+          });
+        } catch {
+          // Part was created but stock failed — not critical
+        }
+      }
+
       setShowCreateModal(false);
       setNewPart({
         part_number: '',
@@ -233,6 +252,8 @@ export default function InventoryPage() {
         max_stock_level: 0,
         reorder_quantity: 0,
       });
+      setInitialStockLocation('');
+      setInitialStockQty('');
       fetchParts();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create spare part';
@@ -570,6 +591,32 @@ export default function InventoryPage() {
               }
               placeholder="e.g. OEM quality front brake pad set for Toyota Corolla 2018-2023"
             />
+          </div>
+
+          {/* Initial Stock */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Initial Stock (optional)</h3>
+            <p className="text-xs text-gray-500 mb-3">Add stock immediately when creating this part. You can also add stock later from the part detail page.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Select
+                label="Location"
+                options={[
+                  { value: '', label: 'Select location' },
+                  ...locations.map((l) => ({ value: l.id, label: l.name })),
+                ]}
+                value={initialStockLocation}
+                onChange={(e) => setInitialStockLocation(e.target.value)}
+              />
+              <Input
+                label="Quantity"
+                type="number"
+                min={0}
+                value={initialStockQty}
+                onChange={(e) => setInitialStockQty(e.target.value === '' ? '' : parseInt(e.target.value))}
+                placeholder="e.g. 50"
+                helperText="How many do you currently have?"
+              />
+            </div>
           </div>
         </div>
       </Modal>
