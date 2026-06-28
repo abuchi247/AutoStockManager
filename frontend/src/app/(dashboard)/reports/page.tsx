@@ -32,6 +32,15 @@ const REPORT_TYPE_OPTIONS: SelectOption[] = [
   { value: 'financial', label: 'Financial Summary' },
 ];
 
+// Map frontend report types to backend API paths
+const REPORT_API_PATH: Record<ReportType, string> = {
+  sales: 'sales',
+  inventory: 'inventory',
+  customer: 'customers',
+  supplier: 'suppliers',
+  financial: 'financial-summary',
+};
+
 // --- Helper functions ---
 
 function getDefaultStartDate(): string {
@@ -105,13 +114,26 @@ export default function ReportsPage() {
 
     try {
       const params = buildParams('json');
-      const response = await api.get<{ data: Record<string, unknown>[] }>(
-        `/reports/${reportType}?${params}`
+      const apiPath = REPORT_API_PATH[reportType];
+      const response = await api.get<Record<string, unknown>>(
+        `/reports/${apiPath}?${params}`
       );
 
-      const data = response.data.data;
+      const responseData = response.data as Record<string, unknown>;
 
-      if (!data || !Array.isArray(data) || data.length === 0) {
+      // The backend returns "rows" for most reports, or flat data for financial-summary
+      let data: Record<string, unknown>[];
+      if ('rows' in responseData && Array.isArray(responseData.rows)) {
+        data = responseData.rows as Record<string, unknown>[];
+      } else if (reportType === 'financial') {
+        // Financial summary is a single object — wrap it in an array for table display
+        const { start_date: _s, end_date: _e, ...metrics } = responseData;
+        data = [metrics];
+      } else {
+        data = [];
+      }
+
+      if (!data || data.length === 0) {
         setReportData([]);
         setColumns([]);
         return;
@@ -134,8 +156,8 @@ export default function ReportsPage() {
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to generate report')
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data
+              ?.detail ?? 'Failed to generate report')
           : 'Failed to generate report';
       setError(message);
     } finally {
@@ -154,7 +176,8 @@ export default function ReportsPage() {
 
       try {
         const params = buildParams(format);
-        const response = await api.get(`/reports/${reportType}?${params}`, {
+        const apiPath = REPORT_API_PATH[reportType];
+        const response = await api.get(`/reports/${apiPath}?${params}`, {
           responseType: 'blob',
         });
 
@@ -175,8 +198,8 @@ export default function ReportsPage() {
       } catch (err: unknown) {
         const message =
           err && typeof err === 'object' && 'response' in err
-            ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-                ?.error?.message ?? `Failed to export report as ${format.toUpperCase()}`)
+            ? ((err as { response?: { data?: { detail?: string } } }).response?.data
+                ?.detail ?? `Failed to export report as ${format.toUpperCase()}`)
             : `Failed to export report as ${format.toUpperCase()}`;
         setError(message);
       } finally {
