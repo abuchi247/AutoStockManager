@@ -16,6 +16,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 - **Barcode System** — Code 128 barcode generation, scanning, and lookup
 - **Inventory Audits** — Snapshot-based cycle counts and full stock counts with variance tracking
 - **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes
+- **Business Settings** — Configurable company profile (name, logo, address, bank details) that populates invoices and reports
 - **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export
 - **Notifications** — Low stock alerts, credit limit warnings, overdue customer reminders, and pending approval notifications
 - **Audit Trail** — Append-only, immutable record of all critical system events
@@ -143,6 +144,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 | Reports | `/api/v1/reports` | Sales, inventory, customers, suppliers, financial |
 | Dashboard | `/api/v1/dashboard` | KPI widgets |
 | Invoices | `/api/v1/invoices` | Generate, download PDF |
+| Business Settings | `/api/v1/business-settings` | Get, update company profile |
 | Notifications | `/api/v1/notifications` | List, mark read |
 | Barcodes | `/api/v1/barcodes` | Lookup, decode |
 
