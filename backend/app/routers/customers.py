@@ -86,8 +86,30 @@ async def list_customers(
         page=page, page_size=page_size, search=search, account_status=account_status
     )
 
+    # Compute balance from credit ledger for each customer
+    from app.models.customer_credit_ledger import CustomerCreditLedger
+    customer_ids = [c.id for c in customers]
+    balance_map: dict = {}
+    if customer_ids:
+        balance_stmt = (
+            select(
+                CustomerCreditLedger.customer_id,
+                func.sum(CustomerCreditLedger.amount).label("balance"),
+            )
+            .filter(CustomerCreditLedger.customer_id.in_(customer_ids))
+            .group_by(CustomerCreditLedger.customer_id)
+        )
+        balance_result = await db.execute(balance_stmt)
+        balance_map = {row.customer_id: float(row.balance) for row in balance_result}
+
+    data = []
+    for c in customers:
+        resp = CustomerResponse.model_validate(c)
+        resp.balance = balance_map.get(c.id, 0)
+        data.append(resp)
+
     return CustomerListResponse(
-        data=[CustomerResponse.model_validate(c) for c in customers],
+        data=data,
         meta={"page": page, "total": total, "page_size": page_size},
     )
 

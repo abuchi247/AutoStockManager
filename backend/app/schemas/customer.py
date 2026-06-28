@@ -147,6 +147,7 @@ class CustomerResponse(BaseModel):
     tax_id: Optional[str] = Field(default=None, description="Tax ID")
     credit_limit: Decimal = Field(..., description="Credit limit")
     account_status: str = Field(..., description="Account status")
+    balance: Optional[float] = Field(default=0, description="Outstanding credit balance")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
     updated_at: Optional[datetime] = Field(default=None, description="Updated timestamp")
     created_by: Optional[str] = Field(default=None, description="Created by user")
