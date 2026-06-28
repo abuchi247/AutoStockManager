@@ -268,6 +268,20 @@ class SalesService:
         sale.total_amount = subtotal + sale.tax_amount
         sale.status = SaleStatus.CONFIRMED
 
+        # Record credit ledger entry for credit sales
+        if sale.payment_type == PaymentType.CREDIT and sale.customer_id:
+            from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
+            credit_entry = CustomerCreditLedger(
+                customer_id=sale.customer_id,
+                transaction_type=CreditTransactionType.SALE.value,
+                amount=sale.total_amount,  # Positive = debit (customer owes)
+                reference_type="sale",
+                reference_id=sale.id,
+                notes=f"Credit sale {sale.invoice_number}",
+                created_by=self.user_id,
+            )
+            self.db.add(credit_entry)
+
         await self.db.flush()
         return sale
 
