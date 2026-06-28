@@ -68,3 +68,56 @@ async def get_dashboard_kpis(
         pending_po_count=kpi_dict.get("pending_po_count"),
         top_selling_products=top_products,
     )
+
+
+@router.get(
+    "/stock-value",
+    status_code=status.HTTP_200_OK,
+    summary="Get stock value by location",
+    description="Returns total stock value (qty × cost_price) per location.",
+)
+async def get_stock_value(
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Get total stock value broken down by location.
+
+    Calculates: sum(current_quantity × spare_part.cost_price) per location.
+    """
+    from sqlalchemy import func, select
+    from app.models.stock_status_cache import StockStatusCache
+    from app.models.spare_part import SparePart
+    from app.models.location import Location
+
+    stmt = (
+        select(
+            StockStatusCache.location_id,
+            Location.name.label("location_name"),
+            func.sum(StockStatusCache.current_quantity * SparePart.cost_price).label("total_value"),
+            func.sum(StockStatusCache.current_quantity).label("total_items"),
+        )
+        .join(SparePart, StockStatusCache.spare_part_id == SparePart.id)
+        .join(Location, StockStatusCache.location_id == Location.id)
+        .filter(StockStatusCache.current_quantity > 0)
+        .group_by(StockStatusCache.location_id, Location.name)
+        .order_by(Location.name.asc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    locations = [
+        {
+            "location_id": str(row.location_id),
+            "location_name": row.location_name,
+            "total_value": float(row.total_value or 0),
+            "total_items": float(row.total_items or 0),
+        }
+        for row in rows
+    ]
+
+    grand_total = sum(loc["total_value"] for loc in locations)
+
+    return {
+        "grand_total": grand_total,
+        "locations": locations,
+    }

@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [stockValue, setStockValue] = useState<{ grand_total: number; locations: Array<{ location_id: string; location_name: string; total_value: number; total_items: number }> } | null>(null);
 
   const fetchKPIs = useCallback(async () => {
     try {
@@ -44,13 +45,26 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const fetchStockValue = useCallback(async () => {
+    try {
+      const response = await api.get('/dashboard/stock-value');
+      setStockValue(response.data);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
   // Initial fetch and 5-minute auto-refresh
   useEffect(() => {
     fetchKPIs();
+    fetchStockValue();
 
-    const interval = setInterval(fetchKPIs, REFRESH_INTERVAL_MS);
+    const interval = setInterval(() => {
+      fetchKPIs();
+      fetchStockValue();
+    }, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchKPIs]);
+  }, [fetchKPIs, fetchStockValue]);
 
   if (isLoading) {
     return (
@@ -129,6 +143,33 @@ export default function DashboardPage() {
           />
         )}
       </div>
+
+      {/* Stock Value by Location */}
+      {stockValue && stockValue.locations.length > 0 && (
+        <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-[#333]">
+              Stock Value by Location
+            </h2>
+            <span className="text-lg font-bold text-[#333]">
+              {formatCurrency(stockValue.grand_total)}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {stockValue.locations.map((loc) => (
+              <div key={loc.location_id} className="flex items-center justify-between rounded-md border border-gray-100 p-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{loc.location_name}</p>
+                  <p className="text-xs text-gray-500">{Math.round(loc.total_items)} items in stock</p>
+                </div>
+                <span className="text-sm font-bold text-gray-900">
+                  {formatCurrency(loc.total_value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top Selling Products */}
       {kpis?.top_selling_products && kpis.top_selling_products.length > 0 && (
