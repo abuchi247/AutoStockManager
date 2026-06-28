@@ -165,11 +165,14 @@ def _render_a4_html(data: InvoiceData) -> str:
     # Company logo section
     logo_section = ""
     if data.company.logo_base64:
-        # Handle both raw base64 and full data URLs
-        logo_src = data.company.logo_base64
-        if not logo_src.startswith("data:"):
-            logo_src = f"data:image/png;base64,{logo_src}"
-        logo_section = f'<img src="{logo_src}" class="logo" alt="Company Logo" />'
+        # Extract raw base64 from data URL if present, then build a clean src
+        logo_data = data.company.logo_base64
+        if logo_data.startswith("data:"):
+            # Use the full data URL as-is (already includes mime type and base64)
+            logo_src = logo_data
+        else:
+            logo_src = f"data:image/png;base64,{logo_data}"
+        logo_section = f'<img src="{logo_src}" class="logo" alt="{data.company.name}" />'
     else:
         logo_section = f'<div class="logo-text">{data.company.name}</div>'
 

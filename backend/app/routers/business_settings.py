@@ -72,6 +72,11 @@ async def update_business_settings(
     settings = await _get_or_create_settings(db)
 
     update_data = request.model_dump(exclude_unset=True)
+
+    # Process logo: resize for invoice rendering compatibility
+    if "logo_base64" in update_data and update_data["logo_base64"]:
+        update_data["logo_base64"] = _process_logo(update_data["logo_base64"])
+
     for field, value in update_data.items():
         setattr(settings, field, value)
 
@@ -80,3 +85,48 @@ async def update_business_settings(
     await db.commit()
     await db.refresh(settings)
     return BusinessSettingsResponse.model_validate(settings)
+
+
+def _process_logo(logo_data: str) -> str:
+    """Process and optimize logo for PDF rendering.
+
+    Strips data URL prefix, decodes, resizes to max 200x200px,
+    converts to PNG, and returns a clean data URL that WeasyPrint can render.
+    """
+    import base64
+    import io
+
+    try:
+        # Strip data URL prefix if present
+        if "," in logo_data and logo_data.startswith("data:"):
+            raw_b64 = logo_data.split(",", 1)[1]
+        else:
+            raw_b64 = logo_data
+
+        # Decode
+        image_bytes = base64.b64decode(raw_b64)
+
+        # Resize using Pillow
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(image_bytes))
+
+        # Convert to RGBA if needed (handles transparency)
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA")
+
+        # Resize to max 200x200 maintaining aspect ratio
+        img.thumbnail((200, 200), Image.LANCZOS)
+
+        # Save as PNG
+        output = io.BytesIO()
+        img.save(output, format="PNG", optimize=True)
+        output.seek(0)
+
+        # Encode back to base64 data URL
+        encoded = base64.b64encode(output.read()).decode("utf-8")
+        return f"data:image/png;base64,{encoded}"
+
+    except Exception:
+        # If processing fails, return original data
+        return logo_data
