@@ -165,7 +165,11 @@ def _render_a4_html(data: InvoiceData) -> str:
     # Company logo section
     logo_section = ""
     if data.company.logo_base64:
-        logo_section = f'<img src="data:image/png;base64,{data.company.logo_base64}" class="logo" alt="Company Logo" />'
+        # Handle both raw base64 and full data URLs
+        logo_src = data.company.logo_base64
+        if not logo_src.startswith("data:"):
+            logo_src = f"data:image/png;base64,{logo_src}"
+        logo_section = f'<img src="{logo_src}" class="logo" alt="Company Logo" />'
     else:
         logo_section = f'<div class="logo-text">{data.company.name}</div>'
 
@@ -445,6 +449,14 @@ def _render_thermal_html(data: InvoiceData) -> str:
     if data.barcode_svg:
         barcode_section = f'<img src="data:image/svg+xml;base64,{data.barcode_svg}" class="barcode" alt="Barcode" />'
 
+    # Thermal logo section
+    thermal_logo_section = ""
+    if data.company.logo_base64:
+        logo_src = data.company.logo_base64
+        if not logo_src.startswith("data:"):
+            logo_src = f"data:image/png;base64,{logo_src}"
+        thermal_logo_section = f'<img src="{logo_src}" style="width:50px;height:50px;margin:0 auto 5px;display:block;object-fit:contain;" alt="Logo" />'
+
     html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -547,6 +559,7 @@ def _render_thermal_html(data: InvoiceData) -> str:
 </head>
 <body>
     <div class="header">
+        {thermal_logo_section}
         <h1>{data.company.name}</h1>
         <p>{data.company.address}</p>
         <p>Tel: {data.company.phone}</p>

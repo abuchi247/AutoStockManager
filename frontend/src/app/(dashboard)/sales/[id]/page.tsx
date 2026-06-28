@@ -110,17 +110,17 @@ export default function SaleDetailPage() {
     }
   }, [sale?.status, saleId, invoiceFormat]);
 
-  const handleGenerateInvoice = async () => {
+  const handleGenerateInvoice = async (overwrite = false) => {
     setIsGeneratingInvoice(true);
     setError(null);
     try {
       const result = await post<{ id: string }>('/invoices/generate', {
         sale_id: saleId,
         format: invoiceFormat,
-        overwrite: false,
+        overwrite,
       });
       setInvoiceId(result.id);
-      setSuccess(`Invoice generated successfully (${invoiceFormat} format)`);
+      setSuccess(`Invoice ${overwrite ? 'regenerated' : 'generated'} successfully (${invoiceFormat} format)`);
     } catch (err: unknown) {
       let message = 'Failed to generate invoice';
       if (err && typeof err === 'object' && 'response' in err) {
@@ -134,6 +134,7 @@ export default function SaleDetailPage() {
       setIsGeneratingInvoice(false);
     }
   };
+
 
   const handleDownloadPdf = async () => {
     if (!invoiceId) return;
@@ -562,11 +563,20 @@ export default function SaleDetailPage() {
               />
             </div>
             {invoiceId ? (
-              <Button onClick={handleDownloadPdf}>
-                Download PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleDownloadPdf}>
+                  Download PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleGenerateInvoice(true)}
+                  isLoading={isGeneratingInvoice}
+                >
+                  Regenerate
+                </Button>
+              </div>
             ) : (
-              <Button onClick={handleGenerateInvoice} isLoading={isGeneratingInvoice}>
+              <Button onClick={() => handleGenerateInvoice(false)} isLoading={isGeneratingInvoice}>
                 Generate Invoice
               </Button>
             )}
