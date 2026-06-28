@@ -568,11 +568,35 @@ function BusinessSettingsSection() {
         logo_base64: payload.logo_base64 || null,
       };
       const data = await put<BusinessSettingsData>('/business-settings', cleanPayload);
-      setSettings(data);
+      // Update state with processed response (logo may be resized)
+      setSettings({
+        ...data,
+        business_name: data.business_name || '',
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        tax_id: data.tax_id || '',
+        website: data.website || '',
+        logo_base64: data.logo_base64 || '',
+        invoice_footer: data.invoice_footer || '',
+        bank_name: data.bank_name || '',
+        bank_account_number: data.bank_account_number || '',
+        bank_account_name: data.bank_account_name || '',
+      });
       setSuccessMsg('Business settings saved successfully');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save settings';
+      let message = 'Failed to save settings';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
+        if (axiosErr.response?.data?.detail) {
+          message = axiosErr.response.data.detail;
+        } else if (axiosErr.response?.status) {
+          message = `Request failed with status code ${axiosErr.response.status}`;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setError(message);
     } finally {
       setIsSaving(false);

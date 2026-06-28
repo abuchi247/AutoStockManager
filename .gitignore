@@ -54,3 +54,4 @@ coverage/
 # Build
 *.egg
 *.whl
+Screenshot*.png
