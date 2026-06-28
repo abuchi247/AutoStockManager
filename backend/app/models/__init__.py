@@ -78,6 +78,7 @@ from app.models.audit_session import (
 from app.models.notification import Notification, NotificationType
 from app.models.invoice import Invoice, InvoiceFormat
 from app.models.audit_trail import AuditTrail, ActionType
+from app.models.business_settings import BusinessSettings
 
 __all__ = [
     "BaseModel",
@@ -126,4 +127,5 @@ __all__ = [
     "NotificationType",
     "AuditTrail",
     "ActionType",
+    "BusinessSettings",
 ]
