@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { get, put, post } from '@/lib/api';
 import {
   Button,
@@ -705,7 +706,23 @@ function CreditLedgerTab({
                       {getTransactionBadge(entry.transaction_type)}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {entry.reference_type}: {entry.reference_id.slice(0, 8)}...
+                      {(() => {
+                        const routeMap: Record<string, string> = {
+                          sale: '/sales',
+                        };
+                        const basePath = routeMap[entry.reference_type];
+                        if (basePath) {
+                          return (
+                            <Link
+                              href={`${basePath}/${entry.reference_id}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {entry.reference_type}: {entry.reference_id.slice(0, 8)}...
+                            </Link>
+                          );
+                        }
+                        return <span>{entry.reference_type}: {entry.reference_id.slice(0, 8)}...</span>;
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                       {entry.notes || '—'}

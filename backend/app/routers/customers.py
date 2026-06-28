@@ -87,7 +87,6 @@ async def list_customers(
     )
 
     # Compute balance from credit ledger for each customer
-    from app.models.customer_credit_ledger import CustomerCreditLedger
     customer_ids = [c.id for c in customers]
     balance_map: dict = {}
     if customer_ids:
@@ -100,12 +99,13 @@ async def list_customers(
             .group_by(CustomerCreditLedger.customer_id)
         )
         balance_result = await db.execute(balance_stmt)
-        balance_map = {row.customer_id: float(row.balance) for row in balance_result}
+        for row in balance_result.all():
+            balance_map[row.customer_id] = float(row.balance or 0)
 
     data = []
     for c in customers:
         resp = CustomerResponse.model_validate(c)
-        resp.balance = balance_map.get(c.id, 0)
+        resp.balance = balance_map.get(c.id, 0.0)
         data.append(resp)
 
     return CustomerListResponse(
@@ -170,7 +170,18 @@ async def get_customer(
 
     try:
         customer = await service.get_customer(customer_id)
-        return CustomerResponse.model_validate(customer)
+        resp = CustomerResponse.model_validate(customer)
+
+        # Compute balance from credit ledger
+        balance_stmt = (
+            select(func.sum(CustomerCreditLedger.amount).label("balance"))
+            .filter(CustomerCreditLedger.customer_id == customer_id)
+        )
+        balance_result = await db.execute(balance_stmt)
+        balance_row = balance_result.scalar()
+        resp.balance = float(balance_row) if balance_row is not None else 0.0
+
+        return resp
     except CustomerNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
