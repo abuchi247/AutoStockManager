@@ -15,6 +15,7 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.routers.audits import router as audits_router
 from app.routers.auth import router as auth_router
 from app.routers.barcodes import router as barcodes_router
+from app.routers.business_settings import router as business_settings_router
 from app.routers.categories import router as categories_router
 from app.routers.credit import router as credit_router
 from app.routers.dashboard import router as dashboard_router
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(invoices_router)
     app.include_router(notifications_router)
+    app.include_router(business_settings_router)
 
     return app
 

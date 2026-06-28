@@ -11,6 +11,7 @@ import {
   Badge,
   Modal,
   Alert,
+  LoadingSpinner,
 } from '@/components';
 import type { Column, SelectOption } from '@/components';
 import type {
@@ -301,6 +302,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Business Settings Section */}
+      <BusinessSettingsSection />
+
       {/* System Settings Section */}
       <SystemSettingsSection />
 
@@ -484,6 +488,258 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// --- Business Settings Component ---
+
+interface BusinessSettingsData {
+  id?: string;
+  business_name: string;
+  address: string;
+  phone: string;
+  email: string;
+  tax_id: string;
+  website: string;
+  logo_base64: string;
+  invoice_footer: string;
+  bank_name: string;
+  bank_account_number: string;
+  bank_account_name: string;
+}
+
+function BusinessSettingsSection() {
+  const [settings, setSettings] = useState<BusinessSettingsData>({
+    business_name: '',
+    address: '',
+    phone: '',
+    email: '',
+    tax_id: '',
+    website: '',
+    logo_base64: '',
+    invoice_footer: '',
+    bank_name: '',
+    bank_account_number: '',
+    bank_account_name: '',
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await get<BusinessSettingsData>('/business-settings');
+        setSettings(data);
+      } catch {
+        // First time — no settings exist yet, use defaults
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const { id: _id, ...payload } = settings;
+      const data = await put<BusinessSettingsData>('/business-settings', payload);
+      setSettings(data);
+      setSuccessMsg('Business settings saved successfully');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save settings';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      setError('Logo must be under 500KB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSettings({ ...settings, logo_base64: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900">Business Profile</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          This information appears on your invoices, receipts, and reports
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4">
+          <Alert variant="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="mb-4">
+          <Alert variant="success" onClose={() => setSuccessMsg(null)}>
+            {successMsg}
+          </Alert>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {/* Basic Info */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label="Business Name"
+            value={settings.business_name}
+            onChange={(e) => setSettings({ ...settings, business_name: e.target.value })}
+            placeholder="e.g. Chidi Auto Parts Ltd"
+            required
+          />
+          <Input
+            label="Phone"
+            value={settings.phone}
+            onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+            placeholder="e.g. 08012345678"
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={settings.email}
+            onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+            placeholder="e.g. info@business.com"
+          />
+          <Input
+            label="Tax ID (TIN/VAT)"
+            value={settings.tax_id}
+            onChange={(e) => setSettings({ ...settings, tax_id: e.target.value })}
+            placeholder="e.g. TIN-12345678"
+          />
+          <Input
+            label="Website"
+            value={settings.website}
+            onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+            placeholder="e.g. www.business.com"
+          />
+        </div>
+
+        {/* Address */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Address
+          </label>
+          <textarea
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+            rows={2}
+            value={settings.address}
+            onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+            placeholder="Business address..."
+          />
+        </div>
+
+        {/* Logo */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Business Logo
+          </label>
+          <div className="flex items-center gap-4">
+            {settings.logo_base64 && (
+              <img
+                src={settings.logo_base64}
+                alt="Business logo"
+                className="h-16 w-16 rounded border border-gray-200 object-contain"
+              />
+            )}
+            <div>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml"
+                onChange={handleLogoUpload}
+                className="block text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="mt-1 text-xs text-gray-400">PNG, JPEG, or SVG. Max 500KB.</p>
+            </div>
+            {settings.logo_base64 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSettings({ ...settings, logo_base64: '' })}
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Bank Details */}
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">Bank Details (shown on invoices)</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Input
+              label="Bank Name"
+              value={settings.bank_name}
+              onChange={(e) => setSettings({ ...settings, bank_name: e.target.value })}
+              placeholder="e.g. First Bank"
+            />
+            <Input
+              label="Account Number"
+              value={settings.bank_account_number}
+              onChange={(e) => setSettings({ ...settings, bank_account_number: e.target.value })}
+              placeholder="e.g. 0123456789"
+            />
+            <Input
+              label="Account Name"
+              value={settings.bank_account_name}
+              onChange={(e) => setSettings({ ...settings, bank_account_name: e.target.value })}
+              placeholder="e.g. Chidi Auto Parts Ltd"
+            />
+          </div>
+        </div>
+
+        {/* Invoice Footer */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Invoice Footer Text
+          </label>
+          <textarea
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+            rows={2}
+            value={settings.invoice_footer}
+            onChange={(e) => setSettings({ ...settings, invoice_footer: e.target.value })}
+            placeholder="e.g. Thank you for your patronage"
+          />
+        </div>
+
+        {/* Save Button */}
+        <div>
+          <Button onClick={handleSave} isLoading={isSaving}>
+            Save Business Settings
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
