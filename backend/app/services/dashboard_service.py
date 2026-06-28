@@ -129,18 +129,25 @@ class DashboardService:
         """Get the sum of confirmed sale total_amount for today.
 
         Uses an aggregate SUM query filtered by status=CONFIRMED and
-        created_at date = today (UTC).
+        created_at within today's range (index-friendly).
 
         Returns:
             Total sales amount for today, or 0.00 if no sales.
         """
         today = date.today()
+        today_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+        tomorrow_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+        # Calculate tomorrow
+        from datetime import timedelta
+        tomorrow_start = today_start + timedelta(days=1)
+
         stmt = select(
             func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
         ).where(
             and_(
                 Sale.status == SaleStatus.CONFIRMED,
-                func.date(Sale.created_at) == today,
+                Sale.created_at >= today_start,
+                Sale.created_at < tomorrow_start,
             )
         )
         result = await self.db.execute(stmt)
@@ -150,20 +157,27 @@ class DashboardService:
         """Get the sum of confirmed sale total_amount for the current month.
 
         Uses an aggregate SUM query filtered by status=CONFIRMED and
-        created_at within the current calendar month (UTC).
+        created_at within the current calendar month (index-friendly range).
 
         Returns:
             Total sales amount for this month, or 0.00 if no sales.
         """
         today = date.today()
-        first_of_month = today.replace(day=1)
+        first_of_month = datetime(today.year, today.month, 1, tzinfo=timezone.utc)
+        # Next month start
+        from datetime import timedelta
+        if today.month == 12:
+            next_month_start = datetime(today.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            next_month_start = datetime(today.year, today.month + 1, 1, tzinfo=timezone.utc)
+
         stmt = select(
             func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
         ).where(
             and_(
                 Sale.status == SaleStatus.CONFIRMED,
-                func.date(Sale.created_at) >= first_of_month,
-                func.date(Sale.created_at) <= today,
+                Sale.created_at >= first_of_month,
+                Sale.created_at < next_month_start,
             )
         )
         result = await self.db.execute(stmt)

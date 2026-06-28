@@ -277,21 +277,25 @@ class ReportService:
                     filtered_sales.append(sale)
             sales = filtered_sales
 
-        # Build report rows
+        # Build report rows — batch load customer names to avoid N+1
         report = SalesReportResult(filters=filters)
+
+        # Collect unique customer IDs and batch-fetch names
+        customer_ids = {s.customer_id for s in sales if s.customer_id}
+        customer_name_map: dict = {}
+        if customer_ids:
+            cust_stmt = select(Customer.id, Customer.name).where(
+                Customer.id.in_(customer_ids)
+            )
+            cust_result = await self.db.execute(cust_stmt)
+            customer_name_map = {row.id: row.name for row in cust_result.all()}
+
         for sale in sales:
             cogs = sum(
                 (item.cost_of_goods_sold or Decimal("0.00"))
                 for item in sale.items
             )
-            # Look up customer name
-            customer_name = None
-            if sale.customer_id:
-                cust_stmt = select(Customer.name).where(
-                    Customer.id == sale.customer_id
-                )
-                cust_result = await self.db.execute(cust_stmt)
-                customer_name = cust_result.scalar_one_or_none()
+            customer_name = customer_name_map.get(sale.customer_id)
 
             gross_margin = sale.total_amount - cogs
             row = SalesReportRow(
@@ -357,14 +361,55 @@ class ReportService:
         report = InventoryReportResult()
         now = datetime.now(timezone.utc)
 
+        if not cache_entries:
+            return report
+
+        # Batch-load all spare parts to avoid N+1
+        part_ids = list({c.spare_part_id for c in cache_entries})
+        parts_stmt = select(SparePart).where(
+            SparePart.id.in_(part_ids),
+            SparePart.deleted_at.is_(None),
+        )
+        parts_result = await self.db.execute(parts_stmt)
+        parts_map = {p.id: p for p in parts_result.scalars().all()}
+
+        # Batch-load stock valuations from cost layers
+        valuation_stmt = select(
+            CostLayer.spare_part_id,
+            CostLayer.location_id,
+            func.coalesce(
+                func.sum(CostLayer.remaining_quantity * CostLayer.unit_cost),
+                Decimal("0"),
+            ).label("stock_value"),
+        ).where(
+            CostLayer.spare_part_id.in_(part_ids),
+            CostLayer.remaining_quantity > 0,
+        ).group_by(CostLayer.spare_part_id, CostLayer.location_id)
+        val_result = await self.db.execute(valuation_stmt)
+        valuation_map = {
+            (row.spare_part_id, row.location_id): row.stock_value
+            for row in val_result.all()
+        }
+
+        # Batch-load last movement dates
+        last_move_stmt = select(
+            InventoryMovementLedger.spare_part_id,
+            InventoryMovementLedger.location_id,
+            func.max(InventoryMovementLedger.created_at).label("last_movement"),
+        ).where(
+            InventoryMovementLedger.spare_part_id.in_(part_ids),
+        ).group_by(
+            InventoryMovementLedger.spare_part_id,
+            InventoryMovementLedger.location_id,
+        )
+        last_move_result = await self.db.execute(last_move_stmt)
+        last_move_map = {
+            (row.spare_part_id, row.location_id): row.last_movement
+            for row in last_move_result.all()
+        }
+
         for cache_entry in cache_entries:
-            # Get spare part details
-            part_stmt = select(SparePart).where(
-                SparePart.id == cache_entry.spare_part_id,
-                SparePart.deleted_at.is_(None),
-            )
-            part_result = await self.db.execute(part_stmt)
-            part = part_result.scalar_one_or_none()
+            part = parts_map.get(cache_entry.spare_part_id)
             if not part:
                 continue
 
@@ -372,21 +417,10 @@ class ReportService:
             if category_id and part.category_id != category_id:
                 continue
 
-            # Calculate stock valuation from cost layers
-            valuation_stmt = select(
-                func.coalesce(
-                    func.sum(
-                        CostLayer.remaining_quantity * CostLayer.unit_cost
-                    ),
-                    Decimal("0"),
-                )
-            ).where(
-                CostLayer.spare_part_id == cache_entry.spare_part_id,
-                CostLayer.location_id == cache_entry.location_id,
-                CostLayer.remaining_quantity > 0,
+            stock_value = valuation_map.get(
+                (cache_entry.spare_part_id, cache_entry.location_id),
+                Decimal("0.00"),
             )
-            val_result = await self.db.execute(valuation_stmt)
-            stock_value = val_result.scalar() or Decimal("0.00")
 
             # Determine weighted average unit cost
             if cache_entry.current_quantity > 0:
@@ -394,15 +428,9 @@ class ReportService:
             else:
                 unit_cost = Decimal("0.00")
 
-            # Check last movement date for slow-moving detection
-            last_move_stmt = select(
-                func.max(InventoryMovementLedger.created_at)
-            ).where(
-                InventoryMovementLedger.spare_part_id == cache_entry.spare_part_id,
-                InventoryMovementLedger.location_id == cache_entry.location_id,
+            last_movement_date = last_move_map.get(
+                (cache_entry.spare_part_id, cache_entry.location_id)
             )
-            last_move_result = await self.db.execute(last_move_stmt)
-            last_movement_date = last_move_result.scalar_one_or_none()
 
             # Determine if below reorder level
             is_below_reorder = (
