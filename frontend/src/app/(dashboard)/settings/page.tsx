@@ -532,7 +532,21 @@ function BusinessSettingsSection() {
     const fetchSettings = async () => {
       try {
         const data = await get<BusinessSettingsData>('/business-settings');
-        setSettings(data);
+        // Normalize null values to empty strings for form state
+        setSettings({
+          ...data,
+          business_name: data.business_name || '',
+          address: data.address || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          tax_id: data.tax_id || '',
+          website: data.website || '',
+          logo_base64: data.logo_base64 || '',
+          invoice_footer: data.invoice_footer || '',
+          bank_name: data.bank_name || '',
+          bank_account_number: data.bank_account_number || '',
+          bank_account_name: data.bank_account_name || '',
+        });
       } catch {
         // First time — no settings exist yet, use defaults
       } finally {
@@ -548,7 +562,12 @@ function BusinessSettingsSection() {
     setSuccessMsg(null);
     try {
       const { id: _id, ...payload } = settings;
-      const data = await put<BusinessSettingsData>('/business-settings', payload);
+      // Only send logo_base64 if it has content (avoid sending large empty/null values)
+      const cleanPayload = {
+        ...payload,
+        logo_base64: payload.logo_base64 || null,
+      };
+      const data = await put<BusinessSettingsData>('/business-settings', cleanPayload);
       setSettings(data);
       setSuccessMsg('Business settings saved successfully');
       setTimeout(() => setSuccessMsg(null), 3000);
