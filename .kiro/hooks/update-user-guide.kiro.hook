@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Update User Guide",
+  "description": "After the agent stops, checks if README.md needs updating based on recent changes and updates it if necessary.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check the recent git diff (last commit) to see what changed. If the changes affect user-facing features, API endpoints, or workflows, update README.md to reflect them. Keep the README concise and accurate. If the changes are purely internal (refactoring, bug fixes with no behavior change visible to users), no README update is needed."
+  }
+}

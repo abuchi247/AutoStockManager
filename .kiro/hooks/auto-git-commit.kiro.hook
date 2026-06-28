@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Git Commit",
+  "description": "Automatically stages and commits all changes to git after the agent stops working, ensuring nothing is left uncommitted.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if there are any uncommitted changes by running `git status`. If there are staged or unstaged changes, stage them all with `git add -A` and commit with a descriptive message summarizing what was done. If there are no changes, do nothing."
+  }
+}
