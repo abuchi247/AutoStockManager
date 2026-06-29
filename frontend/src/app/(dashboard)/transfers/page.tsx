@@ -108,7 +108,7 @@ export default function TransfersPage() {
         `/transfers?${params.toString()}`
       );
       setTransfers(response.data.map((t: Transfer) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus })));
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load transfers';
       setError(message);
@@ -125,7 +125,7 @@ export default function TransfersPage() {
     try {
       const [partsRes, locationsRes] = await Promise.all([
         get<PaginatedResponse<SparePart>>('/spare-parts?page_size=1000'),
-        get<PaginatedResponse<Location>>('/stock/locations?page_size=100'),
+        get<PaginatedResponse<Location>>('/locations?page_size=100'),
       ]);
       setParts(partsRes.data);
       setLocations(locationsRes.data);

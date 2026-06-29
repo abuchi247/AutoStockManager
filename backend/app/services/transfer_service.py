@@ -431,6 +431,10 @@ class TransferService:
     ) -> Transfer:
         """Cancel a transfer that has not yet been received.
 
+        If the transfer is IN_TRANSIT (stock was already deducted from source),
+        reverses the deduction by creating a TRANSFER_IN ledger entry at the
+        source location and restoring cost layers.
+
         Args:
             transfer_id: UUID of the transfer to cancel.
             cancelled_by: UUID of the cancelling user.
@@ -451,6 +455,39 @@ class TransferService:
                 current_status=transfer.status,
                 expected_status="PENDING or IN_TRANSIT",
             )
+
+        # If IN_TRANSIT, reverse the stock deduction at source
+        if transfer.status == TransferStatus.IN_TRANSIT.value:
+            consumed_details = transfer.consumed_layer_details or []
+            for detail in consumed_details:
+                quantity_consumed = Decimal(str(detail["quantity_consumed"]))
+                unit_cost = Decimal(str(detail["unit_cost"]))
+
+                # Create a new cost layer at source to restore stock
+                new_layer = CostLayer(
+                    spare_part_id=transfer.spare_part_id,
+                    location_id=transfer.source_location_id,
+                    unit_cost=unit_cost,
+                    original_quantity=quantity_consumed,
+                    remaining_quantity=quantity_consumed,
+                    source_type="transfer_cancelled",
+                    source_reference_id=transfer.id,
+                )
+                self.db.add(new_layer)
+                await self.db.flush()
+
+                # Record TRANSFER_IN at source (positive qty — restoring stock)
+                await record_inventory_movement(
+                    db=self.db,
+                    spare_part_id=transfer.spare_part_id,
+                    location_id=transfer.source_location_id,
+                    quantity_change=quantity_consumed,
+                    movement_type=MovementType.TRANSFER_IN.value,
+                    reference_type=ReferenceType.TRANSFER.value,
+                    reference_id=transfer.id,
+                    unit_cost=unit_cost,
+                    created_by=cancelled_by,
+                )
 
         transfer.status = TransferStatus.CANCELLED.value
         transfer.cancellation_reason = reason
