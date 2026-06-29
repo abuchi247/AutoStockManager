@@ -15,7 +15,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 - **Transfer Management** — Multi-location transfers with in-transit state and cost layer propagation
 - **Barcode System** — Code 128 barcode generation, scanning, and lookup
 - **Inventory Audits** — Snapshot-based cycle counts and full stock counts with variance tracking
-- **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes
+- **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes and barcodes. Supports regeneration to reflect updated business settings.
 - **Business Settings** — Configurable company profile (name, logo, address, bank details) that populates invoices and reports
 - **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export
 - **Notifications** — Low stock alerts, credit limit warnings, overdue customer reminders, and pending approval notifications
@@ -342,6 +342,23 @@ railway redeploy -y
 - **Frontend:** https://lively-flexibility-production-2bae.up.railway.app
 - **Backend API:** https://autostockmanager-production.up.railway.app
 - **Health Check:** https://autostockmanager-production.up.railway.app/health
+
+## First-Time Configuration
+
+After initial setup, an Admin should configure the business profile so that invoices display the correct company information.
+
+1. Log in as Admin
+2. Go to **Settings** → **Business Profile**
+3. Fill in:
+   - Business name
+   - Phone, email, address
+   - Tax ID
+   - Upload a business logo (PNG/JPEG, max 500KB — resized automatically for invoices)
+   - Bank details (shown on invoices for payment instructions)
+   - Invoice footer text
+4. Click **Save Business Settings**
+
+This information appears on all generated invoices. To update it later, change the settings and click **Regenerate** on any existing invoice to re-render it with the new details.
 
 ## Running Tests
 
