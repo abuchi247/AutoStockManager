@@ -130,7 +130,7 @@ Notifications are automatically generated and delivered to specific roles based 
 
 | Notification Type | Target Roles | Trigger |
 |-------------------|-------------|---------|
-| Low Stock Alert | Storekeeper, Manager | Stock falls below minimum level |
+| Low Stock Alert | Storekeeper, Manager, Admin | Stock falls below minimum level |
 | Credit Limit Exceeded | Manager, Admin | Customer balance exceeds credit limit |
 | Overdue Customer | Manager, Admin | Customer balance outstanding 90+ days |
 | Pending Approval Reminder | Manager, Admin | Transfer or PO pending approval > 24 hours |

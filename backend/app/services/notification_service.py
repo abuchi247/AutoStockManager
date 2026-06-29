@@ -238,7 +238,7 @@ class NotificationService:
         Returns:
             List of created Notification instances.
         """
-        target_roles = [UserRole.STOREKEEPER.value, UserRole.MANAGER.value]
+        target_roles = [UserRole.STOREKEEPER.value, UserRole.MANAGER.value, UserRole.ADMIN.value]
         users = await self._get_users_by_roles(target_roles)
 
         notifications = []
