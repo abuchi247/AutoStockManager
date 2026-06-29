@@ -268,19 +268,35 @@ class SalesService:
         sale.total_amount = subtotal + sale.tax_amount
         sale.status = SaleStatus.CONFIRMED
 
-        # Record credit ledger entry for credit sales
+        # Record credit ledger entry for credit sales with credit limit validation
         if sale.payment_type == PaymentType.CREDIT and sale.customer_id:
-            from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
-            credit_entry = CustomerCreditLedger(
-                customer_id=sale.customer_id,
-                transaction_type=CreditTransactionType.SALE.value,
-                amount=sale.total_amount,  # Positive = debit (customer owes)
-                reference_type="sale",
-                reference_id=sale.id,
-                notes=f"Credit sale {sale.invoice_number}",
-                created_by=self.user_id,
+            from app.models.customer import Customer
+            from app.services.credit_ledger_service import CreditLedgerService, CreditLimitExceededError
+
+            # Acquire pessimistic lock on customer record for credit limit validation
+            cust_stmt = (
+                select(Customer)
+                .filter_by(id=sale.customer_id)
+                .with_for_update()
             )
-            self.db.add(credit_entry)
+            cust_result = await self.db.execute(cust_stmt)
+            customer = cust_result.scalar_one_or_none()
+
+            if customer:
+                credit_service = CreditLedgerService(db=self.db)
+                # record_debit validates credit limit atomically
+                await credit_service.record_debit(
+                    customer_id=sale.customer_id,
+                    amount=sale.total_amount,
+                    reference_type="sale",
+                    reference_id=sale.id,
+                    created_by=self.user_id,
+                    notes=f"Credit sale {sale.invoice_number}",
+                    credit_limit=customer.credit_limit,
+                )
+
+        # Trigger low stock notifications for items that fell below minimum
+        await self._check_low_stock_alerts(sale)
 
         await self.db.flush()
         return sale
@@ -434,6 +450,52 @@ class SalesService:
             raise SaleNotFoundError(sale_id)
 
         return sale
+
+    async def _check_low_stock_alerts(self, sale: Sale) -> None:
+        """Check if any items in the sale have fallen below minimum stock level.
+
+        Triggers low stock notifications for items where the current stock
+        (after the sale deduction) is below the spare part's min_stock_level.
+        """
+        try:
+            from app.models.spare_part import SparePart
+            from app.services.notification_service import NotificationService
+
+            for item in sale.items:
+                # Get current stock from cache (already updated by record_inventory_movement)
+                cache_stmt = (
+                    select(StockStatusCache)
+                    .filter_by(
+                        spare_part_id=item.spare_part_id,
+                        location_id=sale.location_id,
+                    )
+                )
+                cache_result = await self.db.execute(cache_stmt)
+                cache = cache_result.scalar_one_or_none()
+
+                if not cache:
+                    continue
+
+                # Get the spare part's min_stock_level
+                part_stmt = select(SparePart).filter_by(id=item.spare_part_id)
+                part_result = await self.db.execute(part_stmt)
+                part = part_result.scalar_one_or_none()
+
+                if not part or not part.min_stock_level:
+                    continue
+
+                # Check if stock fell below minimum
+                if cache.current_quantity < Decimal(str(part.min_stock_level)):
+                    notification_service = NotificationService(db=self.db)
+                    await notification_service.trigger_low_stock_alert(
+                        spare_part_id=item.spare_part_id,
+                        location_id=sale.location_id,
+                        current_qty=cache.current_quantity,
+                        min_qty=Decimal(str(part.min_stock_level)),
+                    )
+        except Exception:
+            # Don't fail the sale if notification fails
+            pass
 
     def _resolve_return_items(
         self,

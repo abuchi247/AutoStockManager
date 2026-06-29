@@ -35,6 +35,7 @@ from app.services.sales_service import (
     SaleNotFoundError,
     SalesService,
 )
+from app.services.credit_ledger_service import CreditLimitExceededError
 from app.models.sale import SaleItem
 
 router = APIRouter(prefix="/api/v1/sales", tags=["Sales"])
@@ -382,6 +383,11 @@ async def confirm_sale(
     except InsufficientStockError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        )
+    except CreditLimitExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
 
