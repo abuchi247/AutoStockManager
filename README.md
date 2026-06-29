@@ -95,6 +95,48 @@ This system digitizes and streamlines operations for auto spare parts businesses
 | Salesperson | Sales processing, customer lookup, invoices |
 | Storekeeper | Inventory operations, stock counts, transfers |
 
+### Role Permissions Matrix
+
+| Feature | Admin | Manager | Salesperson | Storekeeper |
+|---------|:-----:|:-------:|:-----------:|:-----------:|
+| User management | ✅ | ❌ | ❌ | ❌ |
+| Business settings (update) | ✅ | ❌ | ❌ | ❌ |
+| Delete categories/locations | ✅ | ❌ | ❌ | ❌ |
+| Reports (all types) | ✅ | ✅ | ❌ | ❌ |
+| Supplier management | ✅ | ✅ | ❌ | ❌ |
+| Purchase orders | ✅ | ✅ | ❌ | ❌ |
+| Approve transfers/audits | ✅ | ✅ | ❌ | ❌ |
+| Credit adjustments | ✅ | ✅ | ❌ | ❌ |
+| Sales returns | ✅ | ✅ | ❌ | ❌ |
+| Delete customers/suppliers | ✅ | ✅ | ❌ | ❌ |
+| Create/update categories | ✅ | ✅ | ❌ | ❌ |
+| Sales (create/confirm/cancel) | ✅ | ✅ | ✅ | ❌ |
+| Customer management | ✅ | ✅ | ✅ | ❌ |
+| Record payments | ✅ | ✅ | ✅ | ❌ |
+| Generate/download invoices | ✅ | ✅ | ✅ | ❌ |
+| Spare parts (create/edit) | ✅ | ✅ | ❌ | ✅ |
+| Stock adjustments | ✅ | ✅ | ❌ | ✅ |
+| Transfers (create/receive) | ✅ | ✅ | ❌ | ✅ |
+| Audits (initiate/count) | ✅ | ✅ | ❌ | ✅ |
+| Receive purchase goods | ✅ | ✅ | ❌ | ✅ |
+| Barcodes (generate/assign) | ✅ | ✅ | ❌ | ✅ |
+| Dashboard (role-filtered) | ✅ | ✅ | ✅ | ✅ |
+| Notifications (own) | ✅ | ✅ | ✅ | ✅ |
+| View locations/categories/stock | ✅ | ✅ | ✅ | ✅ |
+
+### Notification Routing by Role
+
+Notifications are automatically generated and delivered to specific roles based on the event type:
+
+| Notification Type | Target Roles | Trigger |
+|-------------------|-------------|---------|
+| Low Stock Alert | Storekeeper, Manager | Stock falls below minimum level |
+| Credit Limit Exceeded | Manager, Admin | Customer balance exceeds credit limit |
+| Overdue Customer | Manager, Admin | Customer balance outstanding 90+ days |
+| Pending Approval Reminder | Manager, Admin | Transfer or PO pending approval > 24 hours |
+
+Each user sees only their own notifications. Notifications support read/unread status and can be marked individually or in bulk.
+
 ## Project Structure
 
 ```
