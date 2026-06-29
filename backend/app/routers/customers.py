@@ -204,7 +204,9 @@ async def update_customer(
     customer_id: UUID,
     request: CustomerUpdate,
     db: DbSession,
-    current_user: CurrentUser,
+    current_user: User = Depends(
+        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+    ),
 ) -> CustomerResponse:
     """Update a customer's attributes (partial update)."""
     service = _get_customer_service(db)

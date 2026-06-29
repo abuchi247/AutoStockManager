@@ -190,6 +190,7 @@ async def adjust_stock(
 async def get_stock_at_location(
     location_id: UUID,
     db: DbSession,
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number (1-based)"),
     page_size: int = Query(default=50, ge=1, le=200, description="Items per page"),
 ) -> StockLocationResponse:
