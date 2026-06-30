@@ -139,7 +139,7 @@ export default function AuditsPage() {
   const fetchLocations = async () => {
     try {
       const response = await get<PaginatedResponse<Location>>(
-        '/stock/locations?page_size=100'
+        '/locations?page_size=100'
       );
       setLocations(response.data);
     } catch {
