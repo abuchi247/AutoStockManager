@@ -181,7 +181,14 @@ class InvoiceService:
         # 8. Determine payment terms
         payment_terms = self._get_payment_terms(sale.payment_type.value)
 
-        # 9. Build InvoiceData
+        # 9. Calculate amount paid and balance due
+        amount_paid = getattr(sale, 'amount_paid', None) or Decimal("0.00")
+        if sale.payment_type.value == "CASH":
+            # Cash sales are fully paid
+            amount_paid = sale.total_amount
+        balance_due = sale.total_amount - amount_paid
+
+        # 10. Build InvoiceData
         invoice_data = InvoiceData(
             invoice_number=sale.invoice_number,
             invoice_date=sale.created_at,
@@ -192,6 +199,8 @@ class InvoiceService:
             tax_amount=sale.tax_amount,
             discount_total=sale.discount_total,
             total_amount=sale.total_amount,
+            amount_paid=amount_paid,
+            balance_due=balance_due,
             payment_type=sale.payment_type.value,
             status=sale.status.value,
             payment_terms=payment_terms,
@@ -199,10 +208,10 @@ class InvoiceService:
             barcode_svg=barcode_svg_base64,
         )
 
-        # 10. Generate PDF
+        # 11. Generate PDF
         pdf_bytes = generate_invoice_pdf(invoice_data, format=format)
 
-        # 11. Store invoice
+        # 12. Store invoice
         if overwrite:
             existing = await self._get_existing_invoice(sale_id, invoice_format)
             if existing is not None:

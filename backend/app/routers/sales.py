@@ -152,6 +152,7 @@ async def create_sale(
         location_id=request.location_id,
         payment_type=PaymentType(request.payment_type),
         items=items,
+        amount_paid=request.amount_paid,
     )
     await db.commit()
     await db.refresh(sale)

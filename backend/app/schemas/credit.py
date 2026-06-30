@@ -36,6 +36,10 @@ class PaymentCreate(BaseModel):
         description="Payment amount (must be positive)",
         examples=[5000.00],
     )
+    sale_id: Optional[UUID] = Field(
+        default=None,
+        description="Optional UUID of the sale this payment is for (links payment to specific transaction)",
+    )
     reference_id: Optional[UUID] = Field(
         default=None,
         description="Optional UUID of the payment reference document",

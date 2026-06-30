@@ -145,6 +145,13 @@ class Sale(BaseModel, SoftDeleteMixin):
         comment="Total discount applied across all line items",
     )
 
+    amount_paid: Mapped[Decimal] = mapped_column(
+        Numeric(precision=14, scale=2),
+        nullable=False,
+        default=Decimal("0.00"),
+        comment="Amount paid at checkout (for credit sales, this may be partial)",
+    )
+
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------

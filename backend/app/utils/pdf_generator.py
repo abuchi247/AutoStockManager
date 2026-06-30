@@ -76,6 +76,8 @@ class InvoiceData:
     tax_amount: Decimal = Decimal("0.00")
     discount_total: Decimal = Decimal("0.00")
     total_amount: Decimal = Decimal("0.00")
+    amount_paid: Decimal = Decimal("0.00")
+    balance_due: Decimal = Decimal("0.00")
     payment_type: str = "CASH"
     status: str = "CONFIRMED"
     payment_terms: str = "Due on receipt"
@@ -403,6 +405,14 @@ def _render_a4_html(data: InvoiceData) -> str:
                 <td>Grand Total:</td>
                 <td class="number">{data.total_amount:,.2f}</td>
             </tr>
+            <tr>
+                <td>Amount Paid:</td>
+                <td class="number">{data.amount_paid:,.2f}</td>
+            </tr>
+            <tr class="total-row" style="color: {'#c0392b' if data.balance_due > 0 else '#27ae60'};">
+                <td>Balance Due:</td>
+                <td class="number">{data.balance_due:,.2f}</td>
+            </tr>
         </table>
     </div>
 
@@ -599,6 +609,14 @@ def _render_thermal_html(data: InvoiceData) -> str:
         <div class="row grand-total">
             <span>TOTAL:</span>
             <span>{data.total_amount:,.2f}</span>
+        </div>
+        <div class="row">
+            <span>Paid:</span>
+            <span>{data.amount_paid:,.2f}</span>
+        </div>
+        <div class="row" style="font-weight:bold;">
+            <span>Balance Due:</span>
+            <span>{data.balance_due:,.2f}</span>
         </div>
     </div>
 

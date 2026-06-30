@@ -87,7 +87,7 @@ async def record_payment(
     service = _get_credit_service(db)
 
     import uuid as uuid_mod
-    ref_id = request.reference_id or uuid_mod.uuid4()
+    ref_id = request.sale_id or request.reference_id or uuid_mod.uuid4()
 
     entry = await service.record_credit(
         customer_id=request.customer_id,
