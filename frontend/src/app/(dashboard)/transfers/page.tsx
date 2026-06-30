@@ -192,7 +192,17 @@ export default function TransfersPage() {
       setSuccessMsg('Transfer created successfully');
       fetchTransfers();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create transfer';
+      let message = 'Failed to create transfer';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
+        if (axiosErr.response?.data?.detail) {
+          message = axiosErr.response.data.detail;
+        } else if (axiosErr.response?.status) {
+          message = `Request failed with status code ${axiosErr.response.status}`;
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
       setCreateError(message);
     } finally {
       setIsCreating(false);
