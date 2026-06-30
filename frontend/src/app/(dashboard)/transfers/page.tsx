@@ -129,8 +129,9 @@ export default function TransfersPage() {
       ]);
       setParts(partsRes.data);
       setLocations(locationsRes.data);
-    } catch {
-      // Silently fail - user can still see the list
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load parts and locations';
+      setError(message);
     }
   }, []);
 
