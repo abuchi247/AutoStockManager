@@ -124,7 +124,7 @@ export default function TransfersPage() {
   const fetchLookupData = useCallback(async () => {
     try {
       const [partsRes, locationsRes] = await Promise.all([
-        get<PaginatedResponse<SparePart>>('/spare-parts?page_size=1000'),
+        get<PaginatedResponse<SparePart>>('/spare-parts?page_size=100'),
         get<PaginatedResponse<Location>>('/locations?page_size=100'),
       ]);
       setParts(partsRes.data || []);
