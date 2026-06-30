@@ -47,6 +47,46 @@ def _get_transfer_service(db: AsyncSession) -> TransferService:
     return TransferService(db=db)
 
 
+async def _enrich_transfers(db: AsyncSession, transfers: list[Transfer]) -> list[TransferResponse]:
+    """Enrich transfer records with spare part and location names."""
+    from app.models.spare_part import SparePart
+    from app.models.location import Location
+
+    if not transfers:
+        return []
+
+    # Batch-load part names
+    part_ids = list({t.spare_part_id for t in transfers})
+    part_stmt = select(SparePart.id, SparePart.name, SparePart.part_number).filter(SparePart.id.in_(part_ids))
+    part_result = await db.execute(part_stmt)
+    part_map = {row.id: (row.name, row.part_number) for row in part_result.all()}
+
+    # Batch-load location names
+    loc_ids = list({t.source_location_id for t in transfers} | {t.destination_location_id for t in transfers})
+    loc_stmt = select(Location.id, Location.name).filter(Location.id.in_(loc_ids))
+    loc_result = await db.execute(loc_stmt)
+    loc_map = {row.id: row.name for row in loc_result.all()}
+
+    # Build enriched responses
+    enriched = []
+    for t in transfers:
+        resp = TransferResponse.model_validate(t)
+        part_info = part_map.get(t.spare_part_id)
+        resp.spare_part_name = part_info[0] if part_info else None
+        resp.spare_part_number = part_info[1] if part_info else None
+        resp.source_location_name = loc_map.get(t.source_location_id)
+        resp.destination_location_name = loc_map.get(t.destination_location_id)
+        enriched.append(resp)
+
+    return enriched
+
+
+async def _enrich_single_transfer(db: AsyncSession, transfer: Transfer) -> TransferResponse:
+    """Enrich a single transfer with spare part and location names."""
+    results = await _enrich_transfers(db, [transfer])
+    return results[0]
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -91,8 +131,11 @@ async def list_transfers(
     result = await db.execute(data_stmt)
     transfers = list(result.scalars().all())
 
+    # Enrich transfers with part/location names
+    enriched = await _enrich_transfers(db, transfers)
+
     return TransferListResponse(
-        data=[TransferResponse.model_validate(t) for t in transfers],
+        data=enriched,
         meta={"page": page, "total": total, "page_size": page_size},
     )
 
@@ -134,7 +177,7 @@ async def create_transfer(
         )
         await db.commit()
         await db.refresh(transfer)
-        return TransferResponse.model_validate(transfer)
+        return await _enrich_single_transfer(db, transfer)
     except InvalidTransferError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -180,7 +223,7 @@ async def get_transfer(
 
     try:
         transfer = await service._get_transfer(transfer_id)
-        return TransferResponse.model_validate(transfer)
+        return await _enrich_single_transfer(db, transfer)
     except TransferNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -224,7 +267,7 @@ async def approve_transfer(
         )
         await db.commit()
         await db.refresh(transfer)
-        return TransferResponse.model_validate(transfer)
+        return await _enrich_single_transfer(db, transfer)
     except TransferNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -277,7 +320,7 @@ async def receive_transfer(
         )
         await db.commit()
         await db.refresh(transfer)
-        return TransferResponse.model_validate(transfer)
+        return await _enrich_single_transfer(db, transfer)
     except TransferNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -324,7 +367,7 @@ async def cancel_transfer(
         )
         await db.commit()
         await db.refresh(transfer)
-        return TransferResponse.model_validate(transfer)
+        return await _enrich_single_transfer(db, transfer)
     except TransferNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

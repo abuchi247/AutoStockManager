@@ -74,8 +74,12 @@ class TransferResponse(BaseModel):
 
     id: UUID = Field(..., description="Transfer UUID")
     spare_part_id: UUID = Field(..., description="Spare part UUID")
+    spare_part_name: Optional[str] = Field(default=None, description="Spare part name")
+    spare_part_number: Optional[str] = Field(default=None, description="Part number")
     source_location_id: UUID = Field(..., description="Source location UUID")
+    source_location_name: Optional[str] = Field(default=None, description="Source location name")
     destination_location_id: UUID = Field(..., description="Destination location UUID")
+    destination_location_name: Optional[str] = Field(default=None, description="Destination location name")
     quantity: Decimal = Field(..., description="Transfer quantity")
     status: str = Field(..., description="Current transfer state")
     consumed_layer_details: Optional[list[dict]] = Field(

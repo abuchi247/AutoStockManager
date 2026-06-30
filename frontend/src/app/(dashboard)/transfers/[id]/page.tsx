@@ -242,27 +242,27 @@ export default function TransferDetailPage() {
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Part</dt>
               <dd className="text-sm font-medium text-gray-900">
-                {transfer.spare_part?.name ?? transfer.spare_part_id.slice(0, 8)}
+                {transfer.spare_part_number || transfer.spare_part_name || transfer.spare_part_id.slice(0, 8)}
               </dd>
             </div>
-            {transfer.spare_part?.part_number && (
+            {transfer.spare_part_number && transfer.spare_part_name && (
               <div className="flex justify-between">
-                <dt className="text-sm text-gray-500">Part Number</dt>
+                <dt className="text-sm text-gray-500">Part Name</dt>
                 <dd className="text-sm font-medium text-gray-900">
-                  {transfer.spare_part.part_number}
+                  {transfer.spare_part_name}
                 </dd>
               </div>
             )}
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Source</dt>
               <dd className="text-sm font-medium text-gray-900">
-                {transfer.source_location?.name ?? 'Unknown'}
+                {transfer.source_location_name ?? 'Unknown'}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Destination</dt>
               <dd className="text-sm font-medium text-gray-900">
-                {transfer.destination_location?.name ?? 'Unknown'}
+                {transfer.destination_location_name ?? 'Unknown'}
               </dd>
             </div>
             <div className="flex justify-between">

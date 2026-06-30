@@ -224,7 +224,7 @@ export default function TransfersPage() {
           className="text-left text-blue-600 hover:text-blue-800 hover:underline"
           onClick={() => router.push(`/transfers/${item.id}`)}
         >
-          {item.spare_part?.name ?? item.spare_part_id.slice(0, 8)}
+          {item.spare_part_number || item.spare_part_name || item.spare_part_id.slice(0, 8)}
         </button>
       ),
     },
@@ -233,7 +233,7 @@ export default function TransfersPage() {
       header: 'From → To',
       render: (item) => (
         <span>
-          {item.source_location?.name ?? 'Unknown'} → {item.destination_location?.name ?? 'Unknown'}
+          {item.source_location_name ?? 'Unknown'} → {item.destination_location_name ?? 'Unknown'}
         </span>
       ),
     },
