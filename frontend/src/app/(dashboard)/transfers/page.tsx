@@ -127,11 +127,12 @@ export default function TransfersPage() {
         get<PaginatedResponse<SparePart>>('/spare-parts?page_size=1000'),
         get<PaginatedResponse<Location>>('/locations?page_size=100'),
       ]);
-      setParts(partsRes.data);
-      setLocations(locationsRes.data);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load parts and locations';
-      setError(message);
+      setParts(partsRes.data || []);
+      setLocations(locationsRes.data || []);
+    } catch {
+      // Non-critical — modal will show empty dropdowns with a message
+      setParts([]);
+      setLocations([]);
     }
   }, []);
 
@@ -323,6 +324,11 @@ export default function TransfersPage() {
           {createError && (
             <Alert variant="error" onClose={() => setCreateError(null)}>
               {createError}
+            </Alert>
+          )}
+          {parts.length === 0 && locations.length === 0 && (
+            <Alert variant="warning">
+              Unable to load parts and locations. Please refresh the page and try again.
             </Alert>
           )}
           <Select
