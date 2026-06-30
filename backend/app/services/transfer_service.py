@@ -269,6 +269,19 @@ class TransferService:
         self.db.add(transfer)
         await self.db.flush()
         await self.db.refresh(transfer)
+
+        # Notify managers/admins about pending transfer for approval
+        try:
+            from app.services.notification_service import NotificationService
+            notification_service = NotificationService(db=self.db)
+            await notification_service.trigger_pending_approval(
+                entity_type="transfer",
+                entity_id=transfer.id,
+                hours_pending=0,
+            )
+        except Exception:
+            pass  # Don't fail transfer creation if notification fails
+
         return transfer
 
     # -------------------------------------------------------------------------
