@@ -191,6 +191,12 @@ class TransferService:
     ) -> Transfer:
         """Create a new transfer request in PENDING status.
 
+        Validates:
+        - Spare part exists
+        - Both locations exist
+        - Source != destination
+        - Sufficient stock at source location
+
         Args:
             spare_part_id: The part to transfer.
             source_location_id: Origin location.
@@ -200,7 +206,58 @@ class TransferService:
 
         Returns:
             The newly created Transfer record.
+
+        Raises:
+            SparePartNotFoundError: If spare part doesn't exist.
+            LocationNotFoundError: If either location doesn't exist.
+            InvalidTransferError: If source == destination.
+            InsufficientStockError: If source doesn't have enough stock.
         """
+        from app.models.spare_part import SparePart
+        from app.models.location import Location
+
+        # Validate spare part exists
+        part_result = await self.db.execute(
+            select(SparePart).filter_by(id=spare_part_id, deleted_at=None)
+        )
+        if part_result.scalar_one_or_none() is None:
+            raise SparePartNotFoundError(spare_part_id)
+
+        # Validate locations exist
+        src_result = await self.db.execute(
+            select(Location).filter_by(id=source_location_id, deleted_at=None)
+        )
+        if src_result.scalar_one_or_none() is None:
+            raise LocationNotFoundError(source_location_id)
+
+        dst_result = await self.db.execute(
+            select(Location).filter_by(id=destination_location_id, deleted_at=None)
+        )
+        if dst_result.scalar_one_or_none() is None:
+            raise LocationNotFoundError(destination_location_id)
+
+        # Validate source != destination
+        if source_location_id == destination_location_id:
+            raise InvalidTransferError("Source and destination locations must be different")
+
+        # Validate sufficient stock at source
+        cache_result = await self.db.execute(
+            select(StockStatusCache).filter_by(
+                spare_part_id=spare_part_id,
+                location_id=source_location_id,
+            )
+        )
+        cache = cache_result.scalar_one_or_none()
+        available = cache.current_quantity if cache else Decimal("0")
+
+        if available < quantity:
+            raise InsufficientStockError(
+                spare_part_id=spare_part_id,
+                location_id=source_location_id,
+                requested=quantity,
+                available=available,
+            )
+
         transfer = Transfer(
             spare_part_id=spare_part_id,
             source_location_id=source_location_id,
