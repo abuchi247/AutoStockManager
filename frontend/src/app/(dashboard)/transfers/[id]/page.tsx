@@ -158,10 +158,15 @@ export default function TransferDetailPage() {
   };
 
   const handleCancel = async () => {
+    const reason = prompt('Please provide a reason for cancellation:');
+    if (!reason || !reason.trim()) {
+      setError('A cancellation reason is required');
+      return;
+    }
     setActionLoading('cancel');
     setError(null);
     try {
-      await post(`/transfers/${transferId}/cancel`);
+      await post(`/transfers/${transferId}/cancel`, { reason: reason.trim() });
       setSuccessMsg('Transfer cancelled');
       fetchTransfer();
     } catch (err: unknown) {
