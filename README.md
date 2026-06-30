@@ -9,8 +9,8 @@ This system digitizes and streamlines operations for auto spare parts businesses
 ## Key Capabilities
 
 - **Inventory Management** — Multi-location stock tracking with FIFO cost layers and barcode support
-- **Sales Management** — Cash and credit sales with pessimistic locking, automatic COGS calculation, and PDF invoice generation
-- **Customer Management** — Credit ledger with limit enforcement, aging analysis, and payment tracking
+- **Sales Management** — Cash and credit sales with pessimistic locking, automatic COGS calculation, partial payments at checkout, and PDF invoice generation
+- **Customer Management** — Credit ledger with limit enforcement, aging analysis, payment tracking linked to specific sales, and partial payment support
 - **Supplier Management** — Purchase orders with full lifecycle (draft → approved → received), goods receipt notes, and supplier balance tracking
 - **Transfer Management** — Multi-location transfers with in-transit state and cost layer propagation
 - **Barcode System** — Code 128 barcode generation, scanning, and lookup
