@@ -17,7 +17,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 - **Inventory Audits** — Snapshot-based cycle counts and full stock counts with variance tracking
 - **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes and barcodes. Supports regeneration to reflect updated business settings.
 - **Business Settings** — Configurable company profile (name, logo, address, bank details) that populates invoices and reports
-- **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export
+- **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export. Dashboard with Top 5 Products and Top 5 Customers widgets filterable by period (month, 3M, 6M, 1Y, all time).
 - **Notifications** — Low stock alerts, credit limit warnings, overdue customer reminders, and pending approval notifications
 - **Audit Trail** — Append-only, immutable record of all critical system events
 - **Security** — Role-based access control (Admin, Manager, Salesperson, Storekeeper) with JWT authentication, rate limiting, and account lockout
