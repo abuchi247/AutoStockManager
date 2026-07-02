@@ -470,6 +470,18 @@ export default function SaleDetailPage() {
               <span>Total:</span>
               <span>{formatCurrency(sale.total_amount)}</span>
             </div>
+            {sale.payment_type === 'CREDIT' && (
+              <>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Paid at Checkout:</span>
+                  <span>{formatCurrency(sale.amount_paid || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold text-red-600">
+                  <span>Balance Due:</span>
+                  <span>{formatCurrency(Number(sale.total_amount) - Number(sale.amount_paid || 0))}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

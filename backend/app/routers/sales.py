@@ -313,6 +313,7 @@ async def update_sale(
     sale.subtotal = subtotal
     sale.discount_total = discount_total
     sale.total_amount = subtotal
+    sale.amount_paid = Decimal(str(request.amount_paid)) if request.amount_paid else Decimal("0.00")
     sale.updated_by = str(current_user.id)
 
     await db.commit()
