@@ -22,7 +22,7 @@ def upgrade() -> None:
         sa.Column(
             "amount_paid",
             sa.Numeric(precision=14, scale=2),
-            nullable=False,
+            nullable=True,
             server_default="0.00",
             comment="Amount paid at checkout (for credit sales, this may be partial)",
         ),

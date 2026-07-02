@@ -57,44 +57,40 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database: run Alembic migrations and create sequences.
+    """Initialize database: create tables, run schema patches, create sequences.
 
-    Runs Alembic migrations on startup (upgrade to head) to handle both
-    new table creation and column additions on existing tables.
-    This ensures Railway deployments always have the latest schema.
+    Safe to run on every startup. Handles both new installations and upgrades.
     """
-    # Import all models so Base.metadata knows about them
     _import_models()
 
     try:
-        # Run Alembic migrations to handle schema changes (ADD COLUMN, etc.)
-        import asyncio
-        from alembic.config import Config
-        from alembic import command
-        import os
-
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "..", "alembic"))
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
-        logger.info("Alembic migrations applied (upgrade head)")
-
         async with engine.begin() as conn:
+            # Create all tables that don't exist yet
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables synced (create_all)")
+
             # Create invoice number sequence if it doesn't exist
             await conn.execute(
                 text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1")
             )
             logger.info("invoice_number_seq sequence ensured")
+
+            # Schema patches: add columns that create_all can't add to existing tables
+            # These use IF NOT EXISTS patterns to be idempotent
+            await conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'sales' AND column_name = 'amount_paid'
+                    ) THEN
+                        ALTER TABLE sales ADD COLUMN amount_paid NUMERIC(14,2) DEFAULT 0.00;
+                    END IF;
+                END $$;
+            """))
+            logger.info("Schema patches applied")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
-        # Fallback: try create_all for new tables at minimum
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-                logger.info("Fallback: Database tables synced (create_all)")
-        except Exception as e2:
-            logger.error(f"Fallback init also failed: {e2}")
         # Don't crash the app — let it start and retry connections later
 
 

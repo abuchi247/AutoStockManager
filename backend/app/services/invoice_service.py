@@ -185,8 +185,9 @@ class InvoiceService:
         # 9. Calculate amount paid and balance due
         amount_paid = Decimal("0.00")
         if sale.payment_type.value == "CASH":
-            # Cash sales are fully paid
             amount_paid = sale.total_amount
+        elif hasattr(sale, 'amount_paid') and sale.amount_paid:
+            amount_paid = sale.amount_paid
         balance_due = sale.total_amount - amount_paid
 
         # 10. Build InvoiceData

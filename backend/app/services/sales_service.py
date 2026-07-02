@@ -118,6 +118,7 @@ class SalesService:
         location_id: uuid.UUID,
         payment_type: PaymentType = PaymentType.CASH,
         items: Optional[list[dict]] = None,
+        amount_paid: Optional[Decimal] = None,
     ) -> Sale:
         """Create a new sale in DRAFT status.
 
@@ -141,6 +142,7 @@ class SalesService:
             tax_amount=Decimal("0.00"),
             total_amount=Decimal("0.00"),
             discount_total=Decimal("0.00"),
+            amount_paid=amount_paid or Decimal("0.00"),
         )
         self.db.add(sale)
         await self.db.flush()
@@ -269,31 +271,39 @@ class SalesService:
         sale.total_amount = subtotal + sale.tax_amount
         sale.status = SaleStatus.CONFIRMED
 
+        # For cash sales, mark as fully paid
+        if sale.payment_type == PaymentType.CASH:
+            sale.amount_paid = sale.total_amount
+
         # Record credit ledger entry for credit sales with credit limit validation
         if sale.payment_type == PaymentType.CREDIT and sale.customer_id:
             from app.models.customer import Customer
             from app.services.credit_ledger_service import CreditLedgerService, CreditLimitExceededError
 
-            # Acquire pessimistic lock on customer record for credit limit validation
-            cust_stmt = (
-                select(Customer)
-                .filter_by(id=sale.customer_id)
-                .with_for_update()
-            )
-            cust_result = await self.db.execute(cust_stmt)
-            customer = cust_result.scalar_one_or_none()
+            # Credit amount = total minus any partial payment at checkout
+            credit_amount = sale.total_amount - (sale.amount_paid or Decimal("0.00"))
 
-            if customer:
-                credit_service = CreditLedgerService(db=self.db)
-                await credit_service.record_debit(
-                    customer_id=sale.customer_id,
-                    amount=sale.total_amount,
-                    reference_type="sale",
-                    reference_id=sale.id,
-                    created_by=self.user_id,
-                    notes=f"Credit sale {sale.invoice_number}",
-                    credit_limit=customer.credit_limit,
+            if credit_amount > Decimal("0.00"):
+                # Acquire pessimistic lock on customer record for credit limit validation
+                cust_stmt = (
+                    select(Customer)
+                    .filter_by(id=sale.customer_id)
+                    .with_for_update()
                 )
+                cust_result = await self.db.execute(cust_stmt)
+                customer = cust_result.scalar_one_or_none()
+
+                if customer:
+                    credit_service = CreditLedgerService(db=self.db)
+                    await credit_service.record_debit(
+                        customer_id=sale.customer_id,
+                        amount=credit_amount,
+                        reference_type="sale",
+                        reference_id=sale.id,
+                        created_by=self.user_id,
+                        notes=f"Credit sale {sale.invoice_number}" + (f" (paid {sale.amount_paid} at checkout)" if sale.amount_paid and sale.amount_paid > Decimal("0") else ""),
+                        credit_limit=customer.credit_limit,
+                    )
 
         # Trigger low stock notifications for items that fell below minimum
         await self._check_low_stock_alerts(sale)
