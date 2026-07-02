@@ -19,6 +19,7 @@ Satisfies Requirements:
 
 import uuid
 import logging
+from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import select
