@@ -195,3 +195,202 @@ async def download_invoice_pdf(
             "Content-Disposition": f'inline; filename="{filename}"',
         },
     )
+
+
+@router.post(
+    "/credit-note/{sale_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Generate credit note PDF for a returned sale",
+    description="Generate a credit note (refund document) for a sale that has been fully or partially returned.",
+    responses={
+        400: {"description": "Sale has no returns"},
+        404: {"description": "Sale not found"},
+    },
+)
+async def generate_credit_note(
+    sale_id: UUID,
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+    ),
+) -> Response:
+    """Generate a credit note PDF for a returned sale.
+
+    Best practice: original invoice is never modified. A credit note is
+    a separate document referencing the original invoice.
+    """
+    from decimal import Decimal
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import selectinload
+    from app.models.sale import Sale, SaleItem, SaleStatus
+    from app.models.spare_part import SparePart
+    from app.models.customer import Customer
+    from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType
+    from sqlalchemy import func as sa_func
+
+    # Load sale with items
+    stmt = (
+        select(Sale)
+        .filter_by(id=sale_id)
+        .options(selectinload(Sale.items).selectinload(SaleItem.spare_part))
+    )
+    result = await db.execute(stmt)
+    sale = result.scalar_one_or_none()
+
+    if sale is None:
+        raise HTTPException(status_code=404, detail="Sale not found")
+
+    # Check sale has returns
+    return_stmt = (
+        select(
+            InventoryMovementLedger.spare_part_id,
+            sa_func.sum(InventoryMovementLedger.quantity_change).label("total_returned"),
+        )
+        .filter(
+            InventoryMovementLedger.reference_id == sale_id,
+            InventoryMovementLedger.reference_type == "sale",
+            InventoryMovementLedger.movement_type == MovementType.RETURN.value,
+        )
+        .group_by(InventoryMovementLedger.spare_part_id)
+    )
+    return_result = await db.execute(return_stmt)
+    returned_map = {row.spare_part_id: abs(float(row.total_returned)) for row in return_result}
+
+    if not returned_map:
+        raise HTTPException(status_code=400, detail="This sale has no returns. Credit note can only be generated for returned sales.")
+
+    # Get customer name
+    customer_name = "Walk-in Customer"
+    if sale.customer_id:
+        cust_result = await db.execute(select(Customer.name).filter_by(id=sale.customer_id))
+        customer_name = cust_result.scalar_one_or_none() or "Walk-in Customer"
+
+    # Load business settings for header
+    service = await _get_invoice_service_with_settings(db)
+    company = service.company
+
+    # Build credit note items
+    credit_items_html = ""
+    total_refund = Decimal("0.00")
+    for item in sale.items:
+        qty_returned = returned_map.get(item.spare_part_id, 0)
+        if qty_returned > 0:
+            refund_amount = Decimal(str(qty_returned)) * item.unit_price
+            total_refund += refund_amount
+            part_name = item.spare_part.name if item.spare_part else "Unknown"
+            part_number = item.spare_part.part_number if item.spare_part else ""
+            credit_items_html += f"""
+            <tr>
+                <td>{part_number}</td>
+                <td>{part_name}</td>
+                <td class="number">{qty_returned:.0f}</td>
+                <td class="number">{item.unit_price:,.2f}</td>
+                <td class="number">{refund_amount:,.2f}</td>
+            </tr>"""
+
+    # Generate credit note HTML
+    now = datetime.now(timezone.utc)
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Credit Note - {sale.invoice_number}</title>
+    <style>
+        @page {{ size: A4; margin: 15mm; }}
+        body {{ font-family: Arial, sans-serif; font-size: 11pt; color: #333; }}
+        .header {{ display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid #c0392b; padding-bottom: 15px; }}
+        .company-info h1 {{ margin: 5px 0; font-size: 16pt; color: #333; }}
+        .company-info p {{ margin: 2px 0; font-size: 9pt; color: #666; }}
+        .credit-note-title {{ text-align: right; }}
+        .credit-note-title h2 {{ margin: 0; color: #c0392b; font-size: 24pt; }}
+        .credit-note-title p {{ margin: 3px 0; font-size: 10pt; }}
+        .details {{ display: flex; justify-content: space-between; margin: 20px 0; }}
+        .bill-to h3 {{ margin: 0 0 5px; color: #333; font-size: 10pt; text-transform: uppercase; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th {{ background-color: #c0392b; color: white; padding: 8px 6px; text-align: left; font-size: 9pt; }}
+        td {{ padding: 8px 6px; border-bottom: 1px solid #eee; font-size: 10pt; }}
+        .number {{ text-align: right; }}
+        .totals {{ margin-top: 20px; text-align: right; }}
+        .totals table {{ width: 300px; margin-left: auto; }}
+        .totals td {{ padding: 5px 8px; }}
+        .total-row {{ font-weight: bold; font-size: 14pt; border-top: 2px solid #c0392b; }}
+        .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 9pt; color: #666; }}
+        .watermark {{ color: #c0392b; font-size: 14pt; font-weight: bold; text-align: center; margin: 10px 0; padding: 8px; border: 2px solid #c0392b; display: inline-block; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <h1>{company.name}</h1>
+            <p>{company.address}</p>
+            <p>Phone: {company.phone}</p>
+            <p>Email: {company.email}</p>
+        </div>
+        <div class="credit-note-title">
+            <h2>CREDIT NOTE</h2>
+            <p><strong>Reference:</strong> CN-{sale.invoice_number}</p>
+            <p><strong>Date:</strong> {now.strftime("%Y-%m-%d")}</p>
+            <p><strong>Original Invoice:</strong> {sale.invoice_number}</p>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin: 10px 0;">
+        <span class="watermark">REFUND / CREDIT NOTE</span>
+    </div>
+
+    <div class="details">
+        <div class="bill-to">
+            <h3>Credited To</h3>
+            <p><strong>{customer_name}</strong></p>
+        </div>
+        <div>
+            <p><strong>Original Sale Date:</strong> {sale.created_at.strftime("%Y-%m-%d")}</p>
+            <p><strong>Payment Type:</strong> {sale.payment_type.value if hasattr(sale.payment_type, 'value') else sale.payment_type}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Part No.</th>
+                <th>Description</th>
+                <th class="number">Qty Returned</th>
+                <th class="number">Unit Price</th>
+                <th class="number">Refund Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {credit_items_html}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <table>
+            <tr>
+                <td>Original Sale Total:</td>
+                <td class="number">{sale.total_amount:,.2f}</td>
+            </tr>
+            <tr class="total-row">
+                <td>Total Credit/Refund:</td>
+                <td class="number">-{total_refund:,.2f}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>This credit note confirms the return of goods and corresponding refund/credit against invoice {sale.invoice_number}.</p>
+        <p>Generated on {now.strftime("%Y-%m-%d %H:%M")} UTC</p>
+    </div>
+</body>
+</html>"""
+
+    # Convert to PDF
+    from app.utils.pdf_generator import html_to_pdf
+    pdf_bytes = html_to_pdf(html)
+
+    filename = f"credit_note_CN-{sale.invoice_number}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )

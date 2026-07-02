@@ -594,9 +594,28 @@ export default function SaleDetailPage() {
             )}
           </div>
           {sale.status === 'returned' && (
-            <p className="mt-3 text-sm text-amber-600">
-              ⚠️ This sale has been returned. The original invoice remains as a record. A credit note should be issued separately.
-            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const { default: apiClient } = await import('@/lib/api');
+                    const response = await apiClient.get(`/invoices/credit-note/${saleId}`, {
+                      responseType: 'blob',
+                    });
+                    const blob = new Blob([response.data], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                    setTimeout(() => URL.revokeObjectURL(url), 30000);
+                  } catch {
+                    setError('Failed to generate credit note');
+                  }
+                }}
+              >
+                Download Credit Note
+              </Button>
+              <span className="text-sm text-gray-500">Printable refund document for this return</span>
+            </div>
           )}
         </div>
       )}
