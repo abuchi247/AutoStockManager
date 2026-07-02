@@ -109,7 +109,7 @@ export default function DashboardPage() {
             title="Total Sales Today"
             value={formatCurrency(kpis.total_sales_today)}
             borderColor="#2196F3"
-            href="/sales"
+            href={`/reports?type=sales&start_date=${new Date().toISOString().split('T')[0]}&end_date=${new Date().toISOString().split('T')[0]}`}
           />
         )}
 
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             title="Sales This Month"
             value={formatCurrency(kpis.total_sales_month)}
             borderColor="#4CAF50"
-            href="/sales"
+            href={`/reports?type=sales&start_date=${new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}&end_date=${new Date().toISOString().split('T')[0]}`}
           />
         )}
 

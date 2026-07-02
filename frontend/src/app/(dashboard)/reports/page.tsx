@@ -9,7 +9,8 @@
  * Requirements: 12.1, 12.6
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import {
   Button,
@@ -62,10 +63,12 @@ function formatCellValue(value: unknown): string {
 }
 
 export default function ReportsPage() {
-  // Form state
-  const [reportType, setReportType] = useState<ReportType>('sales');
-  const [startDate, setStartDate] = useState(getDefaultStartDate());
-  const [endDate, setEndDate] = useState(getDefaultEndDate());
+  const searchParams = useSearchParams();
+
+  // Form state — initialized from URL params if present
+  const [reportType, setReportType] = useState<ReportType>((searchParams.get('type') as ReportType) || 'sales');
+  const [startDate, setStartDate] = useState(searchParams.get('start_date') || getDefaultStartDate());
+  const [endDate, setEndDate] = useState(searchParams.get('end_date') || getDefaultEndDate());
   const [locationFilter, setLocationFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -164,6 +167,14 @@ export default function ReportsPage() {
       setIsLoading(false);
     }
   }, [reportType, buildParams]);
+
+  // Auto-generate report if URL params are present (e.g., from dashboard click)
+  useEffect(() => {
+    if (searchParams.get('type') && searchParams.get('start_date')) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Export report via API — downloads as CSV or PDF.
