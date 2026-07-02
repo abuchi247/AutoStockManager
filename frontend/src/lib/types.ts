@@ -354,6 +354,7 @@ export interface SaleCreate {
   customer_id?: string;
   location_id: string;
   payment_type: PaymentType;
+  amount_paid?: number;
   items: SaleItemCreate[];
 }
 
