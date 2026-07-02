@@ -92,8 +92,23 @@ async def list_sales(
     result = await db.execute(data_stmt)
     sales = list(result.scalars().all())
 
+    # Enrich with customer names
+    from app.models.customer import Customer
+    customer_ids = list({s.customer_id for s in sales if s.customer_id})
+    customer_map: dict = {}
+    if customer_ids:
+        cust_stmt = select(Customer.id, Customer.name).filter(Customer.id.in_(customer_ids))
+        cust_result = await db.execute(cust_stmt)
+        customer_map = {row.id: row.name for row in cust_result.all()}
+
+    data = []
+    for s in sales:
+        resp = SaleResponse.model_validate(s)
+        resp.customer_name = customer_map.get(s.customer_id) if s.customer_id else None
+        data.append(resp)
+
     return SaleListResponse(
-        data=[SaleResponse.model_validate(s) for s in sales],
+        data=data,
         meta={"page": page, "total": total, "page_size": page_size},
     )
 

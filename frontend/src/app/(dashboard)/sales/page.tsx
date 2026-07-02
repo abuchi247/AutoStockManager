@@ -140,7 +140,7 @@ export default function SalesPage() {
     {
       key: 'customer',
       header: 'Customer',
-      render: (item) => <span>{item.customer?.name ?? 'Walk-in'}</span>,
+      render: (item) => <span>{item.customer_name ?? 'Walk-in'}</span>,
     },
     {
       key: 'total_amount',
