@@ -593,14 +593,14 @@ export default function SaleDetailPage() {
               </Button>
             )}
           </div>
-          {sale.status === 'returned' && (
+          {(sale.status === 'returned' || (sale.items && sale.items.some((item) => Number(item.returned_quantity || 0) > 0))) && (
             <div className="mt-3 flex items-center gap-3">
               <Button
                 variant="secondary"
                 onClick={async () => {
                   try {
                     const { default: apiClient } = await import('@/lib/api');
-                    const response = await apiClient.get(`/invoices/credit-note/${saleId}`, {
+                    const response = await apiClient.post(`/invoices/credit-note/${saleId}`, {}, {
                       responseType: 'blob',
                     });
                     const blob = new Blob([response.data], { type: 'application/pdf' });
