@@ -84,11 +84,6 @@ class SaleCreate(BaseModel):
         description="Payment type: CASH or CREDIT",
         examples=["CASH", "CREDIT"],
     )
-    amount_paid: Optional[Decimal] = Field(
-        default=None,
-        ge=0,
-        description="Amount paid at checkout (for partial credit payments). If not provided, defaults to full amount for cash, 0 for credit.",
-    )
     items: list[SaleItemCreate] = Field(
         default_factory=list,
         description="List of line items for the sale",
@@ -191,7 +186,6 @@ class SaleResponse(BaseModel):
     tax_amount: Decimal = Field(..., description="Tax amount")
     total_amount: Decimal = Field(..., description="Total amount")
     discount_total: Decimal = Field(..., description="Total discount")
-    amount_paid: Decimal = Field(default=Decimal("0.00"), description="Amount paid at checkout")
     items: list[SaleItemResponse] = Field(
         default_factory=list, description="Sale line items"
     )
