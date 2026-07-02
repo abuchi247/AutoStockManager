@@ -55,6 +55,7 @@ export default function EditSalePage() {
   const [customerId, setCustomerId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [paymentType, setPaymentType] = useState<string>('CASH');
+  const [amountPaid, setAmountPaid] = useState<number | ''>('');
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
   // Reference data
@@ -95,6 +96,9 @@ export default function EditSalePage() {
         setCustomerId(sale.customer_id || '');
         setLocationId(sale.location_id);
         setPaymentType(sale.payment_type.toUpperCase());
+        if (sale.amount_paid && sale.amount_paid > 0) {
+          setAmountPaid(sale.amount_paid);
+        }
 
         // Map sale items to line items
         if (sale.items && sale.items.length > 0) {
@@ -197,6 +201,7 @@ export default function EditSalePage() {
     customer_id: customerId || undefined,
     location_id: locationId,
     payment_type: paymentType as SaleCreate['payment_type'],
+    amount_paid: paymentType === 'CREDIT' && amountPaid ? Number(amountPaid) : undefined,
     items: lineItems.map((li): SaleItemCreate => ({
       spare_part_id: li.spare_part_id,
       quantity: li.quantity || 1,
@@ -341,6 +346,24 @@ export default function EditSalePage() {
             onChange={(e) => setPaymentType(e.target.value)}
           />
         </div>
+
+        {/* Amount Paid at Checkout (only for credit sales) */}
+        {paymentType === 'CREDIT' && (
+          <div className="mt-4 max-w-xs">
+            <Input
+              label="Amount Paid at Checkout"
+              type="number"
+              min={0}
+              max={totalAmount > 0 ? totalAmount : undefined}
+              step={0.01}
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value === '' ? '' : parseFloat(e.target.value))}
+              placeholder="0.00 (optional — leave empty if fully on credit)"
+              helperText={totalAmount > 0 ? `Balance due: ${formatCurrency(Math.max(0, totalAmount - (Number(amountPaid) || 0)))}` : undefined}
+              error={Number(amountPaid) > totalAmount && totalAmount > 0 ? `Cannot exceed total (${formatCurrency(totalAmount)})` : undefined}
+            />
+          </div>
+        )}
       </div>
 
       {/* Line items */}
