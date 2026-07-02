@@ -69,7 +69,6 @@ export default function PurchasesPage() {
 
   // Create form state
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [poNotes, setPoNotes] = useState('');
   const [poItems, setPoItems] = useState<PurchaseOrderItemCreate[]>([
@@ -106,14 +105,10 @@ export default function PurchasesPage() {
 
   const fetchFormData = useCallback(async () => {
     try {
-      const [suppliersRes, partsRes] = await Promise.all([
-        get<PaginatedResponse<Supplier>>('/suppliers?page_size=100'),
-        get<PaginatedResponse<SparePart>>('/spare-parts?page_size=100'),
-      ]);
+      const suppliersRes = await get<PaginatedResponse<Supplier>>('/suppliers?page_size=100');
       setSuppliers(suppliersRes.data);
-      setSpareParts(partsRes.data);
     } catch {
-      // Silently fail — user will see empty dropdowns
+      // Silently fail
     }
   }, []);
 
@@ -195,11 +190,6 @@ export default function PurchasesPage() {
   const supplierOptions: SelectOption[] = suppliers.map((s) => ({
     value: s.id,
     label: s.name,
-  }));
-
-  const partOptions: SelectOption[] = spareParts.map((p) => ({
-    value: p.id,
-    label: `${p.part_number} — ${p.name}`,
   }));
 
   const columns: Column<PurchaseOrder>[] = [
@@ -377,13 +367,9 @@ export default function PurchasesPage() {
               {poItems.map((item, index) => (
                 <div key={index} className="flex items-end gap-2">
                   <div className="flex-1">
-                    <Select
-                      options={partOptions}
+                    <PartSearchInput
                       value={item.spare_part_id}
-                      onChange={(e) =>
-                        handleItemChange(index, 'spare_part_id', e.target.value)
-                      }
-                      placeholder="Select part"
+                      onChange={(partId) => handleItemChange(index, 'spare_part_id', partId)}
                     />
                   </div>
                   <div className="w-24">
@@ -424,6 +410,113 @@ export default function PurchasesPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+
+// --- Part Search Autocomplete Component ---
+
+function PartSearchInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (partId: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [results, setResults] = useState<SparePart[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [selectedName, setSelectedName] = useState('');
+
+  // Debounced search
+  useEffect(() => {
+    if (!search || search.length < 2) {
+      setResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await get<PaginatedResponse<SparePart>>(
+          `/spare-parts?search=${encodeURIComponent(search)}&page_size=10`
+        );
+        setResults(res.data || []);
+        setShowResults(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  const handleSelect = (part: SparePart) => {
+    onChange(part.id);
+    setSelectedName(`${part.part_number} — ${part.name}`);
+    setSearch('');
+    setShowResults(false);
+  };
+
+  const handleClear = () => {
+    onChange('');
+    setSelectedName('');
+    setSearch('');
+  };
+
+  if (value && selectedName) {
+    return (
+      <div className="flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+        <span className="flex-1 truncate">{selectedName}</span>
+        <button type="button" onClick={handleClear} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onFocus={() => results.length > 0 && setShowResults(true)}
+        placeholder="Search part..."
+        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {isSearching && (
+        <div className="absolute right-2 top-2">
+          <svg className="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+        </div>
+      )}
+      {showResults && results.length > 0 && (
+        <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          {results.map((part) => (
+            <li key={part.id}>
+              <button
+                type="button"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
+                onClick={() => handleSelect(part)}
+              >
+                <span className="font-medium">{part.part_number}</span>
+                <span className="ml-1 text-gray-500">— {part.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {showResults && results.length === 0 && search.length >= 2 && !isSearching && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white p-2 text-sm text-gray-500 shadow-lg">
+          No parts found
+        </div>
+      )}
     </div>
   );
 }
