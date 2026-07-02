@@ -182,7 +182,7 @@ class InvoiceService:
         payment_terms = self._get_payment_terms(sale.payment_type.value)
 
         # 9. Calculate amount paid and balance due
-        amount_paid = getattr(sale, 'amount_paid', None) or Decimal("0.00")
+        amount_paid = Decimal("0.00")
         if sale.payment_type.value == "CASH":
             # Cash sales are fully paid
             amount_paid = sale.total_amount
