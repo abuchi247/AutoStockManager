@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -108,6 +109,7 @@ export default function DashboardPage() {
             title="Total Sales Today"
             value={formatCurrency(kpis.total_sales_today)}
             borderColor="#2196F3"
+            href="/sales"
           />
         )}
 
@@ -116,6 +118,7 @@ export default function DashboardPage() {
             title="Sales This Month"
             value={formatCurrency(kpis.total_sales_month)}
             borderColor="#4CAF50"
+            href="/sales"
           />
         )}
 
@@ -124,6 +127,7 @@ export default function DashboardPage() {
             title="Outstanding Receivables"
             value={formatCurrency(kpis.outstanding_receivables)}
             borderColor="#FF9800"
+            href="/customers"
           />
         )}
 
@@ -132,6 +136,7 @@ export default function DashboardPage() {
             title="Low Stock Items"
             value={kpis.low_stock_count.toString()}
             borderColor="#f44336"
+            href="/inventory"
           />
         )}
 
@@ -140,6 +145,7 @@ export default function DashboardPage() {
             title="Pending Purchase Orders"
             value={kpis.pending_po_count.toString()}
             borderColor="#9C27B0"
+            href="/purchases"
           />
         )}
       </div>
@@ -345,13 +351,20 @@ interface KPICardProps {
   title: string;
   value: string;
   borderColor: string;
+  href?: string;
 }
 
-function KPICard({ title, value, borderColor }: KPICardProps) {
+function KPICard({ title, value, borderColor, href }: KPICardProps) {
+  const router = useRouter();
+
   return (
     <div
-      className="bg-white rounded-lg p-5 shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)] cursor-default"
+      className={`bg-white rounded-lg p-5 shadow-[0_2px_4px_rgba(0,0,0,0.1)] transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)] ${href ? 'cursor-pointer' : 'cursor-default'}`}
       style={{ borderLeft: `4px solid ${borderColor}` }}
+      onClick={() => href && router.push(href)}
+      role={href ? 'link' : undefined}
+      tabIndex={href ? 0 : undefined}
+      onKeyDown={(e) => href && e.key === 'Enter' && router.push(href)}
     >
       <p className="text-[14px] font-medium text-[#666] uppercase tracking-[0.5px] m-0 mb-2">
         {title}
