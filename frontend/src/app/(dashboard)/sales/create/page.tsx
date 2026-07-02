@@ -99,6 +99,8 @@ export default function CreateSalePage() {
         const params = new URLSearchParams();
         params.set('search', partSearch);
         params.set('page_size', '10');
+        // Include location filter to get location-specific stock levels
+        if (locationId) params.set('location_id', locationId);
         const response = await get<{ data: SparePart[]; meta: { page: number; total: number; page_size: number } }>(
           `/spare-parts?${params.toString()}`
         );
@@ -112,7 +114,7 @@ export default function CreateSalePage() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [partSearch]);
+  }, [partSearch, locationId]);
 
   const addLineItem = (part: SparePart) => {
     // Don't add duplicate
@@ -122,6 +124,7 @@ export default function CreateSalePage() {
       return;
     }
 
+    const stock = part.total_stock ?? 0;
     const newItem: LineItem = {
       id: crypto.randomUUID(),
       spare_part_id: part.id,
@@ -131,6 +134,7 @@ export default function CreateSalePage() {
       unit_price: part.selling_price,
       discount_amount: '',
       line_total: part.selling_price,
+      available_stock: stock,
     };
 
     setLineItems([...lineItems, newItem]);
@@ -339,23 +343,33 @@ export default function CreateSalePage() {
           {showPartDropdown && partResults.length > 0 && (
             <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
               <ul className="max-h-60 overflow-y-auto py-1">
-                {partResults.map((part) => (
-                  <li key={part.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-gray-50"
-                      onClick={() => addLineItem(part)}
-                    >
-                      <div>
-                        <span className="font-medium text-gray-900">{part.name}</span>
-                        <span className="ml-2 text-gray-500">({part.part_number})</span>
-                      </div>
-                      <span className="text-gray-600">
-                        {formatCurrency(part.selling_price)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                {partResults.map((part) => {
+                  const stock = part.total_stock ?? 0;
+                  const isOutOfStock = stock <= 0;
+                  return (
+                    <li key={part.id}>
+                      <button
+                        type="button"
+                        className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-gray-50 ${isOutOfStock ? 'opacity-50' : ''}`}
+                        onClick={() => addLineItem(part)}
+                        disabled={isOutOfStock}
+                      >
+                        <div>
+                          <span className="font-medium text-gray-900">{part.name}</span>
+                          <span className="ml-2 text-gray-500">({part.part_number})</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-medium ${isOutOfStock ? 'text-red-600' : stock <= part.min_stock_level ? 'text-amber-600' : 'text-green-600'}`}>
+                            {isOutOfStock ? 'Out of stock' : `${stock} in stock`}
+                          </span>
+                          <span className="text-gray-600">
+                            {formatCurrency(part.selling_price)}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -394,25 +408,35 @@ export default function CreateSalePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
-                {lineItems.map((item) => (
-                  <tr key={item.id}>
+                {lineItems.map((item) => {
+                  const exceedsStock = item.available_stock !== undefined && (item.quantity || 0) > item.available_stock;
+                  return (
+                  <tr key={item.id} className={exceedsStock ? 'bg-red-50' : ''}>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       <div>
                         <p className="font-medium text-gray-900">{item.spare_part_name}</p>
                         <p className="text-gray-500">{item.part_number}</p>
+                        {item.available_stock !== undefined && (
+                          <p className={`text-xs mt-0.5 ${item.available_stock <= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            Available: {item.available_stock}
+                          </p>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <input
                         type="number"
                         min={1}
-                        className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={`w-20 rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 ${exceedsStock ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
                         value={item.quantity}
                         onChange={(e) =>
                           updateLineItem(item.id, 'quantity', e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))
                         }
                         aria-label={`Quantity for ${item.spare_part_name}`}
                       />
+                      {exceedsStock && (
+                        <p className="text-xs text-red-600 mt-0.5">Exceeds stock</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <input
@@ -454,7 +478,8 @@ export default function CreateSalePage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
