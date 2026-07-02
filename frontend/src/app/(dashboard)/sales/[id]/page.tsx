@@ -372,7 +372,7 @@ export default function SaleDetailPage() {
           <div>
             <p className="text-sm font-medium text-gray-500">Customer</p>
             <p className="mt-1 text-sm text-gray-900">
-              {sale.customer?.name ?? 'Walk-in'}
+              {sale.customer_name ?? 'Walk-in'}
             </p>
           </div>
           <div>

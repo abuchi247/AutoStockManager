@@ -225,6 +225,14 @@ async def get_sale(
 
     resp = SaleResponse.model_validate(sale)
     resp.items = items_response
+
+    # Add customer name
+    if sale.customer_id:
+        from app.models.customer import Customer
+        cust_result = await db.execute(select(Customer.name).filter_by(id=sale.customer_id))
+        cust_name = cust_result.scalar_one_or_none()
+        resp.customer_name = cust_name
+
     return resp
 
 

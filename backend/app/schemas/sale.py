@@ -181,6 +181,7 @@ class SaleResponse(BaseModel):
 
     id: UUID = Field(..., description="Sale UUID")
     customer_id: Optional[UUID] = Field(default=None, description="Customer UUID")
+    customer_name: Optional[str] = Field(default=None, description="Customer name")
     location_id: UUID = Field(..., description="Selling location UUID")
     invoice_number: Optional[str] = Field(
         default=None, description="Invoice number (generated on confirm)"
