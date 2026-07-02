@@ -121,3 +121,145 @@ async def get_stock_value(
         "grand_total": grand_total,
         "locations": locations,
     }
+
+
+@router.get(
+    "/top-products",
+    status_code=status.HTTP_200_OK,
+    summary="Get top selling products",
+    description="Returns top 5 selling products by quantity for a given period.",
+)
+async def get_top_products(
+    db: DbSession,
+    current_user: CurrentUser,
+    period: str = "all",
+) -> dict:
+    """Get top 5 selling products.
+
+    Period options: 1m (month), 3m, 6m, 1y, all (all time).
+    """
+    from sqlalchemy import func, select, and_
+    from app.models.sale import Sale, SaleItem, SaleStatus
+    from app.models.spare_part import SparePart
+    from datetime import date, datetime, timezone, timedelta
+
+    # Calculate start date based on period
+    start_date = _get_period_start(period)
+
+    conditions = [Sale.status == SaleStatus.CONFIRMED]
+    if start_date:
+        conditions.append(Sale.created_at >= start_date)
+
+    stmt = (
+        select(
+            SaleItem.spare_part_id,
+            SparePart.name.label("part_name"),
+            SparePart.part_number.label("part_number"),
+            func.sum(SaleItem.quantity).label("total_quantity_sold"),
+            func.sum(SaleItem.line_total).label("total_revenue"),
+        )
+        .join(Sale, SaleItem.sale_id == Sale.id)
+        .join(SparePart, SaleItem.spare_part_id == SparePart.id)
+        .where(and_(*conditions))
+        .group_by(SaleItem.spare_part_id, SparePart.name, SparePart.part_number)
+        .order_by(func.sum(SaleItem.quantity).desc())
+        .limit(5)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return {
+        "period": period,
+        "data": [
+            {
+                "spare_part_id": str(row.spare_part_id),
+                "part_name": row.part_name,
+                "part_number": row.part_number,
+                "total_quantity_sold": float(row.total_quantity_sold),
+                "total_revenue": float(row.total_revenue or 0),
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.get(
+    "/top-customers",
+    status_code=status.HTTP_200_OK,
+    summary="Get top customers by spend",
+    description="Returns top 5 customers by total purchase amount for a given period.",
+)
+async def get_top_customers(
+    db: DbSession,
+    current_user: CurrentUser,
+    period: str = "all",
+) -> dict:
+    """Get top 5 customers by total spend.
+
+    Period options: 1m (month), 3m, 6m, 1y, all (all time).
+    """
+    from sqlalchemy import func, select, and_
+    from app.models.sale import Sale, SaleStatus
+    from app.models.customer import Customer
+    from datetime import date, datetime, timezone, timedelta
+
+    # Calculate start date based on period
+    start_date = _get_period_start(period)
+
+    conditions = [
+        Sale.status == SaleStatus.CONFIRMED,
+        Sale.customer_id.isnot(None),
+    ]
+    if start_date:
+        conditions.append(Sale.created_at >= start_date)
+
+    stmt = (
+        select(
+            Sale.customer_id,
+            Customer.name.label("customer_name"),
+            Customer.phone.label("customer_phone"),
+            func.sum(Sale.total_amount).label("total_spent"),
+            func.count(Sale.id).label("order_count"),
+        )
+        .join(Customer, Sale.customer_id == Customer.id)
+        .where(and_(*conditions))
+        .group_by(Sale.customer_id, Customer.name, Customer.phone)
+        .order_by(func.sum(Sale.total_amount).desc())
+        .limit(5)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return {
+        "period": period,
+        "data": [
+            {
+                "customer_id": str(row.customer_id),
+                "customer_name": row.customer_name,
+                "customer_phone": row.customer_phone or "",
+                "total_spent": float(row.total_spent or 0),
+                "order_count": row.order_count,
+            }
+            for row in rows
+        ],
+    }
+
+
+def _get_period_start(period: str):
+    """Convert period string to a datetime start point."""
+    from datetime import date, datetime, timezone, timedelta
+
+    today = date.today()
+    if period == "1m":
+        return datetime(today.year, today.month, 1, tzinfo=timezone.utc)
+    elif period == "3m":
+        d = today - timedelta(days=90)
+        return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    elif period == "6m":
+        d = today - timedelta(days=180)
+        return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    elif period == "1y":
+        d = today - timedelta(days=365)
+        return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    else:  # "all"
+        return None

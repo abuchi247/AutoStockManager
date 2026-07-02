@@ -172,50 +172,174 @@ export default function DashboardPage() {
       )}
 
       {/* Top Selling Products */}
-      {kpis?.top_selling_products && kpis.top_selling_products.length > 0 && (
-        <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
-          <h2 className="text-base font-semibold text-[#333] mb-4">
-            Top Selling Products
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">
-                    #
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">
-                    Product Name
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#666]">
-                    Quantity Sold
-                  </th>
+      <TopProductsWidget />
+
+      {/* Top Customers */}
+      <TopCustomersWidget />
+    </div>
+  );
+}
+
+// --- Helper Components ---
+
+const PERIOD_OPTIONS = [
+  { value: '1m', label: 'This Month' },
+  { value: '3m', label: '3 Months' },
+  { value: '6m', label: '6 Months' },
+  { value: '1y', label: '1 Year' },
+  { value: 'all', label: 'All Time' },
+];
+
+function PeriodFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-1">
+      {PERIOD_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+            value === opt.value
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TopProductsWidget() {
+  const [period, setPeriod] = useState('all');
+  const [data, setData] = useState<Array<{ spare_part_id: string; part_name: string; part_number: string; total_quantity_sold: number; total_revenue: number }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.get(`/dashboard/top-products?period=${period}`);
+        setData(response.data.data || []);
+      } catch {
+        setData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [period]);
+
+  return (
+    <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <h2 className="text-base font-semibold text-[#333]">Top 5 Products</h2>
+        <PeriodFilter value={period} onChange={setPeriod} />
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-6"><LoadingSpinner /></div>
+      ) : data.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">No sales data for this period</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">#</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">Product</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#666]">Qty Sold</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#666]">Revenue</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.map((item, i) => (
+                <tr key={item.spare_part_id} className="hover:bg-gray-50 transition-colors">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{i + 1}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <p className="font-medium text-gray-900">{item.part_name}</p>
+                    <p className="text-xs text-gray-500">{item.part_number}</p>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    {item.total_quantity_sold.toLocaleString()}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700">
+                    {formatCurrency(item.total_revenue)}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {kpis.top_selling_products.map((product, index) => (
-                  <tr key={product.spare_part_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                      {index + 1}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-[#333]">
-                      {product.part_name}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700">
-                      {Number(product.total_quantity_sold).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
 
-// --- Helper Components ---
+function TopCustomersWidget() {
+  const [period, setPeriod] = useState('all');
+  const [data, setData] = useState<Array<{ customer_id: string; customer_name: string; customer_phone: string; total_spent: number; order_count: number }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.get(`/dashboard/top-customers?period=${period}`);
+        setData(response.data.data || []);
+      } catch {
+        setData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [period]);
+
+  return (
+    <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <h2 className="text-base font-semibold text-[#333]">Top 5 Customers</h2>
+        <PeriodFilter value={period} onChange={setPeriod} />
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-6"><LoadingSpinner /></div>
+      ) : data.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">No customer data for this period</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">#</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#666]">Customer</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#666]">Orders</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#666]">Total Spent</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.map((item, i) => (
+                <tr key={item.customer_id} className="hover:bg-gray-50 transition-colors">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{i + 1}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <p className="font-medium text-gray-900">{item.customer_name}</p>
+                    {item.customer_phone && <p className="text-xs text-gray-500">{item.customer_phone}</p>}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700">
+                    {item.order_count}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
+                    {formatCurrency(item.total_spent)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface KPICardProps {
   title: string;
