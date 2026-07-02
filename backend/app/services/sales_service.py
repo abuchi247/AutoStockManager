@@ -275,6 +275,10 @@ class SalesService:
         if sale.payment_type == PaymentType.CASH:
             sale.amount_paid = sale.total_amount
 
+        # Validate amount_paid doesn't exceed total
+        if (sale.amount_paid or Decimal("0")) > sale.total_amount:
+            sale.amount_paid = sale.total_amount
+
         # Record credit ledger entry for credit sales with credit limit validation
         if sale.payment_type == PaymentType.CREDIT and sale.customer_id:
             from app.models.customer import Customer

@@ -329,11 +329,16 @@ export default function CreateSalePage() {
               label="Amount Paid at Checkout"
               type="number"
               min={0}
+              max={totalAmount > 0 ? totalAmount : undefined}
               step={0.01}
               value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value === '' ? '' : parseFloat(e.target.value))}
+              onChange={(e) => {
+                const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                setAmountPaid(val);
+              }}
               placeholder="0.00 (optional — leave empty if fully on credit)"
-              helperText={totalAmount > 0 ? `Balance due: ${formatCurrency(totalAmount - (Number(amountPaid) || 0))}` : undefined}
+              helperText={totalAmount > 0 ? `Balance due: ${formatCurrency(Math.max(0, totalAmount - (Number(amountPaid) || 0)))}` : undefined}
+              error={Number(amountPaid) > totalAmount && totalAmount > 0 ? `Cannot exceed total (${formatCurrency(totalAmount)})` : undefined}
             />
           </div>
         )}
