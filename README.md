@@ -15,7 +15,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 - **Transfer Management** — Multi-location transfers with in-transit state and cost layer propagation
 - **Barcode System** — Code 128 barcode generation, scanning, and lookup
 - **Inventory Audits** — Snapshot-based cycle counts and full stock counts with variance tracking
-- **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes and barcodes. Supports regeneration to reflect updated business settings.
+- **Invoice Generation** — PDF invoices in A4 and thermal (80mm) formats with QR codes and barcodes. Supports regeneration to reflect updated business settings. Credit notes generated automatically for returns.
 - **Business Settings** — Configurable company profile (name, logo, address, bank details) that populates invoices and reports
 - **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export. Dashboard with Top 5 Products and Top 5 Customers widgets filterable by period (month, 3M, 6M, 1Y, all time).
 - **Notifications** — Low stock alerts, credit limit warnings, overdue customer reminders, and pending approval notifications
