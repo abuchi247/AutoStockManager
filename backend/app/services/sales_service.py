@@ -447,6 +447,27 @@ class SalesService:
             sale.status = SaleStatus.RETURNED
         # Otherwise keep as CONFIRMED (partial return)
 
+        # Record credit ledger reversal for credit sales (reduces customer balance)
+        if sale.payment_type == PaymentType.CREDIT and sale.customer_id:
+            from app.models.customer_credit_ledger import CustomerCreditLedger, CreditTransactionType
+
+            # Calculate total refund value for the items being returned now
+            refund_amount = Decimal("0.00")
+            for sale_item, return_quantity in items_to_return:
+                refund_amount += return_quantity * sale_item.unit_price
+
+            if refund_amount > Decimal("0.00"):
+                credit_entry = CustomerCreditLedger(
+                    customer_id=sale.customer_id,
+                    transaction_type=CreditTransactionType.RETURN.value,
+                    amount=-refund_amount,  # Negative = credit (reduces balance)
+                    reference_type="sale",
+                    reference_id=sale.id,
+                    notes=f"Return on {sale.invoice_number}",
+                    created_by=returned_by,
+                )
+                self.db.add(credit_entry)
+
         await self.db.flush()
         return sale
 
