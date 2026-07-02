@@ -41,6 +41,7 @@ interface LineItem {
   discount_amount: number | '';
   line_total: number;
   available_stock?: number;
+  cost_price?: number;
 }
 
 export default function CreateSalePage() {
@@ -135,6 +136,7 @@ export default function CreateSalePage() {
       discount_amount: '',
       line_total: part.selling_price,
       available_stock: stock,
+      cost_price: part.cost_price,
     };
 
     setLineItems([...lineItems, newItem]);
@@ -443,13 +445,16 @@ export default function CreateSalePage() {
                         type="number"
                         min={0}
                         step={0.01}
-                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className={`w-28 rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 ${item.cost_price && (item.unit_price || 0) < item.cost_price ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
                         value={item.unit_price}
                         onChange={(e) =>
                           updateLineItem(item.id, 'unit_price', e.target.value === '' ? '' : parseFloat(e.target.value))
                         }
                         aria-label={`Unit price for ${item.spare_part_name}`}
                       />
+                      {item.cost_price && (item.unit_price || 0) < item.cost_price && (
+                        <p className="text-xs text-amber-600 mt-0.5">Below cost ({formatCurrency(item.cost_price)})</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <input
