@@ -527,32 +527,45 @@ export default function SaleDetailPage() {
           </div>
           <div className="mt-4 flex justify-end">
             <div className="w-full max-w-xs space-y-2 rounded-md bg-white p-4 border border-amber-200">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Original Total:</span>
-                <span>{formatCurrency(sale.total_amount)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-red-600">
-                <span>Total Refunded:</span>
-                <span>
-                  -{formatCurrency(
-                    sale.items.reduce((sum, item) => {
-                      const returned = Number(item.returned_quantity || 0);
-                      return sum + returned * Number(item.unit_price);
-                    }, 0)
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-amber-200 pt-2 text-base font-semibold text-gray-900">
-                <span>Net Amount:</span>
-                <span>
-                  {formatCurrency(
-                    Number(sale.total_amount) - sale.items.reduce((sum, item) => {
-                      const returned = Number(item.returned_quantity || 0);
-                      return sum + returned * Number(item.unit_price);
-                    }, 0)
-                  )}
-                </span>
-              </div>
+              {(() => {
+                const goodsReturnedValue = sale.items.reduce((sum, item) => {
+                  const returned = Number(item.returned_quantity || 0);
+                  return sum + returned * Number(item.unit_price);
+                }, 0);
+                const amountPaid = Number(sale.amount_paid || 0);
+                const totalAmount = Number(sale.total_amount);
+                // Cash refund = min(amount paid, goods returned value)
+                const cashRefund = Math.min(amountPaid, goodsReturnedValue);
+                // Credit reversed = goods returned value - cash refund
+                const creditReversed = goodsReturnedValue - cashRefund;
+
+                return (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Goods Returned Value:</span>
+                      <span>{formatCurrency(goodsReturnedValue)}</span>
+                    </div>
+                    {amountPaid > 0 && (
+                      <div className="flex justify-between text-sm text-green-700 font-medium">
+                        <span>Cash Refund to Customer:</span>
+                        <span>{formatCurrency(cashRefund)}</span>
+                      </div>
+                    )}
+                    {creditReversed > 0 && (
+                      <div className="flex justify-between text-sm text-blue-700">
+                        <span>Credit Balance Reversed:</span>
+                        <span>{formatCurrency(creditReversed)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-amber-200 pt-2 text-base font-semibold text-gray-900">
+                      <span>Net Amount Owed:</span>
+                      <span>
+                        {formatCurrency(Math.max(0, totalAmount - goodsReturnedValue))}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
