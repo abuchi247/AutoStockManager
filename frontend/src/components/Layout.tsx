@@ -218,8 +218,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="max-w-[1400px] mx-auto">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-gray-50 to-gray-100/50">
+          <div className="max-w-[1400px] mx-auto animate-[fadeInUp_0.3s_ease-out]">
             {children}
           </div>
         </main>

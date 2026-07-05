@@ -33,10 +33,11 @@ export function Input({
       <input
         id={inputId}
         className={cn(
-          'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors',
+          'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200',
           'placeholder:text-muted-foreground',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          'disabled:cursor-not-allowed disabled:opacity-50',
+          'hover:border-gray-400',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:border-primary',
+          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-input',
           error && 'border-destructive focus-visible:ring-destructive',
           className
         )}
