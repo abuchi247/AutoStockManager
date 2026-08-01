@@ -69,6 +69,7 @@ def _make_mock_sale(
     subtotal=Decimal("1400.00"),
     tax_amount=Decimal("100.00"),
     discount_total=Decimal("0.00"),
+    amount_paid=None,
 ):
     """Helper to create a mock Sale object."""
     mock_sale = MagicMock()
@@ -83,6 +84,7 @@ def _make_mock_sale(
     mock_sale.subtotal = subtotal
     mock_sale.tax_amount = tax_amount
     mock_sale.discount_total = discount_total
+    mock_sale.amount_paid = amount_paid if amount_paid is not None else (total_amount if payment_type_value == "CASH" else Decimal("0.00"))
     mock_sale.created_at = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
     mock_sale.items = []
     return mock_sale

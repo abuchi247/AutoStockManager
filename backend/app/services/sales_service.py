@@ -92,6 +92,15 @@ class SaleHasNoItemsError(Exception):
         super().__init__(f"Sale '{sale_id}' has no items and cannot be confirmed")
 
 
+class ReturnQuantityExceededError(Exception):
+    """Raised when a return request exceeds the returnable quantity."""
+
+    def __init__(self, sale_id: uuid.UUID, detail: str):
+        self.sale_id = sale_id
+        self.detail = detail
+        super().__init__(detail)
+
+
 # =============================================================================
 # Sales Service
 # =============================================================================
@@ -394,10 +403,9 @@ class SalesService:
         try:
             items_to_return = self._resolve_return_items(sale, return_items, previously_returned)
         except ValueError as e:
-            raise InvalidSaleStatusError(
+            raise ReturnQuantityExceededError(
                 sale_id=sale_id,
-                current_status="RETURN_EXCEEDED",
-                expected_status=str(e),
+                detail=str(e),
             )
 
         # Process each return item

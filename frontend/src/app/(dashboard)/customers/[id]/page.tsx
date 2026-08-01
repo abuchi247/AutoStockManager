@@ -621,11 +621,11 @@ function PurchaseHistoryTab({
               <td className="whitespace-nowrap px-6 py-4 text-sm">
                 <Badge
                   variant={
-                    sale.status === 'confirmed'
+                    sale.status === 'CONFIRMED'
                       ? 'success'
-                      : sale.status === 'cancelled'
+                      : sale.status === 'CANCELLED'
                       ? 'danger'
-                      : sale.status === 'returned'
+                      : sale.status === 'RETURNED'
                       ? 'warning'
                       : 'info'
                   }

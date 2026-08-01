@@ -31,6 +31,9 @@ import type {
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { saleCreateSchema } from '@/lib/validation/schemas';
+
 interface LineItem {
   id: string;
   spare_part_id: string;
@@ -179,6 +182,15 @@ export default function CreateSalePage() {
     })),
   });
 
+  const validateSalePayload = (): SaleCreate | null => {
+    const validation = validateWithSchema(saleCreateSchema, buildSalePayload());
+    if (!validation.data) {
+      setError(formatFieldErrors(validation.errors));
+      return null;
+    }
+    return validation.data as unknown as SaleCreate;
+  };
+
   const handleSaveDraft = async () => {
     if (!locationId) {
       setError('Please select a location.');
@@ -192,7 +204,8 @@ export default function CreateSalePage() {
     setIsSaving(true);
     setError(null);
     try {
-      const payload = buildSalePayload();
+      const payload = validateSalePayload();
+      if (!payload) return;
       const sale = await post<Sale>('/sales', payload);
       setSuccess('Sale saved as draft successfully.');
       setTimeout(() => {
@@ -220,7 +233,8 @@ export default function CreateSalePage() {
     setError(null);
     try {
       // First create the sale
-      const payload = buildSalePayload();
+      const payload = validateSalePayload();
+      if (!payload) return;
       const sale = await post<Sale>('/sales', payload);
       const saleId = sale.id;
 

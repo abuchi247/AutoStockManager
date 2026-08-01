@@ -6,22 +6,38 @@
  * Allows users to select a report type, specify date range and filters,
  * generate reports displayed in a table, and export as CSV or PDF.
  *
- * Requirements: 12.1, 12.6
+ * Heavy report rendering and document export code is loaded on demand so it is
+ * never part of the initial bundle for routes that do not generate reports.
+ *
+ * Requirements: 12.1, 12.6, 19.2, 19.3, 19.4, 19.6
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import api from '@/lib/api';
+import { useResourceQuery, queryKeys } from '@/lib/queries';
 import {
   Button,
   Input,
   Select,
   Alert,
   LoadingSpinner,
-  DataTable,
 } from '@/components';
-import type { Column, SelectOption } from '@/components';
+import type { SelectOption } from '@/components';
 import type { ReportType } from '@/lib/types';
+
+const ReportResultsTable = dynamic(
+  () => import('@/components/reports/ReportResultsTable').then((mod) => mod.ReportResultsTable),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-32 items-center justify-center" role="status">
+        <LoadingSpinner />
+        <span className="sr-only">Preparing report results</span>
+      </div>
+    ),
+  },
+);
 
 // --- Report Type Options ---
 
@@ -54,14 +70,6 @@ function getDefaultEndDate(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-function formatCellValue(value: unknown): string {
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'number') {
-    return value.toLocaleString('en-NG');
-  }
-  return String(value);
-}
-
 export default function ReportsPage() {
   const searchParams = useSearchParams();
 
@@ -74,10 +82,7 @@ export default function ReportsPage() {
   const [supplierFilter, setSupplierFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
 
-  // Report data state
   const [reportData, setReportData] = useState<Record<string, unknown>[] | null>(null);
-  const [columns, setColumns] = useState<Column<Record<string, unknown>>[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -106,79 +111,37 @@ export default function ReportsPage() {
     [startDate, endDate, locationFilter, customerFilter, supplierFilter, categoryFilter, reportType]
   );
 
-  /**
-   * Generate report — fetch JSON data from the API.
-   */
+  const reportParams = buildParams('json');
+  const reportQuery = useResourceQuery<Record<string, unknown>>(
+    queryKeys.reports.report({ reportType, reportParams }),
+    `/reports/${REPORT_API_PATH[reportType]}?${reportParams}`,
+    { enabled: false },
+  );
+
   const handleGenerate = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-    setReportData(null);
-
+    setError(null); setSuccessMessage(null); setReportData(null);
     try {
-      const params = buildParams('json');
-      const apiPath = REPORT_API_PATH[reportType];
-      const response = await api.get<Record<string, unknown>>(
-        `/reports/${apiPath}?${params}`
-      );
-
-      const responseData = response.data as Record<string, unknown>;
-
-      // The backend returns "rows" for most reports, or flat data for financial-summary
+      const result = await reportQuery.refetch();
+      const responseData = result.data ?? {};
       let data: Record<string, unknown>[];
-      if ('rows' in responseData && Array.isArray(responseData.rows)) {
-        data = responseData.rows as Record<string, unknown>[];
-      } else if (reportType === 'financial') {
-        // Financial summary is a single object — wrap it in an array for table display
-        const { start_date: _s, end_date: _e, ...metrics } = responseData;
-        data = [metrics];
-      } else {
-        data = [];
-      }
-
-      if (!data || data.length === 0) {
-        setReportData([]);
-        setColumns([]);
-        return;
-      }
-
-      // Auto-generate columns from data keys
-      const keys = Object.keys(data[0]);
-      const generatedColumns: Column<Record<string, unknown>>[] = keys.map((key) => ({
-        key,
-        header: key
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (c) => c.toUpperCase()),
-        render: (item: Record<string, unknown>) => (
-          <span>{formatCellValue(item[key])}</span>
-        ),
-      }));
-
-      setColumns(generatedColumns);
+      if ('rows' in responseData && Array.isArray(responseData.rows)) data = responseData.rows as Record<string, unknown>[];
+      else if (reportType === 'financial') { const { start_date: _s, end_date: _e, ...metrics } = responseData; data = [metrics]; }
+      else data = [];
       setReportData(data);
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { detail?: string } } }).response?.data
-              ?.detail ?? 'Failed to generate report')
-          : 'Failed to generate report';
-      setError(message);
-    } finally {
-      setIsLoading(false);
+      setError(err instanceof Error ? err.message : 'Failed to generate report');
     }
-  }, [reportType, buildParams]);
+  }, [reportType, reportQuery]);
 
-  // Auto-generate report if URL params are present (e.g., from dashboard click)
+
+  const isLoading = reportQuery.isFetching;
+
   useEffect(() => {
-    if (searchParams.get('type') && searchParams.get('start_date')) {
-      handleGenerate();
-    }
+    if (searchParams.get('type') && searchParams.get('start_date')) void handleGenerate();
+    // URL-driven initial report generation intentionally runs once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Export report via API — downloads as CSV or PDF.
-   */
   const handleExport = useCallback(
     async (format: 'csv' | 'pdf') => {
       setIsExporting(true);
@@ -188,22 +151,16 @@ export default function ReportsPage() {
       try {
         const params = buildParams(format);
         const apiPath = REPORT_API_PATH[reportType];
-        const response = await api.get(`/reports/${apiPath}?${params}`, {
-          responseType: 'blob',
-        });
+        // Document/blob handling is only needed when a user actually exports.
+        const { buildExportFileName, downloadReportDocument } = await import(
+          '@/lib/reports/document-export'
+        );
 
-        // Create a download link
-        const blob = new Blob([response.data as BlobPart], {
-          type: format === 'csv' ? 'text/csv' : 'application/pdf',
+        await downloadReportDocument({
+          path: `/reports/${apiPath}?${params}`,
+          format,
+          fileName: buildExportFileName({ reportType, startDate, endDate, format }),
         });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${reportType}_report_${startDate}_${endDate}.${format}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
 
         setSuccessMessage(`Report exported as ${format.toUpperCase()} successfully.`);
       } catch (err: unknown) {
@@ -351,7 +308,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages. Alert renders role="alert" so failures are announced. */}
       {error && (
         <Alert variant="error" onClose={() => setError(null)}>
           {error}
@@ -364,32 +321,34 @@ export default function ReportsPage() {
         </Alert>
       )}
 
-      {/* Loading State */}
+      {/* Loading state, announced without blocking the configuration form */}
       {isLoading && (
-        <div className="flex h-48 items-center justify-center">
+        <div className="flex h-48 items-center justify-center" role="status">
           <LoadingSpinner size="lg" />
+          <span className="sr-only">Generating report</span>
         </div>
       )}
 
-      {/* Report Results */}
-      {reportData !== null && !isLoading && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Results
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                ({reportData.length} {reportData.length === 1 ? 'row' : 'rows'})
-              </span>
-            </h2>
-          </div>
+      {isExporting && (
+        <p role="status" className="text-sm text-gray-500">
+          Preparing the export document…
+        </p>
+      )}
 
-          <DataTable
-            columns={columns}
-            data={reportData}
-            isLoading={false}
-            emptyMessage="No data found for the selected report criteria."
-          />
-        </div>
+      {/* Report results */}
+      {reportData !== null && !isLoading && reportData.length === 0 && (
+        <p role="status" className="rounded-md border border-gray-200 bg-white p-6 text-sm text-gray-500">
+          No data found for the selected report criteria. Adjust the date range or filters and generate again.
+        </p>
+      )}
+
+      {reportData !== null && !isLoading && reportData.length > 0 && (
+        <ReportResultsTable
+          rows={reportData}
+          reportLabel={
+            REPORT_TYPE_OPTIONS.find((option) => option.value === reportType)?.label ?? 'Report'
+          }
+        />
       )}
     </div>
   );

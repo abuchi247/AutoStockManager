@@ -27,10 +27,10 @@ import { formatCurrency } from '@/lib/currency';
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
   const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
-    draft: { variant: 'warning', label: 'Draft' },
-    confirmed: { variant: 'success', label: 'Confirmed' },
-    returned: { variant: 'info', label: 'Returned' },
-    cancelled: { variant: 'danger', label: 'Cancelled' },
+    DRAFT: { variant: 'warning', label: 'Draft' },
+    CONFIRMED: { variant: 'success', label: 'Confirmed' },
+    RETURNED: { variant: 'info', label: 'Returned' },
+    CANCELLED: { variant: 'danger', label: 'Cancelled' },
   };
   const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
   return <Badge variant={variant}>{label}</Badge>;
@@ -103,7 +103,7 @@ export default function SaleDetailPage() {
 
   // Check if invoice exists for this sale
   useEffect(() => {
-    if (sale?.status === 'confirmed' || sale?.status === 'returned') {
+    if (sale?.status === 'CONFIRMED' || sale?.status === 'RETURNED') {
       get<{ id: string }>(`/invoices/by-sale/${saleId}?format=${invoiceFormat}`)
         .then((inv) => setInvoiceId(inv.id))
         .catch(() => setInvoiceId(null));
@@ -310,7 +310,7 @@ export default function SaleDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {sale.status === 'draft' && (
+          {sale.status === 'DRAFT' && (
             <Button
               variant="secondary"
               onClick={() => router.push(`/sales/${saleId}/edit`)}
@@ -318,7 +318,7 @@ export default function SaleDetailPage() {
               Edit Items
             </Button>
           )}
-          {sale.status === 'draft' && (
+          {sale.status === 'DRAFT' && (
             <Button
               onClick={handleConfirm}
               isLoading={isConfirming}
@@ -326,7 +326,7 @@ export default function SaleDetailPage() {
               Confirm Sale
             </Button>
           )}
-          {sale.status === 'draft' && (
+          {sale.status === 'DRAFT' && (
             <Button
               variant="danger"
               onClick={handleCancel}
@@ -335,7 +335,7 @@ export default function SaleDetailPage() {
               Cancel Sale
             </Button>
           )}
-          {sale.status === 'confirmed' && (
+          {sale.status === 'CONFIRMED' && (
             <Button
               variant="danger"
               onClick={openReturnModal}
@@ -572,7 +572,7 @@ export default function SaleDetailPage() {
       )}
 
       {/* Invoice Section */}
-      {(sale.status === 'confirmed' || sale.status === 'returned') && (
+      {(sale.status === 'CONFIRMED' || sale.status === 'RETURNED') && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Invoice</h2>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -606,7 +606,7 @@ export default function SaleDetailPage() {
               </Button>
             )}
           </div>
-          {(sale.status === 'returned' || (sale.items && sale.items.some((item) => Number(item.returned_quantity || 0) > 0))) && (
+          {(sale.status === 'RETURNED' || (sale.items && sale.items.some((item) => Number(item.returned_quantity || 0) > 0))) && (
             <div className="mt-3 flex items-center gap-3">
               <Button
                 variant="secondary"

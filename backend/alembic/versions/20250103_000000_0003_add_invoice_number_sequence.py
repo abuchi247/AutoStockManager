@@ -20,7 +20,7 @@ from alembic import op
 
 # Revision identifiers used by Alembic to maintain migration ordering.
 revision: str = "0003"
-down_revision: Union[str, None] = "0002"
+down_revision: Union[str, None] = "0002a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

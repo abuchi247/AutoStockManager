@@ -31,6 +31,7 @@ from app.schemas.sale import (
 from app.services.sales_service import (
     InsufficientStockError,
     InvalidSaleStatusError,
+    ReturnQuantityExceededError,
     SaleHasNoItemsError,
     SaleNotFoundError,
     SalesService,
@@ -472,7 +473,7 @@ async def return_sale(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
-    except InvalidSaleStatusError as e:
+    except (InvalidSaleStatusError, ReturnQuantityExceededError) as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),

@@ -9,10 +9,11 @@
  * Requirements: 13.1, 13.2, 13.3, 13.4
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useResourceQuery, queryKeys } from '@/lib/queries';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert } from '@/components/Alert';
 import { formatCurrency } from '@/lib/currency';
@@ -20,52 +21,23 @@ import type { DashboardKPIs } from '@/lib/types';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
+// Charting code is only needed once stock-value data is available, so it is
+// requested separately from the initial dashboard bundle.
+// Requirements: 19.2
+const StockValueBarChart = dynamic(
+  () => import('@/components/charts/StockValueBarChart').then((mod) => mod.StockValueBarChart),
+  { ssr: false, loading: () => <div className="h-24" aria-hidden="true" /> },
+);
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [stockValue, setStockValue] = useState<{ grand_total: number; locations: Array<{ location_id: string; location_name: string; total_value: number; total_items: number }> } | null>(null);
-
-  const fetchKPIs = useCallback(async () => {
-    try {
-      const response = await api.get<DashboardKPIs>('/dashboard/kpis');
-      setKpis(response.data);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to load dashboard data')
-          : 'Failed to load dashboard data';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchStockValue = useCallback(async () => {
-    try {
-      const response = await api.get('/dashboard/stock-value');
-      setStockValue(response.data);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  // Initial fetch and 5-minute auto-refresh
-  useEffect(() => {
-    fetchKPIs();
-    fetchStockValue();
-
-    const interval = setInterval(() => {
-      fetchKPIs();
-      fetchStockValue();
-    }, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [fetchKPIs, fetchStockValue]);
+  const kpisQuery = useResourceQuery<DashboardKPIs>(queryKeys.dashboard.kpis(), '/dashboard/kpis', { refetchInterval: REFRESH_INTERVAL_MS });
+  const stockValueQuery = useResourceQuery<{ grand_total: number; locations: Array<{ location_id: string; location_name: string; total_value: number; total_items: number }> }>(queryKeys.dashboard.stockValue(), '/dashboard/stock-value', { refetchInterval: REFRESH_INTERVAL_MS });
+  const kpis = kpisQuery.data;
+  const stockValue = stockValueQuery.data;
+  const isLoading = kpisQuery.isLoading;
+  const error = kpisQuery.error?.message ?? null;
+  const lastUpdated = kpisQuery.dataUpdatedAt ? new Date(kpisQuery.dataUpdatedAt) : null;
 
   if (isLoading) {
     return (
@@ -161,6 +133,9 @@ export default function DashboardPage() {
               {formatCurrency(stockValue.grand_total)}
             </span>
           </div>
+          <div className="mb-4">
+            <StockValueBarChart data={stockValue.locations} />
+          </div>
           <div className="space-y-3">
             {stockValue.locations.map((loc) => (
               <div key={loc.location_id} className="flex items-center justify-between rounded-md border border-gray-100 p-3">
@@ -219,23 +194,9 @@ function PeriodFilter({ value, onChange }: { value: string; onChange: (v: string
 
 function TopProductsWidget() {
   const [period, setPeriod] = useState('all');
-  const [data, setData] = useState<Array<{ spare_part_id: string; part_name: string; part_number: string; total_quantity_sold: number; total_revenue: number }>>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await api.get(`/dashboard/top-products?period=${period}`);
-        setData(response.data.data || []);
-      } catch {
-        setData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [period]);
+  const query = useResourceQuery<{ data: Array<{ spare_part_id: string; part_name: string; part_number: string; total_quantity_sold: number; total_revenue: number }> }>(queryKeys.dashboard.topProducts(period), `/dashboard/top-products?period=${period}`);
+  const data = query.data?.data ?? [];
+  const isLoading = query.isLoading;
 
   return (
     <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
@@ -284,23 +245,9 @@ function TopProductsWidget() {
 
 function TopCustomersWidget() {
   const [period, setPeriod] = useState('all');
-  const [data, setData] = useState<Array<{ customer_id: string; customer_name: string; customer_phone: string; total_spent: number; order_count: number }>>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await api.get(`/dashboard/top-customers?period=${period}`);
-        setData(response.data.data || []);
-      } catch {
-        setData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [period]);
+  const query = useResourceQuery<{ data: Array<{ customer_id: string; customer_name: string; customer_phone: string; total_spent: number; order_count: number }> }>(queryKeys.dashboard.topCustomers(period), `/dashboard/top-customers?period=${period}`);
+  const data = query.data?.data ?? [];
+  const isLoading = query.isLoading;
 
   return (
     <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">

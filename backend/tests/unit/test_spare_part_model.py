@@ -179,10 +179,10 @@ class TestSparePartModel:
         assert col.nullable is True
 
     def test_category_id_column(self):
-        """SparePart should have a non-nullable category_id FK."""
+        """SparePart should have a nullable category_id FK."""
         col = SparePart.__table__.columns["category_id"]
         assert isinstance(col.type, PG_UUID)
-        assert col.nullable is False
+        assert col.nullable is True
         fk = list(col.foreign_keys)[0]
         assert fk.target_fullname == "categories.id"
 

@@ -123,7 +123,7 @@ export default function AuditsPage() {
         status: a.status?.toLowerCase() as AuditStatus,
         audit_type: a.audit_type?.toLowerCase() as AuditType,
       })));
-      setTotalPages(response.meta.total_pages);
+      setTotalPages(response.meta.total_pages ?? 1);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load audit sessions';
       setError(message);
@@ -288,7 +288,7 @@ export default function AuditsPage() {
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={audits as unknown as Record<string, unknown>[]}
+        data={audits}
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -296,6 +296,7 @@ export default function AuditsPage() {
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}
+        label="Audit sessions"
         emptyMessage="No audit sessions found. Start your first audit to get started."
       />
 

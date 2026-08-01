@@ -261,11 +261,12 @@ export default function LocationsPage() {
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={locations as unknown as Record<string, unknown>[]}
+        data={locations}
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
         onPageChange={setPage}
+        label="Locations"
         emptyMessage="No locations found. Add your first location to get started."
       />
 
