@@ -20,6 +20,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from urllib.parse import quote
 
 import bcrypt
 from jose import JWTError, jwt
@@ -28,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.models.user import User, UserRole
+from app.services.password_reset_service import PasswordResetJobQueue
 from app.services.session_service import SessionService
 
 
@@ -241,6 +243,7 @@ class AuthService:
         db: AsyncSession,
         settings: Optional[Settings] = None,
         session_service: Optional[SessionService] = None,
+        password_reset_queue: Optional[PasswordResetJobQueue] = None,
     ):
         """Initialize the auth service.
 
@@ -253,6 +256,7 @@ class AuthService:
         self.db = db
         self.settings = settings or get_settings()
         self.session_service = session_service
+        self.password_reset_queue = password_reset_queue
 
     async def login(
         self,
@@ -495,37 +499,35 @@ class AuthService:
 
         return {"message": "Successfully logged out"}
 
-    async def request_password_reset(self, email: str) -> dict[str, Any]:
-        """Generate a password reset token (Requirement 2.4).
+    async def request_password_reset(self, email: str) -> dict[str, str]:
+        """Request a reset link without revealing whether an account exists.
 
-        Args:
-            email: The user's email address.
-
-        Returns:
-            Dict with the reset_token. In production, this would be sent
-            via email rather than returned directly.
-
-        Raises:
-            AuthenticationError: If no user is found with the email.
+        Existing users receive a delivery job containing the reset URL. Unknown
+        users follow the same response path and receive the same message, so
+        the endpoint cannot be used for email enumeration.
         """
+        generic_message = "If the email exists, a reset link will be sent"
         result = await self.db.execute(
             select(User).filter_by(email=email, deleted_at=None)
         )
         user = result.scalar_one_or_none()
 
-        if user is None:
-            # Return generic message to avoid email enumeration
-            raise AuthenticationError("If the email exists, a reset link will be sent")
+        if user is not None:
+            reset_token = create_password_reset_token(
+                user_id=str(user.id),
+                settings=self.settings,
+            )
+            reset_url = (
+                f"{self.settings.frontend_base_url.rstrip('/')}/"
+                f"{self.settings.password_reset_path.lstrip('/')}?token={quote(reset_token)}"
+            )
+            if self.password_reset_queue is not None:
+                await self.password_reset_queue.enqueue(
+                    "password_reset_email",
+                    {"recipient": user.email, "reset_url": reset_url},
+                )
 
-        reset_token = create_password_reset_token(
-            user_id=str(user.id),
-            settings=self.settings,
-        )
-
-        return {
-            "reset_token": reset_token,
-            "message": "Password reset token generated",
-        }
+        return {"message": generic_message}
 
     async def reset_password(self, reset_token: str, new_password: str) -> dict[str, str]:
         """Reset a user's password using a valid reset token (Requirement 2.4).
@@ -546,18 +548,37 @@ class AuthService:
         if not is_valid:
             raise PasswordValidationError(error_msg)
 
-        # Decode reset token
+        # Decode and validate the reset token. jose validates the signature and
+        # exp claim; the explicit claim checks reject structurally valid JWTs
+        # intended for another token flow or missing one-time-use metadata.
         try:
             payload = decode_token(reset_token, self.settings)
-        except JWTError:
+        except (JWTError, TypeError, ValueError):
             raise AuthenticationError("Invalid or expired reset token")
 
         if payload.get("type") != "password_reset":
             raise AuthenticationError("Invalid token type")
 
         user_id = payload.get("sub")
-        if user_id is None:
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if not user_id or not jti or not exp:
             raise AuthenticationError("Invalid token payload")
+        try:
+            uuid.UUID(str(user_id))
+            uuid.UUID(str(jti))
+            expires_at = datetime.fromtimestamp(float(exp), tz=timezone.utc)
+        except (TypeError, ValueError, OverflowError):
+            raise AuthenticationError("Invalid token payload")
+
+        # Claim the JTI before changing the password. Redis SET NX is atomic,
+        # preventing two concurrent confirmations from both succeeding.
+        if self.session_service is not None:
+            token_claimed = await self.session_service.consume_password_reset_token(
+                str(jti), expires_at
+            )
+            if not token_claimed:
+                raise AuthenticationError("Reset token has already been used")
 
         # Find user
         result = await self.db.execute(
@@ -574,6 +595,11 @@ class AuthService:
         user.failed_login_attempts = 0
         user.locked_until = None
         await self.db.flush()
+
+        # Password changes invalidate every active refresh session, not just
+        # the session that submitted the reset request.
+        if self.session_service is not None:
+            await self.session_service.revoke_all_sessions(str(user.id))
 
         return {"message": "Password reset successfully"}
 

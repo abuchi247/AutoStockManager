@@ -10,7 +10,7 @@ Tests Requirements:
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +19,7 @@ import pytest_asyncio
 from app.config import Settings
 from app.models.login_history import LoginHistory
 from app.services.session_service import (
+    RESET_TOKEN_USED_PREFIX,
     SESSION_REGISTRY_PREFIX,
     SESSION_TOKEN_PREFIX,
     SessionService,
@@ -159,9 +160,39 @@ class TestSessionRegistry:
         assert result is False
 
 
-# =============================================================================
-# Logout / Session Removal Tests (Requirement 17.4)
-# =============================================================================
+    @pytest.mark.asyncio
+    async def test_consume_password_reset_token_is_atomic_and_uses_expiry_ttl(
+        self, session_service, mock_redis
+    ):
+        """Reset marker uses SET NX and a TTL derived from token expiry."""
+        jti = str(uuid.uuid4())
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=90)
+        mock_redis.set.return_value = True
+
+        consumed = await session_service.consume_password_reset_token(
+            jti, expires_at
+        )
+
+        assert consumed is True
+        marker_key = f"{RESET_TOKEN_USED_PREFIX}{jti}"
+        call = mock_redis.set.call_args
+        assert call.args[0] == marker_key
+        assert call.kwargs["nx"] is True
+        assert 1 <= call.kwargs["ex"] <= 90
+
+    @pytest.mark.asyncio
+    async def test_consume_password_reset_token_rejects_replay(
+        self, session_service, mock_redis
+    ):
+        """Redis reports a second NX claim as an already-used token."""
+        mock_redis.set.return_value = False
+
+        consumed = await session_service.consume_password_reset_token(
+            str(uuid.uuid4()), datetime.now(timezone.utc) + timedelta(minutes=1)
+        )
+
+        assert consumed is False
+
 
 
 class TestSessionRemoval:

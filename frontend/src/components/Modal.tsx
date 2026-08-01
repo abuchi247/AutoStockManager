@@ -19,6 +19,15 @@ const sizeClasses = {
   xl: 'max-w-[calc(100vw-2rem)] sm:max-w-xl',
 };
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
 export function Modal({
   isOpen,
   onClose,
@@ -28,20 +37,55 @@ export function Modal({
   size = 'md',
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Focus management: move focus into the dialog, keep Tab inside it while it is
+  // open, and return focus to the trigger on close.
+  // Requirements: 19.6
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (!isOpen) return;
+
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []);
+
+    (focusables()[0] ?? dialogRef.current)?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const elements = focusables();
+      if (elements.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+      previouslyFocused.current?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -61,8 +105,10 @@ export function Modal({
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={cn(
-          'w-full rounded-lg border border-border bg-background p-4 sm:p-6 shadow-lg animate-fade-in max-h-[90vh] overflow-y-auto',
+          'w-full rounded-lg border border-border bg-background p-4 sm:p-6 shadow-lg animate-fade-in max-h-[90vh] overflow-y-auto focus-visible:outline-none',
           sizeClasses[size]
         )}
       >

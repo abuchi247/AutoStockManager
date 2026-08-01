@@ -126,6 +126,14 @@ class TestAuthSchemas:
                 new_password="short",
             )
 
+    def test_password_reset_response_does_not_expose_token(self):
+        from app.schemas.auth import PasswordResetResponse
+
+        response = PasswordResetResponse(
+            message="If the email exists, a reset link will be sent"
+        )
+        assert not hasattr(response, "reset_token")
+
     def test_token_response_valid(self):
         resp = TokenResponse(
             access_token="access.token",

@@ -13,11 +13,11 @@ These rules MUST be followed to prevent breaking the hosted Railway deployment.
 - Do NOT change EXPOSE or CMD port values without also updating the Railway variable
 
 ## Database Changes
-- The backend auto-creates new tables on startup via `init_db()` using `Base.metadata.create_all`
-- Adding new models/tables is safe — they'll be created automatically on deploy
-- Adding new columns to EXISTING tables requires an Alembic migration (create_all won't add columns to existing tables)
-- NEVER modify the `init_db()` function to remove the `create_all` call
-- The `invoice_number_seq` sequence is also auto-created on startup
+- The backend runs `alembic upgrade head` before Uvicorn accepts traffic.
+- Schema changes MUST be represented by a reviewed Alembic migration; application startup does not call `Base.metadata.create_all` or execute inline DDL.
+- The migration runner uses a PostgreSQL advisory lock to serialize concurrent deployment instances.
+- Adding new columns to existing tables requires an Alembic migration.
+- A migration failure MUST leave the container stopped rather than serving a partial schema.
 
 ## Frontend Environment
 - `NEXT_PUBLIC_API_URL` on the frontend Railway service MUST be `https://autostockmanager-production.up.railway.app/api/v1`

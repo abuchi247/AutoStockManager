@@ -1,0 +1,343 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Lockfile validation
+  # ──────────────────────────────────────────────────────────────────────────
+  lockfile-check:
+    name: Validate lockfiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate backend requirements.txt is committed and well-formed
+        run: |
+          if [ ! -f backend/requirements.txt ]; then
+            echo "ERROR: backend/requirements.txt not found"
+            exit 1
+          fi
+          # Ensure all entries are pinned (== or @ for URL pins)
+          if grep -E '^[a-zA-Z]' backend/requirements.txt | grep -vE '(==|@)' | grep -v '^#'; then
+            echo "ERROR: Found unpinned dependencies in backend/requirements.txt"
+            exit 1
+          fi
+          echo "✓ Backend lockfile is valid and all dependencies pinned"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate frontend lockfile integrity
+        working-directory: frontend
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "ERROR: frontend/package-lock.json not found"
+            exit 1
+          fi
+          # npm ci will fail if lockfile is out of sync with package.json
+          npm ci --ignore-scripts
+          echo "✓ Frontend lockfile is valid and in sync with package.json"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Backend tests and checks
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    needs: [lockfile-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run linting
+        working-directory: backend
+        run: python -m py_compile app/main.py
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest --tb=short -q
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Frontend tests and checks
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    needs: [lockfile-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Bundle size budget check
+        working-directory: frontend
+        run: npm run perf:bundle
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Frontend production-build performance budgets (Core Web Vitals)
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend-performance:
+    name: Frontend performance budgets
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Lighthouse budgets against the production build
+        working-directory: frontend
+        run: npm run perf:lighthouse
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: frontend/.lighthouseci/
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Dependency vulnerability scanning
+  # ──────────────────────────────────────────────────────────────────────────
+  dependency-scan:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    needs: [lockfile-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.7.3 PyYAML==6.0.2
+
+      - name: Collect unexpired backend vulnerability exceptions
+        id: exceptions
+        run: python .github/scripts/security_exceptions.py
+
+      - name: Scan backend dependencies
+        working-directory: backend
+        run: |
+          echo "Scanning backend Python dependencies..."
+          # pip-audit has no severity threshold flag, so every known advisory is
+          # a failure. Accepted risks live in .security-exceptions.yml and are
+          # passed as --ignore-vuln only while the exception is unexpired.
+          pip-audit -r requirements.txt --desc on -f json -o /tmp/backend-audit.json \
+            ${{ steps.exceptions.outputs.ignore_flags }} || true
+          pip-audit -r requirements.txt --strict \
+            ${{ steps.exceptions.outputs.ignore_flags }}
+
+      - name: Upload backend audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-audit
+          path: /tmp/backend-audit.json
+          if-no-files-found: ignore
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Scan frontend dependencies
+        working-directory: frontend
+        run: |
+          echo "Scanning frontend Node.js dependencies..."
+          # npm audit returns non-zero for any vulnerability; we threshold at high
+          npm audit --audit-level=high || {
+            echo ""
+            echo "──────────────────────────────────────────────────────────"
+            echo "HIGH or CRITICAL vulnerabilities found in frontend deps."
+            echo "Review .security-exceptions.yml for accepted risks."
+            echo "──────────────────────────────────────────────────────────"
+            exit 1
+          }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Container image build, scan, and tag
+  # ──────────────────────────────────────────────────────────────────────────
+  container-build:
+    name: Build and scan containers
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, dependency-scan]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute build metadata
+        id: meta
+        run: |
+          echo "commit_sha=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+          echo "migration_head=$(grep -r 'revision =' backend/alembic/versions/ 2>/dev/null | sort | tail -1 | sed "s/.*'\(.*\)'/\1/" || echo 'unknown')" >> "$GITHUB_OUTPUT"
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            MIGRATION_HEAD=${{ steps.meta.outputs.migration_head }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Trivy scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: Scan frontend container
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: Verify container metadata
+        run: |
+          echo "=== Backend image labels ==="
+          docker inspect --format='{{json .Config.Labels}}' \
+            "${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}" | python3 -m json.tool
+
+          echo ""
+          echo "=== Frontend image labels ==="
+          docker inspect --format='{{json .Config.Labels}}' \
+            "${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}" | python3 -m json.tool
+
+          echo ""
+          echo "=== Backend runs as non-root ==="
+          docker inspect --format='{{.Config.User}}' \
+            "${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}"
+
+          echo ""
+          echo "=== Frontend runs as non-root ==="
+          docker inspect --format='{{.Config.User}}' \
+            "${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}"
+
+      - name: Log in to container registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images (main branch only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker push "${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}"
+          docker push "${{ env.BACKEND_IMAGE }}:latest"
+          docker push "${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}"
+          docker push "${{ env.FRONTEND_IMAGE }}:latest"
+
+      - name: Create build summary
+        run: |
+          echo "## Build Artifacts" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Property | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Short SHA | \`${{ steps.meta.outputs.commit_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build Date | ${{ steps.meta.outputs.build_date }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Migration Head | \`${{ steps.meta.outputs.migration_head }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Backend Image | \`${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Frontend Image | \`${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"

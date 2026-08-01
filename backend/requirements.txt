@@ -20,6 +20,9 @@ bcrypt==4.2.1
 # Redis
 redis==5.2.1
 
+# Background jobs (Redis-backed, asyncio-native)
+arq==0.26.3
+
 # Rate Limiting
 slowapi==0.1.9
 
@@ -33,11 +36,16 @@ qrcode[pil]==8.0
 # HTTP Client (for testing & integrations)
 httpx==0.28.1
 
+# Error tracking (optional at runtime; disabled unless configured)
+sentry-sdk==2.19.2
+
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.25.0
 hypothesis==6.122.3
 aiosqlite==0.20.0
+# Used by the deployment-configuration contract tests
+PyYAML==6.0.2
 
 # Utilities
 python-dateutil==2.9.0.post0

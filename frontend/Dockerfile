@@ -1,17 +1,63 @@
-FROM node:20-alpine
+###############################################################################
+# Production Dockerfile for AutoStockManager frontend
+# - Multi-stage build: deps → build → runtime
+# - Runs as non-root user
+# - No development mounts or default credentials
+# - Only exposes required port
+###############################################################################
 
-# Set work directory
+# ---------- Stage 1: Dependencies ----------
+FROM node:20-alpine AS deps
+
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+# Copy lockfile and manifest for reproducible install
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 
-# Copy application code
+# ---------- Stage 2: Build ----------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Expose port
+# Build metadata available at build time
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+ENV NEXT_PUBLIC_BUILD_COMMIT=${GIT_COMMIT}
+ENV NEXT_PUBLIC_BUILD_DATE=${BUILD_DATE}
+
+RUN npm run build
+
+# ---------- Stage 3: Runtime ----------
+FROM node:20-alpine AS runtime
+
+ENV NODE_ENV=production
+
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy only production artifacts
+COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
+COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
+COPY --from=builder --chown=appuser:appgroup /app/public ./public
+
+# Switch to non-root user
+USER appuser
+
+# Expose only the application port
 EXPOSE 3000
 
-# Run the development server
-CMD ["npm", "run", "dev"]
+# Build metadata labels
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/autostockmanager/frontend"
+
+# Start the optimized production server
+CMD ["node", "server.js"]

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -9,14 +9,14 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   helperText?: string;
 }
 
-export function Input({
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({
   label,
   error,
   helperText,
   id,
   className = '',
   ...props
-}: InputProps) {
+}, ref) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
   return (
@@ -32,6 +32,7 @@ export function Input({
       )}
       <input
         id={inputId}
+        ref={ref}
         className={cn(
           'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm transition-all duration-200',
           'placeholder:text-muted-foreground',
@@ -59,6 +60,6 @@ export function Input({
       )}
     </div>
   );
-}
+});
 
 export default Input;

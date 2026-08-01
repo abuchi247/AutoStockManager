@@ -464,44 +464,78 @@ class TestAuthServicePasswordReset:
 
     @pytest.mark.asyncio
     async def test_request_password_reset_success(self):
-        """Valid email should generate a reset token."""
+        """Existing email gets a generic response and delivery job."""
         settings = _test_settings()
         user = _make_user()
         db = _mock_db_with_user(user)
+        queue = MagicMock()
+        queue.enqueue = AsyncMock(return_value="job-1")
 
-        service = AuthService(db, settings)
+        service = AuthService(db, settings, password_reset_queue=queue)
         result = await service.request_password_reset("test@example.com")
 
-        assert "reset_token" in result
+        assert result == {"message": "If the email exists, a reset link will be sent"}
+        assert "reset_token" not in result
+        queue.enqueue.assert_awaited_once()
+        job_name, payload = queue.enqueue.await_args.args
+        assert job_name == "password_reset_email"
+        assert payload["recipient"] == "test@example.com"
+        assert "token=" in payload["reset_url"]
+        assert payload["reset_url"].startswith("http://localhost:3000/")
 
     @pytest.mark.asyncio
-    async def test_request_password_reset_unknown_email(self):
-        """Unknown email should raise AuthenticationError."""
+    async def test_request_password_reset_unknown_email_is_generic(self):
+        """Unknown email has the same response and no delivery job."""
         settings = _test_settings()
         db = AsyncMock()
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = None
         db.execute = AsyncMock(return_value=result_mock)
+        queue = MagicMock()
+        queue.enqueue = AsyncMock()
 
-        service = AuthService(db, settings)
-        with pytest.raises(AuthenticationError):
-            await service.request_password_reset("unknown@example.com")
+        service = AuthService(db, settings, password_reset_queue=queue)
+        result = await service.request_password_reset("unknown@example.com")
+
+        assert result == {"message": "If the email exists, a reset link will be sent"}
+        queue.enqueue.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_reset_password_success(self):
-        """Valid reset token and password should update the password."""
+        """Valid reset token changes the password and revokes sessions."""
         settings = _test_settings()
         user = _make_user()
         db = _mock_db_with_user(user)
+        session_service = MagicMock()
+        session_service.consume_password_reset_token = AsyncMock(return_value=True)
+        session_service.revoke_all_sessions = AsyncMock(return_value=2)
 
         reset_token = create_password_reset_token(str(user.id), settings)
 
-        service = AuthService(db, settings)
+        service = AuthService(db, settings, session_service=session_service)
         result = await service.reset_password(reset_token, "NewPass123")
 
         assert "message" in result
-        # Password should have changed
         assert verify_password("NewPass123", user.password_hash, settings)
+        session_service.consume_password_reset_token.assert_awaited_once()
+        session_service.revoke_all_sessions.assert_awaited_once_with(str(user.id))
+
+    @pytest.mark.asyncio
+    async def test_reset_password_replay_is_rejected(self):
+        """A reset JTI already claimed by another request cannot be reused."""
+        settings = _test_settings()
+        user = _make_user()
+        db = _mock_db_with_user(user)
+        session_service = MagicMock()
+        session_service.consume_password_reset_token = AsyncMock(return_value=False)
+        session_service.revoke_all_sessions = AsyncMock()
+        reset_token = create_password_reset_token(str(user.id), settings)
+
+        service = AuthService(db, settings, session_service=session_service)
+        with pytest.raises(AuthenticationError, match="already been used"):
+            await service.reset_password(reset_token, "NewPass123")
+
+        session_service.revoke_all_sessions.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_reset_password_weak_password(self):

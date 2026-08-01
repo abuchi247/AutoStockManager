@@ -30,6 +30,7 @@ async def _get_db():
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(security_scheme)
     ],
@@ -101,6 +102,9 @@ async def get_current_user(
             detail="User account is inactive",
         )
 
+    # Keep only a non-sensitive identifier in request state for observability.
+    # The full ORM object is never sent to logs or the error tracker.
+    request.state.authenticated_user_id = str(user.id)
     return user
 
 

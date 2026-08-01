@@ -1,3 +1,13 @@
+###############################################################################
+# Development compose file
+#
+# This file mounts host source into the containers and publishes PostgreSQL and
+# Redis on the host. It is for development and CI only.
+#
+# Production uses the standalone stack instead (never merged with this file,
+# because Compose merges `volumes`/`ports` rather than replacing them):
+#   docker compose -f docker-compose.production.yml up -d
+###############################################################################
 version: "3.8"
 
 services:
@@ -16,6 +26,46 @@ services:
       - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
       - CORS_ORIGINS=["http://localhost:3000"]
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      - JOB_QUEUE_NAME=${JOB_QUEUE_NAME:-arq:queue}
+      - JOB_MAX_TRIES=${JOB_MAX_TRIES:-5}
+      - JOB_BASE_BACKOFF_SECONDS=${JOB_BASE_BACKOFF_SECONDS:-1}
+      - JOB_MAX_BACKOFF_SECONDS=${JOB_MAX_BACKOFF_SECONDS:-300}
+      - JOB_TIMEOUT_SECONDS=${JOB_TIMEOUT_SECONDS:-300}
+      - JOB_MAX_CONCURRENCY=${JOB_MAX_CONCURRENCY:-10}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autostockmanager-worker
+    command: ["arq", "app.services.background_jobs.WorkerSettings"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=${SECRET_KEY:-dev-secret-key-not-for-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - JOB_QUEUE_NAME=${JOB_QUEUE_NAME:-arq:queue}
+      - JOB_MAX_TRIES=${JOB_MAX_TRIES:-5}
+      - JOB_BASE_BACKOFF_SECONDS=${JOB_BASE_BACKOFF_SECONDS:-1}
+      - JOB_MAX_BACKOFF_SECONDS=${JOB_MAX_BACKOFF_SECONDS:-300}
+      - JOB_TIMEOUT_SECONDS=${JOB_TIMEOUT_SECONDS:-300}
+      - JOB_MAX_CONCURRENCY=${JOB_MAX_CONCURRENCY:-10}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
     volumes:
       - ./backend:/app
     depends_on:

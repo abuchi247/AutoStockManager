@@ -9,6 +9,8 @@ Returns HTTP 429 Too Many Requests when limits are exceeded.
 Satisfies Requirement 17.2: Rate limiting 100/min authenticated, 20/min unauthenticated.
 """
 
+from collections.abc import Callable
+
 from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -83,25 +85,37 @@ def _dynamic_rate_limit(request: Request) -> str:
     return f"{settings.rate_limit_unauthenticated}/minute"
 
 
+# The router decorators and the application must use the same limiter.
+_shared_limiter: Limiter | None = None
+
+
 def create_rate_limiter() -> Limiter:
-    """Create and configure the slowapi Limiter instance.
+    """Return the shared slowapi limiter used by routes and the app factory."""
+    global _shared_limiter
+    if _shared_limiter is None:
+        settings = get_settings()
+        _shared_limiter = Limiter(
+            key_func=get_rate_limit_key,
+            default_limits=[f"{settings.rate_limit_unauthenticated}/minute"],
+            storage_uri=settings.redis_url,
+        )
+    return _shared_limiter
 
-    Uses Redis as the storage backend for distributed rate limiting.
-    The key function distinguishes authenticated vs unauthenticated
-    requests for differentiated rate limits.
 
-    Returns:
-        Configured slowapi Limiter instance.
-    """
-    settings = get_settings()
+def get_rate_limiter() -> Limiter:
+    """Return the process-wide limiter used by routes and the app factory."""
+    return create_rate_limiter()
 
-    limiter = Limiter(
-        key_func=get_rate_limit_key,
-        default_limits=[f"{settings.rate_limit_unauthenticated}/minute"],
-        storage_uri=settings.redis_url,
-    )
 
-    return limiter
+def auth_rate_limit(setting_name: str) -> Callable:
+    """Decorate an authentication endpoint with a configured strict limit."""
+
+    def configured_limit(request: Request) -> str:
+        settings = get_settings()
+        limit = getattr(settings, setting_name)
+        return f"{limit}/minute"
+
+    return get_rate_limiter().limit(configured_limit)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

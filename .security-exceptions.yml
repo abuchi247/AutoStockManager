@@ -1,0 +1,20 @@
+# Security Vulnerability Exceptions
+# ----------------------------------
+# This file documents accepted vulnerability findings with justifications and
+# expiration dates. CI scans will reference this to suppress known accepted risks.
+#
+# Format:
+#   - id: <CVE or advisory ID>
+#     package: <affected package>
+#     severity: <critical|high|medium|low>
+#     reason: <brief justification>
+#     expires: <YYYY-MM-DD>  # Must be reviewed before this date
+#     reviewer: <github username or name>
+#
+# Rules:
+#   - Critical/High exceptions expire in 30 days maximum
+#   - Medium exceptions expire in 90 days maximum
+#   - Exceptions MUST be reviewed before expiry or the CI scan will fail
+#   - Expired exceptions are treated as failures
+
+exceptions: []

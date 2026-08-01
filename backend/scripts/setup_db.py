@@ -2,10 +2,9 @@
 """Database setup script for fresh deployments.
 
 This script is idempotent — safe to run multiple times. It will:
-1. Create all database tables (if they don't exist)
-2. Create the invoice_number_seq sequence (if it doesn't exist)
-3. Create an admin user (if one doesn't exist)
-4. Seed default categories (if none exist)
+1. Apply all reviewed Alembic migrations
+2. Create an admin user (if one doesn't exist)
+3. Seed default categories (if none exist)
 
 Usage:
     # Inside the container or with railway run:
@@ -29,7 +28,8 @@ from sqlalchemy import text
 sys.path.insert(0, "/app")
 sys.path.insert(0, ".")
 
-from app.database import Base, async_session_factory, engine  # noqa: E402
+from app.database import async_session_factory, engine  # noqa: E402
+from app.migration_runner import run_migrations  # noqa: E402
 
 
 DEFAULT_CATEGORIES = {
@@ -52,22 +52,13 @@ async def setup():
     print("Auto Spare Parts ERP — Database Setup")
     print("=" * 60)
 
-    # Step 1: Create tables
-    print("\n[1/4] Creating database tables...")
-    from app.models import *  # noqa: F401, F403
+    # Step 1: Apply reviewed schema migrations
+    print("\n[1/3] Applying Alembic migrations...")
+    await run_migrations()
+    print("  ✓ Database is at Alembic head")
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("  ✓ All tables created/verified")
-
-    # Step 2: Create invoice sequence
-    print("\n[2/4] Creating invoice_number_seq sequence...")
-    async with engine.begin() as conn:
-        await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1"))
-    print("  ✓ Sequence created/verified")
-
-    # Step 3: Create admin user
-    print("\n[3/4] Creating admin user...")
+    # Step 2: Create admin user
+    print("\n[2/3] Creating admin user...")
     async with async_session_factory() as session:
         result = await session.execute(
             text("SELECT id FROM users WHERE username = :u"), {"u": "admin"}
@@ -94,8 +85,8 @@ async def setup():
             await session.commit()
             print("  ✓ Admin user created (admin / Admin123!)")
 
-    # Step 4: Seed categories
-    print("\n[4/4] Seeding default categories...")
+    # Step 3: Seed categories
+    print("\n[3/3] Seeding categories...")
     async with async_session_factory() as session:
         result = await session.execute(text("SELECT COUNT(*) FROM categories"))
         count = result.scalar() or 0

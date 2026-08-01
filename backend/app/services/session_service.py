@@ -25,6 +25,7 @@ from app.models.login_history import LoginHistory
 # Redis key patterns for session registry
 SESSION_REGISTRY_PREFIX = "session:user:"
 SESSION_TOKEN_PREFIX = "session:token:"
+RESET_TOKEN_USED_PREFIX = "auth:password-reset:used:"
 
 
 class SessionService:
@@ -161,6 +162,31 @@ class SessionService:
         await self.redis.delete(user_key)
 
         return revoked_count
+
+    async def consume_password_reset_token(
+        self,
+        jti: str,
+        expires_at: datetime,
+    ) -> bool:
+        """Atomically mark a password-reset JTI as used until it expires.
+
+        Redis SET with NX makes concurrent confirmation requests race safely:
+        exactly one request can claim a JTI. The marker TTL is derived from
+        the token expiry so expired markers do not accumulate.
+        """
+        now = datetime.now(timezone.utc)
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        ttl_seconds = max(1, int((expires_at - now).total_seconds()))
+        marker_key = f"{RESET_TOKEN_USED_PREFIX}{jti}"
+        return bool(
+            await self.redis.set(
+                marker_key,
+                "1",
+                ex=ttl_seconds,
+                nx=True,
+            )
+        )
 
     async def get_active_sessions(self, user_id: str) -> list[dict[str, Any]]:
         """Get all active sessions for a user.

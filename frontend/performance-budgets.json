@@ -1,0 +1,30 @@
+{
+  "description": "Frontend performance budgets for critical routes. Enforced against production builds by scripts/check-bundle-budget.mjs (JavaScript weight) and lighthouserc.json (Core Web Vitals). Mirrors OPERATIONS_RUNBOOK.md section 10 and must be recalibrated from production evidence.",
+  "measurement": {
+    "build": "next build (production)",
+    "networkProfile": "Lighthouse default mobile throttling",
+    "viewports": ["1440x900 desktop", "393x851 mobile"]
+  },
+  "javascript": {
+    "unit": "KB gzipped",
+    "defaultRouteBudget": 300,
+    "routeBudgets": {
+      "/login": 260,
+      "/dashboard": 300,
+      "/inventory": 320,
+      "/sales": 300,
+      "/reports": 320
+    }
+  },
+  "webVitals": {
+    "largestContentfulPaintMs": 2500,
+    "interactionToNextPaintMs": 200,
+    "cumulativeLayoutShift": 0.1,
+    "totalBlockingTimeMs": 300,
+    "routeLoadMs": 1500
+  },
+  "accessibility": {
+    "axeSeverityFailOn": ["critical", "serious"],
+    "lighthouseMinScore": 0.9
+  }
+}

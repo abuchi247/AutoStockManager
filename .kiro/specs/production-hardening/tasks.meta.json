@@ -1,0 +1,529 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Add production configuration validation": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513515
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449523394
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449655748
+      }
+    ],
+    "2.1 Add request ID middleware and response propagation": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513739
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449663478
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785450231340
+      }
+    ],
+    "2.2 Add global exception handling and error-tracker adapter": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513789
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785450237883
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785451077394
+      }
+    ],
+    "3. Tighten CORS and request limits": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513831
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785451097586
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785451683961
+      }
+    ],
+    "4.1 Make password reset generic and one-time": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513886
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785451774143
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785457248185
+      }
+    ],
+    "5.1 Migrate frontend token storage to memory-only access tokens": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513929
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785457275811
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785460691169
+      }
+    ],
+    "6. Upgrade health checks to verify dependencies": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449513989
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785460712427
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785461412575
+      }
+    ],
+    "7. Establish Alembic-only schema management": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514056
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785461439959
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785461913454
+      }
+    ],
+    "8. Add Redis-backed background task processing": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514098
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785461938193
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462597282
+      }
+    ],
+    "9. Add protected production API documentation access": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514150
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462624711
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462752628
+      }
+    ],
+    "10.1 Add production operations documentation": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514188
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462767006
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462927031
+      }
+    ],
+    "11. Add Next.js route error boundaries and not-found pages": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514229
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462953417
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785463394950
+      }
+    ],
+    "12.1 Migrate feature pages to query hooks incrementally": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514265
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785463403761
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785464025600
+      }
+    ],
+    "13. Add React Hook Form and Zod validation layer": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514319
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785464051317
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785464707158
+      }
+    ],
+    "14.1 Add Playwright end-to-end coverage": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514363
+      },
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785464713063
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670331
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490693147
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785491041549
+      }
+    ],
+    "15. Document and enforce frontend dependency currency": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514411
+      },
+      {
+        "executionId": "ae656364-6244-4a94-a374-5f5a771984a4",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490353838
+      },
+      {
+        "executionId": "ae656364-6244-4a94-a374-5f5a771984a4",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490536746
+      }
+    ],
+    "17.1 Add caching and idempotency controls where side effects require them": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514471
+      },
+      {
+        "executionId": "ae656364-6244-4a94-a374-5f5a771984a4",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490549537
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670383
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785491056076
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785492407950
+      }
+    ],
+    "17.2 Add metrics, tracing, SLOs, and performance regression checks": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514515
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670446
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785492417567
+      }
+    ],
+    "17.3 Implement backup, restore, retention, and least-privilege controls": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514556
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670506
+      },
+      {
+        "executionId": "bc49093f-17be-4745-ab37-a1089f5c516f",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785498422024
+      },
+      {
+        "executionId": "bc49093f-17be-4745-ab37-a1089f5c516f",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785499170091
+      }
+    ],
+    "17.4 Harden release artifacts and production containers": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514606
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670560
+      },
+      {
+        "executionId": "bc49093f-17be-4745-ab37-a1089f5c516f",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785499180376
+      },
+      {
+        "executionId": "bc49093f-17be-4745-ab37-a1089f5c516f",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785500342688
+      }
+    ],
+    "17.5 Implement frontend performance and accessibility budgets": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514656
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670604
+      },
+      {
+        "executionId": "bc49093f-17be-4745-ab37-a1089f5c516f",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785500347928
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785560032718
+      }
+    ],
+    "18.1 Perform production-like security and resilience smoke tests": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514701
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670662
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785560043365
+      },
+      {
+        "executionId": "42329855-caae-4157-be18-bbb3bfa5aeed",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785614571303
+      }
+    ],
+    "18.2 Review rollout and rollback readiness": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449514738
+      },
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785490670713
+      },
+      {
+        "executionId": "42329855-caae-4157-be18-bbb3bfa5aeed",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785614576827
+      },
+      {
+        "executionId": "42329855-caae-4157-be18-bbb3bfa5aeed",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785615741754
+      }
+    ],
+    "1. Extend backend settings for production hardening": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785449655797
+      }
+    ],
+    "2. Implement structured backend logging": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785451077452
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785561228881
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785613042808
+      },
+      {
+        "executionId": "42329855-caae-4157-be18-bbb3bfa5aeed",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785615760497
+      }
+    ],
+    "4. Add password-reset notification abstraction": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785457248251
+      }
+    ],
+    "5. Implement cookie-based browser refresh authentication": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785460691217
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785561235374
+      },
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785612511071
+      }
+    ],
+    "10. Add CI pipeline and quality gates": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785462927067
+      }
+    ],
+    "12. Install and configure TanStack Query": [
+      {
+        "executionId": "23a21a10-cf80-429d-82c4-119d07c60594",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785464025642
+      }
+    ],
+    "14. Configure frontend unit and component testing": [
+      {
+        "executionId": "688446f4-9eec-47b5-a1e6-e824fcc3425a",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785491041602
+      }
+    ],
+    "17. Add bounded API query and resource-performance controls": [
+      {
+        "executionId": "f985811e-0fa6-4eef-9f5f-62d0b17c37c8",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785560032756
+      }
+    ],
+    "18. Run the complete backend and frontend validation suite": [
+      {
+        "executionId": "42329855-caae-4157-be18-bbb3bfa5aeed",
+        "chatSessionId": "sess_eef72980-94f1-4a59-861c-2446a78a2fa6",
+        "timestamp": 1785615741850
+      }
+    ]
+  }
+}

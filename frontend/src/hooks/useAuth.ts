@@ -1,27 +1,25 @@
 'use client';
 
-/**
- * Authentication State Management Hook
- *
- * Provides reactive auth state (user, loading, error) and methods
- * for login, logout, and token refresh. Integrates with the auth
- * storage layer and API client.
- */
+/** Reactive authentication state backed by an in-memory access token. */
 
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import {
   getAccessToken,
+  setAccessToken,
   getStoredUser,
-  setTokens,
   setStoredUser,
   clearAuth,
-  isTokenExpired,
-  getRefreshToken,
   decodeToken,
   StoredUser,
 } from '@/lib/auth';
-import type { LoginRequest, LoginResponse, UserRole } from '@/lib/types';
+import type {
+  LoginRequest,
+  LoginResponse,
+  RefreshResponse,
+  UserProfile,
+  UserRole,
+} from '@/lib/types';
 
 export interface AuthState {
   user: StoredUser | null;
@@ -40,63 +38,90 @@ export interface AuthActions {
 
 export type UseAuthReturn = AuthState & AuthActions;
 
+function userFromToken(token: string, existingUser: StoredUser | null = null): StoredUser {
+  const decoded = decodeToken(token);
+  const id = typeof decoded?.sub === 'string' ? decoded.sub : existingUser?.id || '';
+  const role = typeof decoded?.role === 'string'
+    ? decoded.role
+    : existingUser?.role || 'admin';
+
+  return {
+    id,
+    username: existingUser?.username || id,
+    email: existingUser?.email || '',
+    role: role.toLowerCase(),
+  };
+}
+
+function userFromProfile(profile: UserProfile): StoredUser {
+  return {
+    id: profile.id,
+    username: profile.username,
+    email: profile.email,
+    role: profile.role.toLowerCase(),
+  };
+}
+
 export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state from localStorage on mount
-  useEffect(() => {
-    const token = getAccessToken();
-    const storedUser = getStoredUser();
+  /** Restore a browser session using only the HttpOnly refresh cookie. */
+  const refreshSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await api.post<RefreshResponse>('/auth/refresh', undefined, {
+        withCredentials: true,
+      });
+      const { access_token } = response.data;
+      if (!access_token) return false;
 
-    if (token && storedUser) {
-      // Check if access token is expired
-      if (isTokenExpired(token)) {
-        // Attempt a silent refresh
-        refreshSession().then((success) => {
-          if (!success) {
-            clearAuth();
-            setUser(null);
-          }
-          setIsLoading(false);
-        });
-      } else {
-        setUser(storedUser);
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
+      setAccessToken(access_token);
+      const restoredUser = userFromToken(access_token, getStoredUser());
+      setStoredUser(restoredUser);
+      setUser(restoredUser);
+      return true;
+    } catch {
+      clearAuth();
+      setUser(null);
+      return false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Log in with username and password.
-   * Stores tokens and user data on success.
-   */
+  // A page reload has no access token in memory, so always attempt one
+  // cookie-authenticated refresh rather than reading a token from storage.
+  useEffect(() => {
+    let mounted = true;
+    refreshSession().finally(() => {
+      if (mounted) setIsLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [refreshSession]);
+
   const login = useCallback(async (credentials: LoginRequest): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await api.post<LoginResponse>('/auth/login', credentials);
-      const { access_token, refresh_token } = response.data;
+      const { access_token, user: responseUser } = response.data;
+      if (!access_token) throw new Error('Login response did not contain an access token');
 
-      setTokens(access_token, refresh_token);
-
-      // Decode the JWT to get user info
-      const decoded = decodeToken(access_token) as { sub?: string; role?: string } | null;
-      
-      const storedUser: StoredUser = {
-        id: decoded?.sub || '',
-        username: credentials.username,
-        email: '',
-        role: (decoded?.role || 'admin').toLowerCase(),
-      };
-
-      setStoredUser(storedUser);
-      setUser(storedUser);
+      // The refresh token, if returned by an older backend, is deliberately
+      // ignored. The server owns it in an HttpOnly cookie.
+      setAccessToken(access_token);
+      const authenticatedUser = responseUser
+        ? userFromProfile(responseUser)
+        : userFromToken(access_token, {
+            id: '',
+            username: credentials.username,
+            email: '',
+            role: 'admin',
+          });
+      setStoredUser(authenticatedUser);
+      setUser(authenticatedUser);
     } catch (err: unknown) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -106,77 +131,33 @@ export function useAuth(): UseAuthReturn {
     }
   }, []);
 
-  /**
-   * Log out the current user.
-   * Calls the backend logout endpoint and clears local state.
-   */
   const logout = useCallback(async (): Promise<void> => {
     try {
-      const refreshToken = getRefreshToken();
-      if (refreshToken) {
-        await api.post('/auth/logout', { refresh_token: refreshToken });
-      }
+      // The browser supplies the refresh cookie; no token is sent in JSON.
+      await api.post('/auth/logout', undefined, { withCredentials: true });
     } catch {
-      // Proceed with local logout even if backend call fails
+      // Local logout must complete even if the server/session store is down.
     } finally {
       clearAuth();
       setUser(null);
       setError(null);
-      // Redirect to login page
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
     }
   }, []);
 
-  /**
-   * Attempt to refresh the session using the stored refresh token.
-   * Returns true if successful, false otherwise.
-   */
-  const refreshSession = useCallback(async (): Promise<boolean> => {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
-
-    try {
-      const response = await api.post<{
-        access_token: string; refresh_token: string;
-      }>('/auth/refresh', { refresh_token: refreshToken });
-
-      const { access_token, refresh_token: newRefreshToken } = response.data;
-      setTokens(access_token, newRefreshToken);
-
-      // Refresh stored user if we have one
-      const storedUser = getStoredUser();
-      if (storedUser) {
-        setUser(storedUser);
-      }
-
-      return true;
-    } catch {
-      clearAuth();
-      setUser(null);
-      return false;
-    }
-  }, []);
-
-  /**
-   * Clear the current error state.
-   */
   const clearError = useCallback((): void => {
     setError(null);
   }, []);
 
-  /**
-   * Check if the current user has one of the specified roles.
-   * Uses case-insensitive comparison since JWT may return title-case roles.
-   */
   const hasRole = useCallback(
     (roles: UserRole | UserRole[]): boolean => {
       if (!user) return false;
       const roleArray = Array.isArray(roles) ? roles : [roles];
-      return roleArray.some(r => r.toLowerCase() === (user.role || '').toLowerCase());
+      return roleArray.some((role) => role.toLowerCase() === (user.role || '').toLowerCase());
     },
-    [user]
+    [user],
   );
 
   return {
@@ -192,21 +173,14 @@ export function useAuth(): UseAuthReturn {
   };
 }
 
-/**
- * Extract a user-friendly error message from an API error.
- */
 function extractErrorMessage(err: unknown): string {
   if (err && typeof err === 'object' && 'response' in err) {
-    const response = (err as { response?: { data?: { error?: { message?: string } }; status?: number } }).response;
-    if (response?.data?.error?.message) {
-      return response.data.error.message;
-    }
-    if (response?.status === 401) {
-      return 'Invalid username or password';
-    }
-    if (response?.status === 423) {
-      return 'Account is locked. Please try again later.';
-    }
+    const response = (err as {
+      response?: { data?: { error?: { message?: string } }; status?: number };
+    }).response;
+    if (response?.data?.error?.message) return response.data.error.message;
+    if (response?.status === 401) return 'Invalid username or password';
+    if (response?.status === 423) return 'Account is locked. Please try again later.';
   }
   return 'An unexpected error occurred. Please try again.';
 }

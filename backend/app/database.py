@@ -3,7 +3,6 @@
 import logging
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
+from app.migration_runner import run_migrations
 
 logger = logging.getLogger(__name__)
 
@@ -57,41 +57,21 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database: create tables, run schema patches, create sequences.
+    """Prepare model metadata and optionally run controlled migrations.
 
-    Safe to run on every startup. Handles both new installations and upgrades.
+    Schema creation and ad hoc DDL are intentionally not performed here.
+    Deployments should run ``alembic upgrade head`` before serving traffic; an
+    environment that enables ``run_migrations_on_startup`` fails closed when
+    that operation raises.
     """
     _import_models()
-
-    try:
-        async with engine.begin() as conn:
-            # Create all tables that don't exist yet
-            await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables synced (create_all)")
-
-            # Create invoice number sequence if it doesn't exist
-            await conn.execute(
-                text("CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1")
-            )
-            logger.info("invoice_number_seq sequence ensured")
-
-            # Schema patches: add columns that create_all can't add to existing tables
-            # These use IF NOT EXISTS patterns to be idempotent
-            await conn.execute(text("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_name = 'sales' AND column_name = 'amount_paid'
-                    ) THEN
-                        ALTER TABLE sales ADD COLUMN amount_paid NUMERIC(14,2) DEFAULT 0.00;
-                    END IF;
-                END $$;
-            """))
-            logger.info("Schema patches applied")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        # Don't crash the app — let it start and retry connections later
+    if settings.run_migrations_on_startup:
+        await run_migrations(settings)
+    else:
+        logger.info(
+            "database_migrations_skipped",
+            extra={"reason": "deployment_step_required"},
+        )
 
 
 def _import_models() -> None:

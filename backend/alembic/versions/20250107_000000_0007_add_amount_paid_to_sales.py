@@ -17,16 +17,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "sales",
-        sa.Column(
-            "amount_paid",
-            sa.Numeric(precision=14, scale=2),
-            nullable=True,
-            server_default="0.00",
-            comment="Amount paid at checkout (for credit sales, this may be partial)",
-        ),
-    )
+    # Older deployments may already have this column from the startup patch
+    # while their alembic_version is still 0006. Treat that state as the
+    # baseline and avoid failing the deployment with a duplicate-column error.
+    bind = op.get_bind()
+    existing_columns = {
+        column["name"] for column in sa.inspect(bind).get_columns("sales")
+    }
+    if "amount_paid" not in existing_columns:
+        op.add_column(
+            "sales",
+            sa.Column(
+                "amount_paid",
+                sa.Numeric(precision=14, scale=2),
+                nullable=True,
+                server_default="0.00",
+                comment="Amount paid at checkout (for credit sales, this may be partial)",
+            ),
+        )
 
 
 def downgrade() -> None:

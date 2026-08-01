@@ -6,7 +6,7 @@ and password reset operations.
 Satisfies Requirements: 2.1, 2.2, 2.3, 2.4
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # =============================================================================
@@ -33,7 +33,11 @@ class LoginRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """Request body for POST /api/v1/auth/refresh."""
+    """Optional request body for POST /api/v1/auth/refresh.
+
+    Browsers send the refresh credential in the HTTP-only cookie and omit the
+    body entirely. This schema exists for non-browser API clients.
+    """
 
     refresh_token: str = Field(
         ...,
@@ -43,7 +47,11 @@ class RefreshTokenRequest(BaseModel):
 
 
 class LogoutRequest(BaseModel):
-    """Request body for POST /api/v1/auth/logout."""
+    """Optional request body for POST /api/v1/auth/logout.
+
+    Browsers rely on the HTTP-only refresh cookie; this schema exists for
+    non-browser API clients.
+    """
 
     refresh_token: str = Field(
         ...,
@@ -84,10 +92,16 @@ class PasswordResetConfirm(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """Response body for successful login or token refresh."""
+    """Response body for successful login or token refresh.
+
+    The refresh credential is intentionally absent: it is delivered only as an
+    HTTP-only cookie so client-side JavaScript can never read it
+    (Requirement 3.5).
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="JWT refresh token")
     token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
 
 
@@ -98,9 +112,12 @@ class MessageResponse(BaseModel):
 
 
 class PasswordResetResponse(BaseModel):
-    """Response for password reset request (includes token for dev/testing)."""
+    """Generic response for password reset requests.
 
-    reset_token: str = Field(..., description="Password reset token")
+    The reset token is delivered through the configured notification queue and
+    is intentionally never included in an API response.
+    """
+
     message: str = Field(..., description="Informational message")
 
 

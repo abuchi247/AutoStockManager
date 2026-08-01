@@ -1,0 +1,123 @@
+import { z } from 'zod';
+
+const uuid = z.string().uuid('Enter a valid identifier');
+const requiredText = (max: number, label: string) =>
+  z.string({ required_error: `${label} is required` }).trim().min(1, `${label} is required`).max(max, `${label} must be ${max} characters or fewer`);
+const optionalText = (max: number) =>
+  z.preprocess((value) => value === '' ? undefined : value, z.string().max(max).optional());
+const nonNegativeNumber = z.number().finite().min(0, 'Must be zero or greater');
+const positiveNumber = z.number().finite().gt(0, 'Must be greater than zero');
+const optionalNonNegativeNumber = z.preprocess(
+  (value) => value === '' || value === undefined ? undefined : value,
+  z.number().finite().min(0, 'Must be zero or greater').optional(),
+);
+
+export const userCreateSchema = z.object({
+  username: requiredText(150, 'Username').min(3, 'Username must be at least 3 characters'),
+  email: z.string().trim().email('Enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.enum(['admin', 'manager', 'salesperson', 'storekeeper']),
+  is_active: z.boolean().optional(),
+});
+
+export const userUpdateSchema = z.object({
+  username: requiredText(150, 'Username').min(3).optional(),
+  email: z.string().trim().email('Enter a valid email address').optional(),
+  role: z.enum(['admin', 'manager', 'salesperson', 'storekeeper']).optional(),
+  is_active: z.boolean().optional(),
+});
+
+export const sparePartCreateSchema = z.object({
+  part_number: requiredText(100, 'Part number'),
+  barcode: optionalText(255),
+  name: requiredText(500, 'Name'),
+  description: optionalText(2000),
+  brand: optionalText(255),
+  category_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  subcategory_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  vehicle_compatibility: z.array(z.string()).optional(),
+  unit_of_measure: z.string().max(50).default('PCS'),
+  cost_price: nonNegativeNumber,
+  selling_price: nonNegativeNumber,
+  min_stock_level: nonNegativeNumber.default(0),
+  max_stock_level: nonNegativeNumber.default(0),
+  reorder_quantity: nonNegativeNumber.default(0),
+});
+
+export const sparePartUpdateSchema = sparePartCreateSchema.partial();
+
+export const saleItemCreateSchema = z.object({
+  spare_part_id: uuid,
+  quantity: positiveNumber,
+  unit_price: positiveNumber,
+  discount_amount: nonNegativeNumber.default(0),
+});
+
+export const saleCreateSchema = z.object({
+  customer_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  location_id: uuid,
+  payment_type: z.enum(['CASH', 'CREDIT']),
+  amount_paid: optionalNonNegativeNumber,
+  items: z.array(saleItemCreateSchema).default([]),
+});
+
+export const purchaseOrderItemCreateSchema = z.object({
+  spare_part_id: uuid,
+  quantity_ordered: positiveNumber,
+  unit_cost: positiveNumber,
+});
+
+export const purchaseOrderCreateSchema = z.object({
+  supplier_id: uuid,
+  notes: optionalText(2000),
+  items: z.array(purchaseOrderItemCreateSchema).min(1, 'Add at least one item'),
+});
+
+export const customerCreateSchema = z.object({
+  name: requiredText(255, 'Name'),
+  phone: optionalText(50),
+  email: optionalText(255),
+  address: optionalText(2000),
+  tax_id: optionalText(100),
+  credit_limit: nonNegativeNumber.default(0),
+  account_status: z.enum(['active', 'suspended', 'closed']).optional(),
+});
+
+export const customerUpdateSchema = customerCreateSchema.partial();
+
+export const supplierCreateSchema = z.object({
+  name: requiredText(255, 'Name'),
+  contact_person: optionalText(255),
+  phone: optionalText(50),
+  email: optionalText(255),
+  address: optionalText(2000),
+  tax_id: optionalText(100),
+  payment_terms: optionalText(100),
+  account_status: z.enum(['active', 'suspended', 'closed']).optional(),
+});
+
+export const supplierUpdateSchema = supplierCreateSchema.partial();
+
+export const transferCreateSchema = z.object({
+  spare_part_id: uuid,
+  source_location_id: uuid,
+  destination_location_id: uuid,
+  quantity: positiveNumber,
+}).superRefine((value, context) => {
+  if (value.source_location_id === value.destination_location_id) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['destination_location_id'], message: 'Choose a different destination location' });
+  }
+});
+
+export const transferCancelSchema = z.object({
+  reason: requiredText(1000, 'Cancellation reason'),
+});
+
+export type UserCreateValues = z.infer<typeof userCreateSchema>;
+export type UserUpdateValues = z.infer<typeof userUpdateSchema>;
+export type SparePartCreateValues = z.infer<typeof sparePartCreateSchema>;
+export type SaleCreateValues = z.infer<typeof saleCreateSchema>;
+export type PurchaseOrderCreateValues = z.infer<typeof purchaseOrderCreateSchema>;
+export type CustomerCreateValues = z.infer<typeof customerCreateSchema>;
+export type SupplierCreateValues = z.infer<typeof supplierCreateSchema>;
+export type TransferCreateValues = z.infer<typeof transferCreateSchema>;
