@@ -29,12 +29,15 @@ This system digitizes and streamlines operations for auto spare parts businesses
 | Backend | Python 3.11, FastAPI, SQLAlchemy 2.0 (async), Alembic |
 | Database | PostgreSQL 15 |
 | Cache/Sessions | Redis 7 |
-| Frontend | Next.js 14, TypeScript, Tailwind CSS, Axios |
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, React Query, Axios |
 | Auth | JWT (Access + Refresh Tokens), bcrypt |
 | PDF | WeasyPrint |
 | Barcode/QR | python-barcode (Code 128), qrcode |
 | Rate Limiting | slowapi + Redis |
-| Testing | pytest, Hypothesis (property-based testing) |
+| Background Jobs | ARQ (async Redis-based task queue) |
+| Error Tracking | Sentry |
+| Testing (Backend) | pytest (1115 unit tests), Hypothesis (property-based) |
+| Testing (Frontend) | Vitest (48 unit tests), Playwright (E2E + accessibility via axe-core) |
 | Deployment | Docker, Docker Compose, Railway |
 
 ## Getting Started
@@ -61,12 +64,13 @@ This system digitizes and streamlines operations for auto spare parts businesses
    ```bash
    docker-compose up --build
    ```
-   This starts PostgreSQL, Redis, the FastAPI backend, and the Next.js frontend.
+   This starts PostgreSQL, Redis, the FastAPI backend, the ARQ background worker, and the Next.js frontend.
 
-4. **Database tables are created automatically** on first startup. If you prefer to run migrations manually:
+4. **Apply database migrations**. The backend container runs this command before Uvicorn and aborts if it fails. To run it manually or as a deployment step:
    ```bash
    docker exec autostockmanager-backend alembic upgrade head
    ```
+   Alembic is the only schema-management path; application startup does not call `create_all` or execute inline DDL. Concurrent migration commands are serialized by a PostgreSQL advisory lock.
 
 5. **Create admin user**
    ```bash
@@ -85,6 +89,14 @@ This system digitizes and streamlines operations for auto spare parts businesses
    - Backend API: http://localhost:8000
    - API Docs (Swagger): http://localhost:8000/docs
    - Login: `admin` / `Admin123!`
+
+### Production operations
+
+Production deployments must replace every development placeholder, inject credentials through a secret manager, and run the serialized Alembic migration step before enabling traffic. The complete procedure covers required environment variables, secret generation, backups and restore drills, `/health` readiness checks, ARQ worker operation, error tracking, rollback, supported frontend versions, and dependency upgrades:
+
+- [Production Operations Runbook](OPERATIONS_RUNBOOK.md)
+
+The Compose defaults and example admin credentials are for local development only. Never use them in a public deployment or commit a populated `.env` file.
 
 ### Default User Roles
 
@@ -145,27 +157,33 @@ Each user sees only their own notifications. Notifications support read/unread s
 │   │   ├── main.py              # FastAPI application factory
 │   │   ├── config.py            # Settings (pydantic-settings)
 │   │   ├── database.py          # Async SQLAlchemy engine
-│   │   ├── models/              # SQLAlchemy ORM models
+│   │   ├── health.py            # Readiness/liveness probes
+│   │   ├── models/              # SQLAlchemy ORM models (26 tables)
 │   │   ├── schemas/             # Pydantic request/response schemas
-│   │   ├── services/            # Business logic layer
+│   │   ├── services/            # Business logic layer + background jobs (ARQ)
 │   │   ├── routers/             # FastAPI route handlers
-│   │   ├── middleware/          # Auth, rate limiting, security headers
+│   │   ├── middleware/          # Auth, rate limiting, security headers, telemetry
 │   │   └── utils/               # FIFO, PDF generation, barcode tools
-│   ├── alembic/                 # Database migrations
-│   ├── tests/                   # Unit and property-based tests
+│   ├── alembic/                 # Database migrations (8 revisions)
+│   ├── tests/                   # 1115 unit + property-based tests
+│   ├── scripts/                 # CLI utilities (create_user, seed, setup_db)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── app/                 # Next.js App Router pages
-│   │   ├── components/          # Shared UI components
-│   │   ├── hooks/               # Custom React hooks
-│   │   └── lib/                 # API client, auth, types
+│   │   ├── components/          # Shared UI components (DataTable, Modal, etc.)
+│   │   ├── hooks/               # Custom React hooks (useAuth, useDebouncedValue)
+│   │   └── lib/                 # API client, auth, types, validation, reports
+│   ├── e2e/                     # Playwright E2E + accessibility tests
+│   ├── scripts/                 # Bundle budget checker
 │   ├── Dockerfile
 │   └── package.json
-├── docker-compose.yml
+├── docker-compose.yml           # Backend, Worker, Frontend, PostgreSQL, Redis
 ├── .env.example
-└── .kiro/specs/                  # Feature specifications
+├── .github/workflows/           # CI + E2E pipelines
+├── OPERATIONS_RUNBOOK.md        # Production deployment guide
+└── .kiro/specs/                 # Feature specifications
 ```
 
 ## API Endpoints
@@ -290,23 +308,27 @@ railway variable set NEXT_PUBLIC_API_URL=https://<backend-service>.up.railway.ap
 
 ### Step 6: Initialize the Database
 
-After the backend is deployed and the database is provisioned, run the setup script. This is a single command that creates tables, sequences, admin user, and seed data:
+After the backend is deployed and the database is provisioned, apply the reviewed schema migrations before running the seed/setup script. The migration command is safe to rerun and is serialized with other deployment instances:
 
 ```bash
 # Link CLI to backend service
 railway link --service <backend-service-name>
 
-# Run the all-in-one setup script (idempotent — safe to run multiple times)
+# Apply migrations explicitly; a failure blocks the deployment step
+cd backend && railway run alembic upgrade head
+
+# Create the admin user and seed categories
 cd backend && railway run python3 scripts/setup_db.py
 ```
 
-This script will:
-1. Create all database tables (if they don't exist)
-2. Create the `invoice_number_seq` sequence
-3. Create an admin user (`admin` / `Admin123!`)
-4. Seed 45 default categories (Brakes, Filters, Engine Parts, etc.)
+The Docker entrypoint also runs `alembic upgrade head` before starting Uvicorn, so a failed migration prevents the API from accepting traffic. `setup_db.py` uses the same migration runner and only handles seed data after migrations succeed.
 
-**Note:** The backend also auto-creates tables on every startup via `init_db()`. This means new model/column changes deployed via git push will automatically create any missing tables without manual intervention. However, the setup script is still needed for first-time seeding of admin user and categories.
+This script will:
+1. Apply all pending Alembic migrations
+2. Create an admin user (`admin` / `Admin123!`)
+3. Seed 45 default categories (Brakes, Filters, Engine Parts, etc.)
+
+**Note:** The backend does not create tables or apply schema patches at runtime. The Docker startup command and `setup_db.py` both run the reviewed Alembic migration chain before any seed data is written.
 
 ### Step 7: Verify Setup
 
@@ -345,6 +367,18 @@ railway link --service <frontend-service-name>
 railway redeploy -y
 ```
 
+**Migration policy:** Never modify production schema manually or rely on SQLAlchemy metadata creation. Add a reviewed revision under `backend/alembic/versions/`, validate it against a copy of the current database, then run:
+
+```bash
+# Local/container deployment
+cd backend && alembic upgrade head
+
+# Railway deployment
+railway run alembic upgrade head
+```
+
+The migration runner holds a PostgreSQL advisory lock, so only one instance applies revisions at a time. If a revision fails, the command exits non-zero and the Docker startup command does not launch the API. To use controlled startup execution instead of the deployment command, set `RUN_MIGRATIONS_ON_STARTUP=true`; failures are propagated and abort application startup.
+
 ### Troubleshooting Railway Deployment
 
 | Issue | Solution |
@@ -355,7 +389,7 @@ railway redeploy -y
 | CORS errors in browser | Set `CORS_ORIGINS=["*"]` on the backend service, or add the frontend URL specifically |
 | Variable change has no effect (frontend) | `NEXT_PUBLIC_*` vars are build-time; redeploy the frontend after changing |
 | `railway run` fails with "No such file" | Make sure you're in the `backend/` directory locally when running commands |
-| New columns/tables missing after deploy | The app auto-creates tables on startup; for column changes on existing tables, run Alembic migrations |
+| New columns/tables missing after deploy | Add a reviewed Alembic revision and run `alembic upgrade head`; the API will not apply schema changes implicitly |
 
 ### Architecture on Railway
 
@@ -404,8 +438,10 @@ This information appears on all generated invoices. To update it later, change t
 
 ## Running Tests
 
+### Backend Tests
+
 ```bash
-# Run all backend tests
+# Run all backend tests (1115 unit tests)
 docker exec autostockmanager-backend pytest
 
 # Run with verbose output
@@ -413,6 +449,31 @@ docker exec autostockmanager-backend pytest -v
 
 # Run specific test file
 docker exec autostockmanager-backend pytest tests/unit/test_sales_service.py
+
+# Run locally (requires system Python with deps installed)
+cd backend && pytest --tb=short -q
+```
+
+### Frontend Tests
+
+```bash
+# Unit tests (Vitest — 48 tests across 14 files)
+cd frontend && npm run test
+
+# Type checking
+cd frontend && npx tsc --noEmit
+
+# Lint
+cd frontend && npm run lint
+
+# Bundle size budget check
+cd frontend && npm run perf:bundle
+
+# End-to-end tests (Playwright — requires running backend + frontend)
+cd frontend && E2E_USERNAME=admin E2E_PASSWORD='Admin123!' npm run e2e
+
+# Accessibility audit via Lighthouse
+cd frontend && npm run perf:lighthouse
 ```
 
 ## Environment Variables
@@ -422,11 +483,14 @@ docker exec autostockmanager-backend pytest tests/unit/test_sales_service.py
 | `POSTGRES_USER` | `postgres` | PostgreSQL username |
 | `POSTGRES_PASSWORD` | — | PostgreSQL password |
 | `POSTGRES_DB` | `autostockmanager` | Database name |
-| `SECRET_KEY` | — | JWT signing secret |
+| `DATABASE_URL` | (derived) | Full async connection string (auto-built from above if not set) |
+| `REDIS_URL` | `redis://redis:6379/0` | Redis connection URL for caching and sessions |
+| `JWT_SECRET_KEY` | — | JWT signing secret (min 32 chars in production) |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Access token TTL |
 | `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token TTL |
 | `CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
-| `ENVIRONMENT` | `development` | development, staging, or production |
+| `ENVIRONMENT` | `development` | `development`, `staging`, or `production` |
+| `SENTRY_DSN` | — | Sentry error tracking DSN (optional, enabled in production) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Backend URL for frontend (must include /api/v1) |
 
 ## Scale Targets
@@ -441,3 +505,18 @@ docker exec autostockmanager-backend pytest tests/unit/test_sales_service.py
 ## License
 
 Private — All rights reserved.
+
+## Frontend end-to-end tests
+
+The Playwright suite covers browser login and creation/cancellation of an isolated draft sale. It creates a unique location, spare part, and stock adjustment through the authenticated API, then removes the fixture records after the test; it does not use shared production data.
+
+Install dependencies and browsers once, then run a production-like frontend build and the suite from `frontend/`:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run build
+E2E_USERNAME=admin E2E_PASSWORD='Admin123!' npm run e2e
+```
+
+The API must be available at `E2E_API_URL` (default `http://127.0.0.1:8000/api/v1`) and the frontend at `PLAYWRIGHT_BASE_URL` (default `http://127.0.0.1:3000`). Set `PLAYWRIGHT_SKIP_WEBSERVER=true` when an already-running frontend should be reused. CI supplies `E2E_USERNAME` and `E2E_PASSWORD` through encrypted repository secrets and starts disposable PostgreSQL, Redis, and backend services before running the suite. The CI workflow is `.github/workflows/frontend-e2e.yml`.
