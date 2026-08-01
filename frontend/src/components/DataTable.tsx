@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface Column<T> {
@@ -22,9 +22,22 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   isLoading?: boolean;
   emptyMessage?: string;
+  /** Accessible name for the table. Falls back to a generic label. */
+  label?: string;
+  /**
+   * Render only the rows near the scroll viewport once the row count passes
+   * `virtualizeThreshold`. Table semantics (row counts, row indexes, header
+   * association) are preserved so screen readers still describe the full set.
+   */
+  virtualize?: boolean;
+  virtualizeThreshold?: number;
+  rowHeight?: number;
+  maxHeight?: number;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+const OVERSCAN_ROWS = 4;
+
+export function DataTable<T extends Record<string, any>>({
   columns,
   data,
   keyField = 'id',
@@ -36,7 +49,59 @@ export function DataTable<T extends Record<string, unknown>>({
   onPageChange,
   isLoading = false,
   emptyMessage = 'No data found',
+  label = 'Data table',
+  virtualize = false,
+  virtualizeThreshold = 50,
+  rowHeight = 48,
+  maxHeight = 560,
 }: DataTableProps<T>) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(maxHeight);
+  const [focusedRow, setFocusedRow] = useState<number | null>(null);
+
+  const isVirtualized = virtualize && !isLoading && data.length > virtualizeThreshold;
+
+  useEffect(() => {
+    if (!isVirtualized) return;
+    const measured = scrollRef.current?.clientHeight ?? 0;
+    if (measured > 0) setViewportHeight(measured);
+  }, [isVirtualized, maxHeight]);
+
+  useEffect(() => {
+    // Reset the window when the dataset changes (new page, new filter).
+    setScrollTop(0);
+    setFocusedRow(null);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [data]);
+
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(event.currentTarget.scrollTop);
+  }, []);
+
+  const rowWindow = useMemo(() => {
+    if (!isVirtualized) {
+      return { start: 0, end: data.length, topPad: 0, bottomPad: 0 };
+    }
+    const visibleCount = Math.ceil(viewportHeight / rowHeight) + OVERSCAN_ROWS * 2;
+    let start = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN_ROWS);
+    let end = Math.min(data.length, start + visibleCount);
+    // Keep a focused row rendered so keyboard focus is never destroyed while
+    // scrolling. The window stays contiguous, so row order is unchanged.
+    if (focusedRow !== null) {
+      if (focusedRow < start) start = focusedRow;
+      if (focusedRow >= end) end = focusedRow + 1;
+    }
+    return {
+      start,
+      end,
+      topPad: start * rowHeight,
+      bottomPad: Math.max(0, (data.length - end) * rowHeight),
+    };
+  }, [isVirtualized, data.length, viewportHeight, rowHeight, scrollTop, focusedRow]);
+
+  const visibleRows = isVirtualized ? data.slice(rowWindow.start, rowWindow.end) : data;
+
   const renderSortIcon = (field: string) => {
     if (sortField !== field) {
       return (
@@ -66,7 +131,7 @@ export function DataTable<T extends Record<string, unknown>>({
   const renderSkeleton = () => (
     <>
       {[...Array(5)].map((_, i) => (
-        <tr key={i} className="border-b border-border">
+        <tr key={i} className="border-b border-border" aria-hidden="true">
           {columns.map((col) => (
             <td key={col.key} className="px-4 py-3">
               <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
@@ -77,51 +142,93 @@ export function DataTable<T extends Record<string, unknown>>({
     </>
   );
 
-  return (
-    <div className="w-full overflow-hidden rounded-md border border-border bg-background">
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  scope="col"
-                  className={cn(
-                    'px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground',
-                    col.sortable && onSort && 'cursor-pointer select-none hover:text-foreground'
-                  )}
-                  onClick={col.sortable && onSort ? () => onSort(col.key) : undefined}
-                  aria-sort={
-                    sortField === col.key
+  const statusMessage = isLoading
+    ? 'Loading data'
+    : data.length === 0
+      ? emptyMessage
+      : isVirtualized
+        ? `Showing rows ${rowWindow.start + 1} to ${rowWindow.end} of ${data.length}`
+        : `${data.length} ${data.length === 1 ? 'row' : 'rows'} loaded`;
+
+  const table = (
+    <table
+      className="min-w-full"
+      aria-label={label}
+      aria-busy={isLoading || undefined}
+      aria-rowcount={isVirtualized ? data.length + 1 : undefined}
+    >
+      <thead className={cn(isVirtualized && 'sticky top-0 z-10 bg-background')}>
+        <tr className="border-b border-border bg-muted/50" aria-rowindex={isVirtualized ? 1 : undefined}>
+          {columns.map((col) => {
+            const isSortable = Boolean(col.sortable && onSort);
+            return (
+              <th
+                key={col.key}
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                aria-sort={
+                  isSortable
+                    ? sortField === col.key
                       ? sortDirection === 'asc'
                         ? 'ascending'
                         : 'descending'
-                      : undefined
-                  }
-                >
-                  {col.header}
-                  {col.sortable && onSort && renderSortIcon(col.key)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              renderSkeleton()
-            ) : data.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-12 text-center text-sm text-muted-foreground"
-                >
-                  {emptyMessage}
-                </td>
+                      : 'none'
+                    : undefined
+                }
+              >
+                {isSortable ? (
+                  <button
+                    type="button"
+                    onClick={() => onSort?.(col.key)}
+                    className="inline-flex items-center gap-0.5 rounded-sm uppercase tracking-wider hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {col.header}
+                    <span className="sr-only">
+                      {sortField === col.key
+                        ? `, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}. Activate to reverse the sort order.`
+                        : ', not sorted. Activate to sort by this column.'}
+                    </span>
+                    {renderSortIcon(col.key)}
+                  </button>
+                ) : (
+                  col.header
+                )}
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody onFocus={isVirtualized ? (event) => {
+        const row = (event.target as HTMLElement).closest('tr');
+        const index = row?.getAttribute('data-row-index');
+        if (index) setFocusedRow(Number(index));
+      } : undefined}>
+        {isLoading ? (
+          renderSkeleton()
+        ) : data.length === 0 ? (
+          <tr>
+            <td
+              colSpan={columns.length}
+              className="px-4 py-12 text-center text-sm text-muted-foreground"
+            >
+              {emptyMessage}
+            </td>
+          </tr>
+        ) : (
+          <>
+            {rowWindow.topPad > 0 && (
+              <tr aria-hidden="true" style={{ height: rowWindow.topPad }}>
+                <td colSpan={columns.length} className="p-0" />
               </tr>
-            ) : (
-              data.map((item) => (
+            )}
+            {visibleRows.map((item, offset) => {
+              const absoluteIndex = rowWindow.start + offset;
+              return (
                 <tr
-                  key={String(item[keyField])}
+                  key={String(item[keyField] ?? absoluteIndex)}
+                  data-row-index={absoluteIndex}
+                  aria-rowindex={isVirtualized ? absoluteIndex + 2 : undefined}
+                  style={isVirtualized ? { height: rowHeight } : undefined}
                   className="border-b border-border transition-colors hover:bg-muted/50"
                 >
                   {columns.map((col) => (
@@ -130,11 +237,39 @@ export function DataTable<T extends Record<string, unknown>>({
                     </td>
                   ))}
                 </tr>
-              ))
+              );
+            })}
+            {rowWindow.bottomPad > 0 && (
+              <tr aria-hidden="true" style={{ height: rowWindow.bottomPad }}>
+                <td colSpan={columns.length} className="p-0" />
+              </tr>
             )}
-          </tbody>
-        </table>
-      </div>
+          </>
+        )}
+      </tbody>
+    </table>
+  );
+
+  return (
+    <div className="w-full overflow-hidden rounded-md border border-border bg-background">
+      <p className="sr-only" role="status" aria-live="polite">
+        {statusMessage}
+      </p>
+      {isVirtualized ? (
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          tabIndex={0}
+          role="group"
+          aria-label={`${label}, scrollable list of ${data.length} rows`}
+          className="overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{ maxHeight }}
+        >
+          {table}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">{table}</div>
+      )}
 
       {/* Pagination */}
       {totalPages !== undefined && totalPages > 1 && onPageChange && (
@@ -143,7 +278,7 @@ export function DataTable<T extends Record<string, unknown>>({
             Page <span className="font-medium text-foreground">{currentPage}</span> of{' '}
             <span className="font-medium text-foreground">{totalPages}</span>
           </div>
-          <div className="flex gap-2">
+          <nav className="flex gap-2" aria-label="Pagination">
             <button
               type="button"
               onClick={() => onPageChange((currentPage || 1) - 1)}
@@ -160,7 +295,7 @@ export function DataTable<T extends Record<string, unknown>>({
             >
               Next
             </button>
-          </div>
+          </nav>
         </div>
       )}
     </div>

@@ -27,6 +27,7 @@ interface CategoryItem {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   children: CategoryItem[];
   spare_parts_count: number;
 }

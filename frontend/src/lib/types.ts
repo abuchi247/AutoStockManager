@@ -38,18 +38,21 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   access_token: string;
-  refresh_token: string;
+  /** Present only during the non-browser compatibility window. */
+  refresh_token?: string;
   token_type: string;
-  user: UserProfile;
+  user?: UserProfile;
 }
 
+/** Non-browser clients may still send a body token during the migration. */
 export interface RefreshRequest {
-  refresh_token: string;
+  refresh_token?: string;
 }
 
 export interface RefreshResponse {
   access_token: string;
-  refresh_token: string;
+  /** Browser responses should omit this because it is held in a cookie. */
+  refresh_token?: string;
   token_type: string;
 }
 
@@ -316,8 +319,8 @@ export interface SupplierUpdate {
 
 // --- Sales ---
 
-export type SaleStatus = 'draft' | 'confirmed' | 'returned' | 'cancelled';
-export type PaymentType = 'cash' | 'credit' | 'card' | 'transfer';
+export type SaleStatus = 'DRAFT' | 'CONFIRMED' | 'RETURNED' | 'CANCELLED';
+export type PaymentType = 'CASH' | 'CREDIT';
 
 export interface Sale {
   id: string;
@@ -330,11 +333,13 @@ export interface Sale {
   tax_amount: number;
   total_amount: number;
   discount_total: number;
+  amount_paid?: number;
   created_by: string;
   created_at: string;
   updated_at: string;
   items?: SaleItem[];
   customer?: Customer;
+  customer_name?: string;
 }
 
 export interface SaleItem {
@@ -477,8 +482,12 @@ export interface Transfer {
   created_at: string;
   updated_at: string;
   spare_part?: SparePart;
+  spare_part_name?: string;
+  spare_part_number?: string;
   source_location?: Location;
+  source_location_name?: string;
   destination_location?: Location;
+  destination_location_name?: string;
 }
 
 export interface TransferCreate {

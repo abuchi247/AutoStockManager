@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { get, post, put } from '@/lib/api';
-import {
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePaginatedQuery, queryKeys, toQueryString, normalizeList } from '@/lib/queries';import {
   DataTable,
   Button,
   Input,
@@ -23,6 +24,9 @@ import type {
 } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 import { getCurrency, setCurrency, CURRENCY_OPTIONS } from '@/lib/currency';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { userCreateSchema, userUpdateSchema } from '@/lib/validation/schemas';
 
 function getRoleBadge(role: UserRole): React.ReactNode {
   const variants: Record<UserRole, 'info' | 'success' | 'warning' | 'default'> = {
@@ -59,24 +63,20 @@ export default function SettingsPage() {
     }
   }, [hasRole, router, authLoading]);
 
-  // Users list state
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const pageSize = 20;
-
-  // Search
   const [search, setSearch] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('username');
+  const [sortField, setSortField] = useState('username');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // Create user modal
+  const usersQuery = usePaginatedQuery<UserProfile>(queryKeys.users.list({ page, page_size: pageSize, search, sort_by: sortField, sort_direction: sortDirection }), `/users?${toQueryString({ page, page_size: pageSize, search, sort_by: sortField, sort_direction: sortDirection })}`, { enabled: hasRole('admin') });
+  const users = normalizeList(usersQuery.data).data;
+  const isLoading = usersQuery.isLoading;
+  const error = usersQuery.error?.message ?? null;
+  const totalPages = normalizeList(usersQuery.data).totalPages;
+  const createUser = useMutation({ mutationFn: (payload: UserCreate) => post('/users', payload), onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }) });
+  const updateUser = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: UserUpdate }) => put(`/users/${id}`, payload), onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }) });
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<UserCreate>({
     username: '',
@@ -87,48 +87,12 @@ export default function SettingsPage() {
 
   // Edit user modal
   const [showEditModal, setShowEditModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editData, setEditData] = useState<UserUpdate>({});
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (search) params.set('search', search);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
-
-      const response = await get<PaginatedResponse<UserProfile>>(
-        `/users?${params.toString()}`
-      );
-      setUsers(response.data);
-      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load users';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search, sortField, sortDirection]);
-
-  useEffect(() => {
-    if (hasRole('admin')) {
-      fetchUsers();
-    }
-  }, [fetchUsers, hasRole]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  // Debounced search only changes the Query key after the short input pause.
+  useEffect(() => { const timeout = setTimeout(() => setPage(1), 300); return () => clearTimeout(timeout); }, [search]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -139,41 +103,15 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCreateUser = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      // Backend expects title-case roles: "Admin", "Manager", "Salesperson", "Storekeeper"
-      const payload = {
-        ...newUser,
-        role: newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1),
-      };
-      await post('/users', payload);
-      setShowCreateModal(false);
-      setNewUser({
-        username: '',
-        email: '',
-        password: '',
-        role: 'salesperson',
-      });
-      fetchUsers();
-    } catch (err: unknown) {
-      let message = 'Failed to create user';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { detail?: string | Array<{ msg: string; loc: string[] }> } } };
-        const detail = axiosErr.response?.data?.detail;
-        if (typeof detail === 'string') {
-          message = detail;
-        } else if (Array.isArray(detail) && detail.length > 0) {
-          message = detail.map((d) => `${d.loc?.[d.loc.length - 1] || 'field'}: ${d.msg}`).join(', ');
-        }
-      } else if (err instanceof Error) {
-        message = err.message;
-      }
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const handleCreateUser = () => {
+    const validation = validateWithSchema(userCreateSchema, newUser);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    const payload = { ...validation.data, role: validation.data.role.charAt(0).toUpperCase() + validation.data.role.slice(1) } as UserCreate;
+    setCreateError(null);
+    createUser.mutate(payload, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewUser({ username: '', email: '', password: '', role: 'salesperson' }); } });
   };
 
   const handleEditUser = (userProfile: UserProfile) => {
@@ -187,38 +125,16 @@ export default function SettingsPage() {
     setShowEditModal(true);
   };
 
-  const handleSaveUser = async () => {
+  const handleSaveUser = () => {
     if (!editingUser) return;
-    setIsEditing(true);
-    setEditError(null);
-    try {
-      // Backend expects title-case roles
-      const payload = {
-        ...editData,
-        role: editData.role ? editData.role.charAt(0).toUpperCase() + editData.role.slice(1) : undefined,
-      };
-      await put(`/users/${editingUser.id}`, payload);
-      setShowEditModal(false);
-      setEditingUser(null);
-      setEditData({});
-      fetchUsers();
-    } catch (err: unknown) {
-      let message = 'Failed to update user';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { detail?: string | Array<{ msg: string; loc: string[] }> } } };
-        const detail = axiosErr.response?.data?.detail;
-        if (typeof detail === 'string') {
-          message = detail;
-        } else if (Array.isArray(detail) && detail.length > 0) {
-          message = detail.map((d) => `${d.loc?.[d.loc.length - 1] || 'field'}: ${d.msg}`).join(', ');
-        }
-      } else if (err instanceof Error) {
-        message = err.message;
-      }
-      setEditError(message);
-    } finally {
-      setIsEditing(false);
+    const validation = validateWithSchema(userUpdateSchema, editData);
+    if (!validation.data) {
+      setEditError(formatFieldErrors(validation.errors));
+      return;
     }
+    const payload: UserUpdate = { ...validation.data, role: validation.data.role ? (validation.data.role.charAt(0).toUpperCase() + validation.data.role.slice(1)) as UserRole : undefined };
+    setEditError(null);
+    updateUser.mutate({ id: editingUser.id, payload }, { onError: (err) => setEditError(err.message), onSuccess: () => { setShowEditModal(false); setEditingUser(null); setEditData({}); } });
   };
 
   const roleOptions: SelectOption[] = [
@@ -333,16 +249,14 @@ export default function SettingsPage() {
         {/* Error display */}
         {error && (
           <div className="mb-4">
-            <Alert variant="error" onClose={() => setError(null)}>
-              {error}
-            </Alert>
+            <Alert variant="error">{error}</Alert>
           </div>
         )}
 
         {/* Users table */}
         <DataTable
           columns={columns}
-          data={users as unknown as Record<string, unknown>[]}
+          data={users}
           isLoading={isLoading}
           currentPage={page}
           totalPages={totalPages}
@@ -350,6 +264,7 @@ export default function SettingsPage() {
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={handleSort}
+          label="Users"
           emptyMessage="No users found."
         />
       </div>
@@ -374,7 +289,7 @@ export default function SettingsPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateUser} isLoading={isCreating}>
+            <Button onClick={handleCreateUser} isLoading={createUser.isPending}>
               Create User
             </Button>
           </>
@@ -448,7 +363,7 @@ export default function SettingsPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveUser} isLoading={isEditing}>
+            <Button onClick={handleSaveUser} isLoading={updateUser.isPending}>
               Save Changes
             </Button>
           </>
@@ -710,9 +625,14 @@ function BusinessSettingsSection() {
           </label>
           <div className="flex items-center gap-4">
             {settings.logo_base64 && (
+              /* Explicit dimensions + lazy decoding keep the logo from shifting layout. */
               <img
                 src={settings.logo_base64}
                 alt="Business logo"
+                width={64}
+                height={64}
+                loading="lazy"
+                decoding="async"
                 className="h-16 w-16 rounded border border-gray-200 object-contain"
               />
             )}

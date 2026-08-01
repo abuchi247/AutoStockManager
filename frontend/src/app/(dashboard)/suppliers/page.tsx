@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { get, post } from '@/lib/api';
+import { usePaginatedQuery, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { useDebouncedSearch } from '@/lib/hooks/useDebouncedValue';
 import {
   DataTable,
   Button,
@@ -19,6 +20,9 @@ import type {
   PaginatedResponse,
   AccountStatus,
 } from '@/lib/types';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { supplierCreateSchema } from '@/lib/validation/schemas';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -37,72 +41,25 @@ function getStatusBadge(status: AccountStatus): React.ReactNode {
 export default function SuppliersPage() {
   const router = useRouter();
 
-  // List state
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const pageSize = 20;
-
-  // Search and filters
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // Create modal
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [newSupplier, setNewSupplier] = useState<SupplierCreate>({
-    name: '',
-    contact_person: '',
-    phone: '',
-    email: '',
-    address: '',
-    tax_id: '',
-    payment_terms: '',
+  const resetToFirstPage = useCallback(() => setPage(1), []);
+  const { search, debouncedSearch, setSearch } = useDebouncedSearch('', {
+    onDebouncedChange: resetToFirstPage,
   });
-
-  const fetchSuppliers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (search) params.set('search', search);
-      if (statusFilter) params.set('account_status', statusFilter);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
-
-      const response = await get<PaginatedResponse<Supplier>>(
-        `/suppliers?${params.toString()}`
-      );
-      setSuppliers(response.data);
-      setTotalPages(response.meta.total_pages);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load suppliers';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search, statusFilter, sortField, sortDirection]);
-
-  useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newSupplier, setNewSupplier] = useState<SupplierCreate>({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', payment_terms: '' });
+  const supplierParams = { page, page_size: pageSize, search: debouncedSearch, account_status: statusFilter, sort_by: sortField, sort_direction: sortDirection };
+  const suppliersQuery = usePaginatedQuery<Supplier>(queryKeys.suppliers.list(supplierParams), `/suppliers?${toQueryString(supplierParams)}`);
+  const createSupplier = useCreateMutation<SupplierCreate>('/suppliers', [queryKeys.suppliers.all]);
+  const suppliers = normalizeList(suppliersQuery.data).data;
+  const isLoading = suppliersQuery.isLoading;
+  const error = suppliersQuery.error?.message ?? null;
+  const totalPages = normalizeList(suppliersQuery.data).totalPages;
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -113,28 +70,14 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleCreateSupplier = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      await post('/suppliers', newSupplier);
-      setShowCreateModal(false);
-      setNewSupplier({
-        name: '',
-        contact_person: '',
-        phone: '',
-        email: '',
-        address: '',
-        tax_id: '',
-        payment_terms: '',
-      });
-      fetchSuppliers();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create supplier';
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const handleCreateSupplier = () => {
+    const validation = validateWithSchema(supplierCreateSchema, newSupplier);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    setCreateError(null);
+    createSupplier.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewSupplier({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', payment_terms: '' }); } });
   };
 
   const statusOptions: SelectOption[] = [
@@ -224,15 +167,15 @@ export default function SuppliersPage() {
 
       {/* Error display */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
 
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={suppliers as unknown as Record<string, unknown>[]}
+        data={suppliers}
+        label="Suppliers"
+        virtualize
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -263,7 +206,7 @@ export default function SuppliersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateSupplier} isLoading={isCreating}>
+            <Button onClick={handleCreateSupplier} isLoading={createSupplier.isPending}>
               Create Supplier
             </Button>
           </>

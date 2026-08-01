@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { get, post } from '@/lib/api';
+import { usePaginatedQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { useDebouncedSearch } from '@/lib/hooks/useDebouncedValue';
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/pagination';
 import {
   DataTable,
   Button,
@@ -20,6 +22,9 @@ import type {
   AccountStatus,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { customerCreateSchema } from '@/lib/validation/schemas';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -40,71 +45,46 @@ function getStatusBadge(status: AccountStatus): React.ReactNode {
 export default function CustomersPage() {
   const router = useRouter();
 
-  // List state
-  const [customers, setCustomers] = useState<(Customer & { balance?: number })[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 20;
-
-  // Search
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // Create modal
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [newCustomer, setNewCustomer] = useState<CustomerCreate>({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-    tax_id: '',
-    credit_limit: '' as unknown as number,
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const resetToFirstPage = useCallback(() => setPage(1), []);
+  const { search, debouncedSearch, setSearch } = useDebouncedSearch('', {
+    onDebouncedChange: resetToFirstPage,
   });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [newCustomer, setNewCustomer] = useState<CustomerCreate>({ name: '', phone: '', email: '', address: '', tax_id: '', credit_limit: '' as unknown as number });
 
-  const fetchCustomers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (search) params.set('search', search);
-      if (statusFilter) params.set('account_status', statusFilter);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
+  const paramsFor = useCallback(
+    (targetPage: number) => ({
+      page: targetPage,
+      page_size: pageSize,
+      search: debouncedSearch,
+      account_status: statusFilter,
+      sort_by: sortField,
+      sort_direction: sortDirection,
+    }),
+    [pageSize, debouncedSearch, statusFilter, sortField, sortDirection],
+  );
+  const customersQuery = usePaginatedQuery<Customer & { balance?: number }>(
+    queryKeys.customers.list(paramsFor(page)), `/customers?${toQueryString(paramsFor(page))}`,
+  );
+  const createCustomer = useCreateMutation<CustomerCreate>('/customers', [queryKeys.customers.all]);
+  const customers = normalizeList(customersQuery.data).data;
+  const isLoading = customersQuery.isLoading;
+  const error = customersQuery.error?.message ?? null;
+  const totalPages = normalizeList(customersQuery.data).totalPages;
 
-      const response = await get<PaginatedResponse<Customer & { balance?: number }>>(
-        `/customers?${params.toString()}`
-      );
-      setCustomers(response.data);
-      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load customers';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search, statusFilter, sortField, sortDirection]);
-
-  useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  usePrefetchNextPage({
+    page,
+    totalPages,
+    isFetching: customersQuery.isFetching,
+    keyFor: (targetPage) => queryKeys.customers.list(paramsFor(targetPage)),
+    pathFor: (targetPage) => `/customers?${toQueryString(paramsFor(targetPage))}`,
+  });
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -115,31 +95,17 @@ export default function CustomersPage() {
     }
   };
 
-  const handleCreateCustomer = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      const payload = {
-        ...newCustomer,
-        credit_limit: newCustomer.credit_limit === ('' as unknown as number) ? 0 : (newCustomer.credit_limit || 0),
-      };
-      await post('/customers', payload);
-      setShowCreateModal(false);
-      setNewCustomer({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        tax_id: '',
-        credit_limit: '' as unknown as number,
-      });
-      fetchCustomers();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create customer';
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const resetCustomerForm = () => setNewCustomer({ name: '', phone: '', email: '', address: '', tax_id: '', credit_limit: '' as unknown as number });
+
+  const handleCreateCustomer = () => {
+    const payload = { ...newCustomer, credit_limit: newCustomer.credit_limit === ('' as unknown as number) ? 0 : (newCustomer.credit_limit || 0) };
+    const validation = validateWithSchema(customerCreateSchema, payload);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    setCreateError(null);
+    createCustomer.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); resetCustomerForm(); } });
   };
 
   const statusOptions: SelectOption[] = [
@@ -237,19 +203,30 @@ export default function CustomersPage() {
             aria-label="Filter by status"
           />
         </div>
+        <div className="w-full sm:w-40">
+          <Select
+            options={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            aria-label="Rows per page"
+          />
+        </div>
       </div>
 
       {/* Error display */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
 
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={customers as unknown as Record<string, unknown>[]}
+        data={customers}
+        label="Customers"
+        virtualize
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -280,7 +257,7 @@ export default function CustomersPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateCustomer} isLoading={isCreating}>
+            <Button onClick={handleCreateCustomer} isLoading={createCustomer.isPending}>
               Create Customer
             </Button>
           </>

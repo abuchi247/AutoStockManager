@@ -255,6 +255,15 @@ class TestCreateSale:
 class TestConfirmSale:
     """Tests for SalesService.confirm_sale."""
 
+    @pytest.fixture(autouse=True)
+    def _patch_invoice_number(self):
+        with patch(
+            "app.services.sales_service.generate_invoice_number",
+            new_callable=AsyncMock,
+            return_value="INV-2025-000001",
+        ):
+            yield
+
     async def test_confirm_sale_not_found(self):
         """confirm_sale should raise SaleNotFoundError when sale doesn't exist."""
         db = AsyncMock()
@@ -526,8 +535,9 @@ class TestConfirmSale:
 
     @patch("app.services.sales_service.consume_fifo_layers")
     @patch("app.services.sales_service.record_inventory_movement")
+    @patch("app.services.credit_ledger_service.CreditLedgerService.record_debit", new_callable=AsyncMock)
     async def test_confirm_sale_credit_payment_type(
-        self, mock_record_movement, mock_consume_fifo
+        self, mock_record_debit, mock_record_movement, mock_consume_fifo
     ):
         """confirm_sale with CREDIT payment should succeed (credit placeholder)."""
         location_id = uuid.uuid4()
@@ -554,6 +564,10 @@ class TestConfirmSale:
         mock_consume_fifo.return_value = (Decimal("350.00"), [])
         mock_record_movement.return_value = MagicMock()
 
+        # Mock customer for credit limit check
+        mock_customer = MagicMock()
+        mock_customer.credit_limit = Decimal("10000.00")
+
         call_count = {"n": 0}
 
         async def mock_execute(stmt):
@@ -561,8 +575,12 @@ class TestConfirmSale:
             result = MagicMock()
             if call_count["n"] == 1:
                 result.scalar_one_or_none.return_value = sale
-            else:
+            elif call_count["n"] == 2:
                 result.scalar_one_or_none.return_value = cache
+            else:
+                # Customer lookup and any other queries
+                result.scalar_one_or_none.return_value = mock_customer
+                result.scalar_one.return_value = mock_customer
             return result
 
         db = AsyncMock()

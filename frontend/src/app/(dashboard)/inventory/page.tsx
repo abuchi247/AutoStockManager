@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
+import { usePaginatedQuery, useResourceQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { useDebouncedSearch } from '@/lib/hooks/useDebouncedValue';
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/pagination';
 import {
   DataTable,
   Button,
@@ -21,6 +24,9 @@ import type {
   PaginatedResponse,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { sparePartCreateSchema } from '@/lib/validation/schemas';
 
 type StockLevel = 'in_stock' | 'low' | 'out_of_stock';
 
@@ -47,44 +53,50 @@ export default function InventoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // List state
-  const [parts, setParts] = useState<(SparePart & { total_stock?: number })[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 20;
-
-  // Search and filters
-  const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const resetToFirstPage = useCallback(() => setPage(1), []);
+  const { search, debouncedSearch, setSearch } = useDebouncedSearch('', {
+    onDebouncedChange: resetToFirstPage,
+  });
   const [brandFilter, setBrandFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState(searchParams.get('location') || '');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
-
-  // Create modal
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [newPart, setNewPart] = useState<SparePartCreate>({
-    part_number: '',
-    name: '',
-    brand: '',
-    unit_of_measure: 'pcs',
-    cost_price: '' as unknown as number,
-    selling_price: '' as unknown as number,
-    min_stock_level: '' as unknown as number,
-    max_stock_level: 0,
-    reorder_quantity: 0,
-  });
-
-  // Initial stock (added during part creation)
+  const partsParamsFor = useCallback(
+    (targetPage: number) => ({
+      page: targetPage,
+      page_size: pageSize,
+      search: debouncedSearch,
+      brand: brandFilter,
+      category_id: categoryFilter,
+      location_id: locationFilter,
+      sort_by: sortField,
+      sort_direction: sortDirection,
+    }),
+    [pageSize, debouncedSearch, brandFilter, categoryFilter, locationFilter, sortField, sortDirection],
+  );
+  const partsQuery = usePaginatedQuery<SparePart & { total_stock?: number }>(
+    queryKeys.inventory.list(partsParamsFor(page)),
+    `/spare-parts?${toQueryString(partsParamsFor(page))}`,
+  );
+  const categoriesQuery = useResourceQuery<{ data: Array<Category & { children?: Category[] }> }>(queryKeys.categories.all, '/categories?page_size=500');
+  const brandsQuery = useResourceQuery<{ data: string[] }>(['spare-parts', 'brands'], '/spare-parts/brands');
+  const locationsQuery = useResourceQuery<{ data: Array<{ id: string; name: string }> }>(queryKeys.locations.all, '/locations?page_size=100');
+  const createPart = useCreateMutation<SparePartCreate, { id: string }>('/spare-parts', [queryKeys.inventory.all, queryKeys.dashboard.all]);
+  const parts = normalizeList(partsQuery.data).data;
+  const totalPages = normalizeList(partsQuery.data).totalPages;
+  const isLoading = partsQuery.isLoading;
+  const error = partsQuery.error?.message ?? null;
+  const categories: Category[] = (categoriesQuery.data?.data ?? []).flatMap((item) => [item, ...(item.children ?? [])]);
+  const brands = brandsQuery.data?.data ?? [];
+  const locations = locationsQuery.data?.data ?? [];
+  const [newPart, setNewPart] = useState<SparePartCreate>({ part_number: '', name: '', brand: '', unit_of_measure: 'pcs', cost_price: '' as unknown as number, selling_price: '' as unknown as number, min_stock_level: '' as unknown as number, max_stock_level: 0, reorder_quantity: 0 });
   const [initialStockLocation, setInitialStockLocation] = useState('');
   const [initialStockQty, setInitialStockQty] = useState<number | ''>('');
-
-  // Barcode lookup modal
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeLoading, setBarcodeLoading] = useState(false);
@@ -92,115 +104,21 @@ export default function InventoryPage() {
 
   const openCreateModal = async () => {
     setShowCreateModal(true);
-    // Auto-generate part number (no category selected yet)
-    try {
-      const result = await get<{ part_number: string }>('/spare-parts/next-part-number');
-      setNewPart((prev) => ({ ...prev, part_number: result.part_number }));
-    } catch {
-      // If it fails, user can type manually
-    }
+    try { const result = await get<{ part_number: string }>('/spare-parts/next-part-number'); setNewPart((prev) => ({ ...prev, part_number: result.part_number })); } catch { /* manual entry remains available */ }
   };
-
   const handleCategoryChange = async (categoryId: string) => {
     setNewPart((prev) => ({ ...prev, category_id: categoryId || undefined }));
-    // Re-generate part number based on selected category
-    try {
-      const url = categoryId
-        ? `/spare-parts/next-part-number?category_id=${categoryId}`
-        : '/spare-parts/next-part-number';
-      const result = await get<{ part_number: string }>(url);
-      setNewPart((prev) => ({ ...prev, part_number: result.part_number }));
-    } catch {
-      // Keep existing part number if generation fails
-    }
+    try { const result = await get<{ part_number: string }>(categoryId ? `/spare-parts/next-part-number?category_id=${categoryId}` : '/spare-parts/next-part-number'); setNewPart((prev) => ({ ...prev, part_number: result.part_number })); } catch { /* retain current number */ }
   };
 
-  // Sort
-  const [sortField, setSortField] = useState<string>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  const fetchParts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (search) params.set('search', search);
-      if (brandFilter) params.set('brand', brandFilter);
-      if (categoryFilter) params.set('category_id', categoryFilter);
-      if (locationFilter) params.set('location_id', locationFilter);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
-
-      const response = await get<PaginatedResponse<SparePart & { total_stock?: number }>>(
-        `/spare-parts?${params.toString()}`
-      );
-      setParts(response.data);
-      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load spare parts';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, search, brandFilter, categoryFilter, locationFilter, sortField, sortDirection]);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await get<{ data: Array<Category & { children?: Category[] }>; meta: { page: number; total: number; page_size: number } }>('/categories?page_size=500');
-      // Flatten tree into a flat list so we can look up any category by ID
-      const flat: Category[] = [];
-      const flatten = (items: Array<Category & { children?: Category[] }>) => {
-        for (const item of items) {
-          flat.push(item);
-          if (item.children && item.children.length > 0) {
-            flatten(item.children as Array<Category & { children?: Category[] }>);
-          }
-        }
-      };
-      flatten(response.data);
-      setCategories(flat);
-    } catch {
-      // Categories are optional for display — don't break if API fails
-    }
-  }, []);
-
-  const fetchBrands = useCallback(async () => {
-    try {
-      const response = await get<{ data: string[]; meta: { page: number; total: number; page_size: number } }>('/spare-parts/brands');
-      setBrands(response.data);
-    } catch {
-      // Brands are optional for display
-    }
-  }, []);
-
-  const fetchLocations = useCallback(async () => {
-    try {
-      const response = await get<{ data: Array<{ id: string; name: string }>; meta: { page: number; total: number; page_size: number } }>('/locations?page_size=100');
-      setLocations(response.data);
-    } catch {
-      // Locations are optional for filtering
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchParts();
-  }, [fetchParts]);
-
-  useEffect(() => {
-    fetchCategories();
-    fetchBrands();
-    fetchLocations();
-  }, [fetchCategories, fetchBrands, fetchLocations]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  // Warm the next page of parts so paging feels immediate.
+  usePrefetchNextPage({
+    page,
+    totalPages,
+    isFetching: partsQuery.isFetching,
+    keyFor: (targetPage) => queryKeys.inventory.list(partsParamsFor(targetPage)),
+    pathFor: (targetPage) => `/spare-parts?${toQueryString(partsParamsFor(targetPage))}`,
+  });
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -211,56 +129,25 @@ export default function InventoryPage() {
     }
   };
 
-  const handleCreatePart = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      // Ensure numeric fields are numbers (not empty strings)
-      const payload = {
-        ...newPart,
-        cost_price: Number(newPart.cost_price) || 0,
-        selling_price: Number(newPart.selling_price) || 0,
-        min_stock_level: Number(newPart.min_stock_level) || 0,
-        max_stock_level: Number(newPart.max_stock_level) || 0,
-        reorder_quantity: Number(newPart.reorder_quantity) || 0,
-      };
-      const created = await post<{ id: string }>('/spare-parts', payload);
-
-      // Add initial stock if location and quantity provided
-      if (initialStockLocation && initialStockQty && Number(initialStockQty) > 0) {
-        try {
-          await post('/stock/adjust', {
-            spare_part_id: created.id,
-            location_id: initialStockLocation,
-            quantity: Number(initialStockQty),
-            reason: 'Initial stock on part creation',
-          });
-        } catch {
-          // Part was created but stock failed — not critical
-        }
-      }
-
-      setShowCreateModal(false);
-      setNewPart({
-        part_number: '',
-        name: '',
-        brand: '',
-        unit_of_measure: 'pcs',
-        cost_price: '' as unknown as number,
-        selling_price: '' as unknown as number,
-        min_stock_level: '' as unknown as number,
-        max_stock_level: 0,
-        reorder_quantity: 0,
-      });
-      setInitialStockLocation('');
-      setInitialStockQty('');
-      fetchParts();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create spare part';
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const handleCreatePart = () => {
+    const payload = { ...newPart, cost_price: Number(newPart.cost_price) || 0, selling_price: Number(newPart.selling_price) || 0, min_stock_level: Number(newPart.min_stock_level) || 0, max_stock_level: Number(newPart.max_stock_level) || 0, reorder_quantity: Number(newPart.reorder_quantity) || 0 };
+    const validation = validateWithSchema(sparePartCreateSchema, payload);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    setCreateError(null);
+    createPart.mutate(validation.data as SparePartCreate, {
+      onError: (err) => setCreateError(err.message),
+      onSuccess: async (created: { id: string }) => {
+        if (initialStockLocation && initialStockQty && Number(initialStockQty) > 0) {
+          try { await post('/stock/adjust', { spare_part_id: created.id, location_id: initialStockLocation, quantity: Number(initialStockQty), reason: 'Initial stock on part creation' }); } catch { /* part remains created */ }
+        }
+        setShowCreateModal(false);
+        setNewPart({ part_number: '', name: '', brand: '', unit_of_measure: 'pcs', cost_price: '' as unknown as number, selling_price: '' as unknown as number, min_stock_level: '' as unknown as number, max_stock_level: 0, reorder_quantity: 0 });
+        setInitialStockLocation(''); setInitialStockQty('');
+      },
+    });
   };
 
   const handleBarcodeLookup = async () => {
@@ -421,19 +308,30 @@ export default function InventoryPage() {
             aria-label="Filter by location"
           />
         </div>
+        <div className="w-full sm:w-40">
+          <Select
+            options={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            aria-label="Rows per page"
+          />
+        </div>
       </div>
 
       {/* Error display */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
 
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={parts as unknown as Record<string, unknown>[]}
+        data={parts}
+        label="Spare parts"
+        virtualize
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -464,7 +362,7 @@ export default function InventoryPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreatePart} isLoading={isCreating}>
+            <Button onClick={handleCreatePart} isLoading={createPart.isPending}>
               Create Part
             </Button>
           </>

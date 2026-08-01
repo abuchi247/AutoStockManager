@@ -9,9 +9,11 @@
  * Requirements: 5.1, 5.3, 5.4
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { get } from '@/lib/api';
+import { usePaginatedQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList } from '@/lib/queries';
+import { useDebouncedSearch } from '@/lib/hooks/useDebouncedValue';
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/pagination';
 import {
   DataTable,
   Button,
@@ -35,10 +37,10 @@ const STATUS_OPTIONS: SelectOption[] = [
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
   const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
-    draft: { variant: 'warning', label: 'Draft' },
-    confirmed: { variant: 'success', label: 'Confirmed' },
-    returned: { variant: 'info', label: 'Returned' },
-    cancelled: { variant: 'danger', label: 'Cancelled' },
+    DRAFT: { variant: 'warning', label: 'Draft' },
+    CONFIRMED: { variant: 'success', label: 'Confirmed' },
+    RETURNED: { variant: 'info', label: 'Returned' },
+    CANCELLED: { variant: 'danger', label: 'Cancelled' },
   };
   const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
   return <Badge variant={variant}>{label}</Badge>;
@@ -55,57 +57,45 @@ function formatDate(dateStr: string): string {
 export default function SalesPage() {
   const router = useRouter();
 
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 20;
-
-  // Filters
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('created_at');
+  const resetToFirstPage = useCallback(() => setPage(1), []);
+  const { search, debouncedSearch, setSearch } = useDebouncedSearch('', {
+    onDebouncedChange: resetToFirstPage,
+  });
+  const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const fetchSales = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (statusFilter) params.set('status', statusFilter);
-      if (search) params.set('search', search);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
+  const paramsFor = useCallback(
+    (targetPage: number) => ({
+      page: targetPage,
+      page_size: pageSize,
+      status: statusFilter,
+      search: debouncedSearch,
+      sort_by: sortField,
+      sort_direction: sortDirection,
+    }),
+    [pageSize, statusFilter, debouncedSearch, sortField, sortDirection],
+  );
 
-      const response = await get<PaginatedResponse<Sale>>(
-        `/sales?${params.toString()}`
-      );
-      setSales(response.data.map((s: Sale) => ({ ...s, status: s.status?.toLowerCase() as SaleStatus })));
-      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load sales';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, statusFilter, search, sortField, sortDirection]);
+  const salesQuery = usePaginatedQuery<Sale>(
+    queryKeys.sales.list(paramsFor(page)),
+    `/sales?${toQueryString(paramsFor(page))}`,
+  );
+  const sales = normalizeList(salesQuery.data).data.map((s) => ({ ...s, status: s.status?.toLowerCase() as SaleStatus }));
+  const isLoading = salesQuery.isLoading;
+  const error = salesQuery.error?.message ?? null;
+  const totalPages = normalizeList(salesQuery.data).totalPages;
 
-  useEffect(() => {
-    fetchSales();
-  }, [fetchSales]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
+  // Warm the next page so paging does not wait on a round trip.
+  usePrefetchNextPage({
+    page,
+    totalPages,
+    isFetching: salesQuery.isFetching,
+    keyFor: (targetPage) => queryKeys.sales.list(paramsFor(targetPage)),
+    pathFor: (targetPage) => `/sales?${toQueryString(paramsFor(targetPage))}`,
+  });
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -201,19 +191,30 @@ export default function SalesPage() {
             aria-label="Filter by status"
           />
         </div>
+        <div className="w-full sm:w-40">
+          <Select
+            options={PAGE_SIZE_OPTIONS}
+            value={String(pageSize)}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            aria-label="Rows per page"
+          />
+        </div>
       </div>
 
       {/* Error display */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
 
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={sales as unknown as Record<string, unknown>[]}
+        data={sales}
+        label="Sales"
+        virtualize
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}

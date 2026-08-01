@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
         Reset your password
       </h2>
       <p className="mt-2 text-center text-sm text-gray-600">
-        Enter the email address associated with your account and we'll send you
+        Enter the email address associated with your account and we&apos;ll send you
         a link to reset your password.
       </p>
 

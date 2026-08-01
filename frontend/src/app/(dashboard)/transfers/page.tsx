@@ -9,9 +9,10 @@
  * Requirements: 4.2, 4.4, 4.5, 4.6
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { get, post } from '@/lib/api';
+import { usePaginatedQuery, useResourceQuery, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
 import {
   DataTable,
   Button,
@@ -30,6 +31,9 @@ import type {
   SparePart,
   Location,
 } from '@/lib/types';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { transferCreateSchema } from '@/lib/validation/schemas';
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
@@ -63,108 +67,33 @@ function formatDate(dateStr: string): string {
 export default function TransfersPage() {
   const router = useRouter();
 
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const pageSize = 20;
-
-  // Filters
   const [statusFilter, setStatusFilter] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('created_at');
+  const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  // Create modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState<TransferCreate>({
-    spare_part_id: '',
-    source_location_id: '',
-    destination_location_id: '',
-    quantity: 1,
-  });
-  const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-
-  // Lookup data for modal
-  const [locations, setLocations] = useState<Location[]>([]);
-
-  // Part search state (autocomplete)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState<TransferCreate>({ spare_part_id: '', source_location_id: '', destination_location_id: '', quantity: 1 });
+  const transfersQuery = usePaginatedQuery<Transfer>(queryKeys.transfers.list({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection }), `/transfers?${toQueryString({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection })}`);
+  const locationsQuery = useResourceQuery<PaginatedResponse<Location>>(queryKeys.locations.all, '/locations?page_size=100');
+  const createTransfer = useCreateMutation<TransferCreate>('/transfers', [queryKeys.transfers.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
+  const transfers = normalizeList(transfersQuery.data).data.map((t) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus }));
+  const locations = locationsQuery.data?.data ?? [];
+  const isLoading = transfersQuery.isLoading;
+  const error = transfersQuery.error?.message ?? null;
+  const totalPages = normalizeList(transfersQuery.data).totalPages;
   const [partSearch, setPartSearch] = useState('');
-  const [partResults, setPartResults] = useState<SparePart[]>([]);
-  const [isSearchingParts, setIsSearchingParts] = useState(false);
+  // Debounced so a typeahead issues one request per pause, not per keystroke.
+  // Requirements: 19.3
+  const debouncedPartSearch = useDebouncedValue(partSearch);
   const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
   const [showPartResults, setShowPartResults] = useState(false);
+  const partsQuery = useResourceQuery<PaginatedResponse<SparePart>>(queryKeys.parts.search(debouncedPartSearch), `/spare-parts?search=${encodeURIComponent(debouncedPartSearch)}&page_size=10`, { enabled: debouncedPartSearch.length >= 2, staleTime: 60_000 });
+  const partResults = partsQuery.data?.data ?? [];
+  const isSearchingParts = partsQuery.isFetching;
 
-  const fetchTransfers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (statusFilter) params.set('status', statusFilter);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
-
-      const response = await get<PaginatedResponse<Transfer>>(
-        `/transfers?${params.toString()}`
-      );
-      setTransfers(response.data.map((t: Transfer) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus })));
-      setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load transfers';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, statusFilter, sortField, sortDirection]);
-
-  useEffect(() => {
-    fetchTransfers();
-  }, [fetchTransfers]);
-
-  const fetchLookupData = useCallback(async () => {
-    try {
-      const locationsRes = await get<PaginatedResponse<Location>>('/locations?page_size=100');
-      setLocations(locationsRes.data || []);
-    } catch {
-      setLocations([]);
-    }
-  }, []);
-
-  // Debounced part search
-  useEffect(() => {
-    if (!partSearch || partSearch.length < 2) {
-      setPartResults([]);
-      setShowPartResults(false);
-      return;
-    }
-
-    const timeout = setTimeout(async () => {
-      setIsSearchingParts(true);
-      try {
-        const res = await get<PaginatedResponse<SparePart>>(
-          `/spare-parts?search=${encodeURIComponent(partSearch)}&page_size=10`
-        );
-        setPartResults(res.data || []);
-        setShowPartResults(true);
-      } catch {
-        setPartResults([]);
-      } finally {
-        setIsSearchingParts(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [partSearch]);
-
-  useEffect(() => {
-    fetchLookupData();
-  }, [fetchLookupData]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -175,38 +104,17 @@ export default function TransfersPage() {
     }
   };
 
-  const handleCreateTransfer = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      await post('/transfers', createForm);
-      setShowCreateModal(false);
-      setCreateForm({
-        spare_part_id: '',
-        source_location_id: '',
-        destination_location_id: '',
-        quantity: 1,
-      });
-      setSelectedPart(null);
-      setPartSearch('');
-      setSuccessMsg('Transfer created successfully');
-      fetchTransfers();
-    } catch (err: unknown) {
-      let message = 'Failed to create transfer';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
-        if (axiosErr.response?.data?.detail) {
-          message = axiosErr.response.data.detail;
-        } else if (axiosErr.response?.status) {
-          message = `Request failed with status code ${axiosErr.response.status}`;
-        }
-      } else if (err instanceof Error) {
-        message = err.message;
-      }
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const handleCreateTransfer = () => {
+    const validation = validateWithSchema(transferCreateSchema, createForm);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    setCreateError(null);
+    createTransfer.mutate(validation.data, {
+      onError: (err) => setCreateError(err.message),
+      onSuccess: () => { setShowCreateModal(false); setCreateForm({ spare_part_id: '', source_location_id: '', destination_location_id: '', quantity: 1 }); setSelectedPart(null); setPartSearch(''); setSuccessMsg('Transfer created successfully'); },
+    });
   };
 
   const locationOptions: SelectOption[] = locations.map((l) => ({
@@ -294,9 +202,7 @@ export default function TransfersPage() {
 
       {/* Alerts */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
       {successMsg && (
         <Alert variant="success" onClose={() => setSuccessMsg(null)}>
@@ -307,7 +213,7 @@ export default function TransfersPage() {
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={transfers as unknown as Record<string, unknown>[]}
+        data={transfers}
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -315,6 +221,7 @@ export default function TransfersPage() {
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}
+        label="Transfers"
         emptyMessage="No transfers found. Create your first transfer to get started."
       />
 
@@ -340,7 +247,7 @@ export default function TransfersPage() {
             </Button>
             <Button
               onClick={handleCreateTransfer}
-              isLoading={isCreating}
+              isLoading={createTransfer.isPending}
               disabled={
                 !createForm.spare_part_id ||
                 !createForm.source_location_id ||
@@ -387,7 +294,7 @@ export default function TransfersPage() {
                 <input
                   type="text"
                   value={partSearch}
-                  onChange={(e) => setPartSearch(e.target.value)}
+                  onChange={(e) => { setPartSearch(e.target.value); setShowPartResults(e.target.value.length >= 2); }}
                   onFocus={() => partResults.length > 0 && setShowPartResults(true)}
                   placeholder="Type to search by part number, name, or barcode..."
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -422,9 +329,9 @@ export default function TransfersPage() {
                     ))}
                   </ul>
                 )}
-                {showPartResults && partResults.length === 0 && partSearch.length >= 2 && !isSearchingParts && (
-                  <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-500 shadow-lg">
-                    No parts found matching &ldquo;{partSearch}&rdquo;
+                {showPartResults && partResults.length === 0 && debouncedPartSearch.length >= 2 && !isSearchingParts && (
+                  <div role="status" className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-500 shadow-lg">
+                    No parts found matching &ldquo;{debouncedPartSearch}&rdquo;
                   </div>
                 )}
               </>

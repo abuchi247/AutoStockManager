@@ -22,6 +22,7 @@ from app.models.inventory_movement_ledger import MovementType
 from app.models.sale import Sale, SaleItem, SaleStatus, PaymentType
 from app.services.sales_service import (
     InvalidSaleStatusError,
+    ReturnQuantityExceededError,
     SaleNotFoundError,
     SalesService,
 )
@@ -608,7 +609,7 @@ class TestReturnSalePartialReturn:
         "app.services.sales_service.record_inventory_movement",
         new_callable=AsyncMock,
     )
-    async def test_partial_return_caps_at_original_quantity(
+    async def test_partial_return_rejects_over_quantity(
         self,
         mock_record,
         mock_db,
@@ -616,22 +617,19 @@ class TestReturnSalePartialReturn:
         returned_by_user,
         sale_item_1,
     ):
-        """Return quantity should be capped at the original sale quantity."""
+        """Return quantity exceeding original should be rejected."""
         _mock_db_with_sale(mock_db, confirmed_sale)
         service = SalesService(mock_db)
 
         # Try to return more than was sold (item_1 has qty=5)
-        await service.return_sale(
-            sale_id=confirmed_sale.id,
-            returned_by=returned_by_user,
-            return_items=[
-                {"sale_item_id": sale_item_1.id, "quantity": "999.00"}
-            ],
-        )
-
-        call_kwargs = mock_record.call_args_list[0].kwargs
-        # Should be capped at original qty of 5
-        assert call_kwargs["quantity_change"] == Decimal("5.00")
+        with pytest.raises(ReturnQuantityExceededError):
+            await service.return_sale(
+                sale_id=confirmed_sale.id,
+                returned_by=returned_by_user,
+                return_items=[
+                    {"sale_item_id": sale_item_1.id, "quantity": "999.00"}
+                ],
+            )
 
     @pytest.mark.asyncio
     @patch(

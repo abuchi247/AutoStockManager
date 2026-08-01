@@ -34,7 +34,7 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -48,26 +48,10 @@ from app.database import Base
 # their table definitions. Without these imports, `alembic revision --autogenerate`
 # will not detect model changes.
 #
-# As new models are added to the project, uncomment their imports below:
-from app.models.base import BaseModel  # noqa: F401
-from app.models.user import User  # noqa: F401
-from app.models.spare_part import SparePart  # noqa: F401
-from app.models.location import Location  # noqa: F401
-from app.models.category import Category  # noqa: F401
-# from app.models.inventory_movement_ledger import InventoryMovementLedger  # noqa: F401
-# from app.models.stock_status_cache import StockStatusCache  # noqa: F401
-# from app.models.cost_layer import CostLayer  # noqa: F401
-# from app.models.sale import Sale, SaleItem  # noqa: F401
-# from app.models.customer import Customer  # noqa: F401
-# from app.models.customer_credit_ledger import CustomerCreditLedger  # noqa: F401
-# from app.models.supplier import Supplier  # noqa: F401
-# from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem  # noqa: F401
-# from app.models.goods_receipt_note import GoodsReceiptNote, GRNItem  # noqa: F401
-# from app.models.transfer import Transfer  # noqa: F401
-# from app.models.audit_session import AuditSession, AuditSnapshotItem, AuditCount  # noqa: F401
-# from app.models.notification import Notification  # noqa: F401
-# from app.models.audit_trail import AuditTrail  # noqa: F401
-# from app.models.invoice import Invoice  # noqa: F401
+# Importing the models package triggers its __init__.py which registers every
+# model with Base.metadata. This avoids maintaining a hand-curated list that
+# silently drifts (which previously left 22 tables without migrations).
+import app.models  # noqa: F401
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -120,21 +104,32 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+MIGRATION_ADVISORY_LOCK_KEY = 784231905
+
+
 def do_run_migrations(connection: Connection) -> None:
-    """Execute migration operations using the provided synchronous connection.
+    """Run migrations while holding a PostgreSQL session advisory lock.
 
-    This function is called within run_sync() to bridge the async/sync gap.
-    It configures the Alembic context with the active connection and runs
-    all pending migrations within a transaction.
-
-    Args:
-        connection: A synchronous SQLAlchemy Connection object provided
-                    by the async engine's run_sync() method.
+    The lock serializes deployment commands when multiple application
+    instances start at once. It is released in a ``finally`` block so a
+    failed migration cannot leave the lock held by a pooled connection.
     """
     context.configure(connection=connection, target_metadata=target_metadata)
-
-    with context.begin_transaction():
-        context.run_migrations()
+    lock_acquired = False
+    try:
+        connection.execute(
+            text("SELECT pg_advisory_lock(:lock_key)"),
+            {"lock_key": MIGRATION_ADVISORY_LOCK_KEY},
+        )
+        lock_acquired = True
+        with context.begin_transaction():
+            context.run_migrations()
+    finally:
+        if lock_acquired:
+            connection.execute(
+                text("SELECT pg_advisory_unlock(:lock_key)"),
+                {"lock_key": MIGRATION_ADVISORY_LOCK_KEY},
+            )
 
 
 async def run_async_migrations() -> None:

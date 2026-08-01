@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { get, post } from '@/lib/api';
+import { usePaginatedQuery, useResourceQuery, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
 import {
   DataTable,
   Button,
@@ -23,6 +24,9 @@ import type {
   PaginatedResponse,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+
+import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
+import { purchaseOrderCreateSchema } from '@/lib/validation/schemas';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -47,76 +51,27 @@ function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
 export default function PurchasesPage() {
   const router = useRouter();
 
-  // List state
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const pageSize = 20;
-
-  // Filters
   const [statusFilter, setStatusFilter] = useState('');
-
-  // Sort
-  const [sortField, setSortField] = useState<string>('created_at');
+  const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-
-  // Create form state
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const ordersQuery = usePaginatedQuery<PurchaseOrder>(queryKeys.purchases.list({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection }), `/purchase-orders?${toQueryString({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection })}`);
+  const suppliersQuery = useResourceQuery<PaginatedResponse<Supplier>>(queryKeys.suppliers.list({ page_size: 100 }), '/suppliers?page_size=100', { enabled: showCreateModal });
+  const createOrder = useCreateMutation<PurchaseOrderCreate>('/purchase-orders', [queryKeys.purchases.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
+  const orders = normalizeList(ordersQuery.data).data.map((po) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus }));
+  const suppliers = suppliersQuery.data?.data ?? [];
+  const isLoading = ordersQuery.isLoading;
+  const error = ordersQuery.error?.message ?? null;
+  const totalPages = normalizeList(ordersQuery.data).totalPages;
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [poNotes, setPoNotes] = useState('');
   const [poItems, setPoItems] = useState<PurchaseOrderItemCreate[]>([
     { spare_part_id: '', quantity_ordered: '' as unknown as number, unit_cost: '' as unknown as number },
   ]);
 
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('page_size', String(pageSize));
-      if (statusFilter) params.set('status', statusFilter);
-      if (sortField) params.set('sort_by', sortField);
-      if (sortDirection) params.set('sort_direction', sortDirection);
-
-      const response = await get<PaginatedResponse<PurchaseOrder>>(
-        `/purchase-orders?${params.toString()}`
-      );
-      setOrders(response.data.map((po: PurchaseOrder) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus })));
-      setTotalPages(response.meta.total_pages);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load purchase orders';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page, statusFilter, sortField, sortDirection]);
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const fetchFormData = useCallback(async () => {
-    try {
-      const suppliersRes = await get<PaginatedResponse<Supplier>>('/suppliers?page_size=100');
-      setSuppliers(suppliersRes.data);
-    } catch {
-      // Silently fail
-    }
-  }, []);
-
-  useEffect(() => {
-    if (showCreateModal) {
-      fetchFormData();
-    }
-  }, [showCreateModal, fetchFormData]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -143,31 +98,19 @@ export default function PurchasesPage() {
     setPoItems(updated);
   };
 
-  const handleCreatePO = async () => {
-    setIsCreating(true);
-    setCreateError(null);
-    try {
-      const payload: PurchaseOrderCreate = {
-        supplier_id: selectedSupplier,
-        notes: poNotes || undefined,
-        items: poItems
-          .filter((item) => item.spare_part_id)
-          .map((item) => ({
-            ...item,
-            quantity_ordered: item.quantity_ordered === ('' as unknown as number) ? 1 : (item.quantity_ordered || 1),
-            unit_cost: item.unit_cost === ('' as unknown as number) ? 0 : (item.unit_cost || 0),
-          })),
-      };
-      await post('/purchase-orders', payload);
-      setShowCreateModal(false);
-      resetCreateForm();
-      fetchOrders();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create purchase order';
-      setCreateError(message);
-    } finally {
-      setIsCreating(false);
+  const handleCreatePO = () => {
+    const payload: PurchaseOrderCreate = {
+      supplier_id: selectedSupplier,
+      notes: poNotes || undefined,
+      items: poItems.filter((item) => item.spare_part_id).map((item) => ({ ...item, quantity_ordered: item.quantity_ordered === ('' as unknown as number) ? 1 : (item.quantity_ordered || 1), unit_cost: item.unit_cost === ('' as unknown as number) ? 0 : (item.unit_cost || 0) })),
+    };
+    const validation = validateWithSchema(purchaseOrderCreateSchema, payload);
+    if (!validation.data) {
+      setCreateError(formatFieldErrors(validation.errors));
+      return;
     }
+    setCreateError(null);
+    createOrder.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); resetCreateForm(); } });
   };
 
   const resetCreateForm = () => {
@@ -264,15 +207,13 @@ export default function PurchasesPage() {
 
       {/* Error display */}
       {error && (
-        <Alert variant="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <Alert variant="error">{error}</Alert>
       )}
 
       {/* Data table */}
       <DataTable
         columns={columns}
-        data={orders as unknown as Record<string, unknown>[]}
+        data={orders}
         isLoading={isLoading}
         currentPage={page}
         totalPages={totalPages}
@@ -280,6 +221,7 @@ export default function PurchasesPage() {
         sortField={sortField}
         sortDirection={sortDirection}
         onSort={handleSort}
+        label="Purchase orders"
         emptyMessage="No purchase orders found."
       />
 
@@ -305,7 +247,7 @@ export default function PurchasesPage() {
             </Button>
             <Button
               onClick={handleCreatePO}
-              isLoading={isCreating}
+              isLoading={createOrder.isPending}
               disabled={!selectedSupplier || poItems.every((i) => !i.spare_part_id)}
             >
               Create PO
@@ -425,36 +367,17 @@ function PartSearchInput({
   onChange: (partId: string) => void;
 }) {
   const [search, setSearch] = useState('');
-  const [results, setResults] = useState<SparePart[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  // Search the server once typing pauses instead of once per keystroke.
+  // Requirements: 19.3
+  const debouncedSearch = useDebouncedValue(search);
   const [showResults, setShowResults] = useState(false);
   const [selectedName, setSelectedName] = useState('');
-
-  // Debounced search
-  useEffect(() => {
-    if (!search || search.length < 2) {
-      setResults([]);
-      setShowResults(false);
-      return;
-    }
-
-    const timeout = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await get<PaginatedResponse<SparePart>>(
-          `/spare-parts?search=${encodeURIComponent(search)}&page_size=10`
-        );
-        setResults(res.data || []);
-        setShowResults(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [search]);
+  const searchQuery = useResourceQuery<PaginatedResponse<SparePart>>(
+    queryKeys.parts.search(debouncedSearch), `/spare-parts?search=${encodeURIComponent(debouncedSearch)}&page_size=10`,
+    { enabled: debouncedSearch.length >= 2, staleTime: 60_000 },
+  );
+  const results = searchQuery.data?.data ?? [];
+  const isSearching = searchQuery.isFetching;
 
   const handleSelect = (part: SparePart) => {
     onChange(part.id);
@@ -483,7 +406,7 @@ function PartSearchInput({
       <input
         type="text"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => { setSearch(e.target.value); setShowResults(e.target.value.length >= 2); }}
         onFocus={() => results.length > 0 && setShowResults(true)}
         placeholder="Search part..."
         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -512,8 +435,11 @@ function PartSearchInput({
           ))}
         </ul>
       )}
-      {showResults && results.length === 0 && search.length >= 2 && !isSearching && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white p-2 text-sm text-gray-500 shadow-lg">
+      {showResults && results.length === 0 && debouncedSearch.length >= 2 && !isSearching && (
+        <div
+          role="status"
+          className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white p-2 text-sm text-gray-500 shadow-lg"
+        >
           No parts found
         </div>
       )}
