@@ -27,9 +27,11 @@ from app.refresh_cookie import (
 )
 from app.schemas.auth import (
     ErrorResponse,
+    ForceChangePasswordRequest,
     LoginRequest,
     LogoutRequest,
     MessageResponse,
+    PasswordChangeRequiredResponse,
     PasswordResetConfirm,
     PasswordResetRequest,
     PasswordResetResponse,
@@ -83,14 +85,35 @@ def _get_user_agent(request: Request) -> str | None:
 
 @router.post(
     "/login",
-    response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Authenticate user and issue tokens",
     description=(
         "Validates user credentials, returns the JWT access token, and sets the "
-        "refresh credential in an HTTP-only cookie."
+        "refresh credential in an HTTP-only cookie. If the user must change their "
+        "password, returns a 200 with password_change_required=true and a scoped token."
     ),
     responses={
+        200: {
+            "description": "Successful authentication or password change required",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "normal_login": {
+                            "summary": "Normal login",
+                            "value": {"access_token": "eyJ...", "token_type": "bearer"},
+                        },
+                        "password_change_required": {
+                            "summary": "Password change required",
+                            "value": {
+                                "password_change_required": True,
+                                "password_change_token": "eyJ...",
+                                "message": "Password change required before first access",
+                            },
+                        },
+                    }
+                }
+            },
+        },
         401: {"model": ErrorResponse, "description": "Invalid credentials"},
         423: {"model": ErrorResponse, "description": "Account locked"},
     },
@@ -102,7 +125,7 @@ async def login(
     response: Response,
     db: DbSession,
     settings: AppSettings,
-) -> TokenResponse:
+) -> TokenResponse | PasswordChangeRequiredResponse:
     """Authenticate user with username/password and issue JWT tokens.
 
     Requirements:
@@ -125,6 +148,15 @@ async def login(
             user_agent=user_agent,
         )
         await db.commit()
+
+        # If the user must change their password, return the scoped token
+        if result.get("password_change_required"):
+            return PasswordChangeRequiredResponse(
+                password_change_required=True,
+                password_change_token=result["password_change_token"],
+                message=result["message"],
+            )
+
         set_refresh_cookie(response, result["refresh_token"], settings)
         return TokenResponse(
             access_token=result["access_token"],
@@ -339,6 +371,66 @@ async def confirm_password_reset(
         )
         await db.commit()
         return MessageResponse(**result)
+    except PasswordValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.message,
+        )
+    except AuthenticationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.message,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+@router.post(
+    "/force-change-password",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Change password (first login)",
+    description=(
+        "Complete the forced password change for accounts that require it. "
+        "Accepts the scoped password_change_token issued at login and the new "
+        "password. On success, returns normal access/refresh tokens so the user "
+        "is immediately authenticated."
+    ),
+    responses={
+        400: {"model": ErrorResponse, "description": "Password validation failed"},
+        401: {"model": ErrorResponse, "description": "Invalid or expired token"},
+    },
+)
+@auth_rate_limit("rate_limit_login")
+async def force_change_password(
+    body: ForceChangePasswordRequest,
+    request: Request,
+    response: Response,
+    db: DbSession,
+    settings: AppSettings,
+) -> TokenResponse:
+    """Change password for a user who must set a new password before first access.
+
+    This endpoint is only usable with the scoped password_change token returned
+    by the login endpoint when must_change_password is True. After the password
+    is changed, the user receives normal tokens and is fully authenticated.
+    """
+    auth_service = await _get_auth_service(db, settings)
+    ip_address = _get_client_ip(request)
+    user_agent = _get_user_agent(request)
+
+    try:
+        result = await auth_service.force_change_password(
+            token=body.password_change_token,
+            new_password=body.new_password,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        await db.commit()
+        set_refresh_cookie(response, result["refresh_token"], settings)
+        return TokenResponse(
+            access_token=result["access_token"],
+            token_type=result["token_type"],
+        )
     except PasswordValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

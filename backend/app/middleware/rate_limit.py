@@ -110,7 +110,7 @@ def get_rate_limiter() -> Limiter:
 def auth_rate_limit(setting_name: str) -> Callable:
     """Decorate an authentication endpoint with a configured strict limit."""
 
-    def configured_limit(request: Request) -> str:
+    def configured_limit(request: Request = None) -> str:
         settings = get_settings()
         limit = getattr(settings, setting_name)
         return f"{limit}/minute"

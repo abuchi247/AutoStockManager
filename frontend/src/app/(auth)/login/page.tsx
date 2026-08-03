@@ -55,8 +55,22 @@ export default function LoginPage() {
     try {
       await login({ username: username.trim(), password });
       router.push('/dashboard');
-    } catch {
-      // Error is already captured in the useAuth hook's error state
+    } catch (err: unknown) {
+      // If password change is required, redirect to the change-password page
+      if (
+        err &&
+        typeof err === 'object' &&
+        'passwordChangeRequired' in err &&
+        (err as { passwordChangeRequired: boolean }).passwordChangeRequired
+      ) {
+        const typedErr = err as unknown as { passwordChangeToken: string };
+        const token = typedErr.passwordChangeToken;
+        // Store the token temporarily in sessionStorage for the change-password page
+        sessionStorage.setItem('password_change_token', token);
+        router.push('/change-password');
+        return;
+      }
+      // Other errors are already captured in the useAuth hook's error state
     }
   }
 

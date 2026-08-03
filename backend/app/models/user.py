@@ -95,6 +95,14 @@ class User(BaseModel, SoftDeleteMixin):
         comment="Number of consecutive failed login attempts",
     )
 
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+        comment="If true, the user must change their password before accessing the system",
+    )
+
     @property
     def is_locked(self) -> bool:
         """Check if the account is currently locked."""

@@ -42,6 +42,21 @@ export interface LoginResponse {
   refresh_token?: string;
   token_type: string;
   user?: UserProfile;
+  /** When true, the user must change their password before accessing the system. */
+  password_change_required?: boolean;
+  /** Scoped token for the force-change-password endpoint (present when password_change_required is true). */
+  password_change_token?: string;
+  message?: string;
+}
+
+export interface ForceChangePasswordRequest {
+  password_change_token: string;
+  new_password: string;
+}
+
+export interface ForceChangePasswordResponse {
+  access_token: string;
+  token_type: string;
 }
 
 /** Non-browser clients may still send a body token during the migration. */

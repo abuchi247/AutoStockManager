@@ -86,6 +86,22 @@ class PasswordResetConfirm(BaseModel):
     )
 
 
+class ForceChangePasswordRequest(BaseModel):
+    """Request body for POST /api/v1/auth/force-change-password."""
+
+    password_change_token: str = Field(
+        ...,
+        min_length=1,
+        description="Scoped token issued at login when password change is required",
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        description="New password (min 8 chars, must include uppercase, lowercase, and digit)",
+        examples=["NewSecure1"],
+    )
+
+
 # =============================================================================
 # Response Schemas
 # =============================================================================
@@ -103,6 +119,28 @@ class TokenResponse(BaseModel):
 
     access_token: str = Field(..., description="JWT access token")
     token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
+
+
+class PasswordChangeRequiredResponse(BaseModel):
+    """Response when a user must change their password before accessing the system.
+
+    Returned by the login endpoint when must_change_password is True.
+    The password_change_token is scoped only to the force-change-password
+    endpoint and expires in 10 minutes.
+    """
+
+    password_change_required: bool = Field(
+        default=True,
+        description="Always true when this response is returned",
+    )
+    password_change_token: str = Field(
+        ...,
+        description="Short-lived token scoped to the password change endpoint",
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable message explaining the requirement",
+    )
 
 
 class MessageResponse(BaseModel):
