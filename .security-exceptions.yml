@@ -17,4 +17,14 @@
 #   - Exceptions MUST be reviewed before expiry or the CI scan will fail
 #   - Expired exceptions are treated as failures
 
-exceptions: []
+exceptions:
+  - id: PYSEC-2025-185
+    package: python-jose
+    severity: medium
+    reason: >
+      No patched version available. python-jose is unmaintained; PYSEC-2025-185
+      relates to JWK parsing edge cases. Our usage only processes tokens signed
+      with a server-controlled HMAC secret and does not accept external JWKs.
+      Migrating to pyjwt/joserfc is tracked but requires significant refactoring.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
