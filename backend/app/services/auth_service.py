@@ -226,6 +226,40 @@ def create_password_reset_token(
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
+def create_password_change_token(
+    user_id: str,
+    settings: Optional[Settings] = None,
+) -> str:
+    """Create a short-lived token scoped only to the force-change-password endpoint.
+
+    Issued when a user authenticates successfully but has must_change_password=True.
+    This token cannot be used as a regular access token; its type claim restricts
+    it to the password change operation only.
+
+    Args:
+        user_id: The user's UUID as a string.
+        settings: Optional settings override.
+
+    Returns:
+        Encoded JWT token string with type="password_change".
+    """
+    if settings is None:
+        settings = get_settings()
+
+    now = datetime.now(timezone.utc)
+    # Short-lived: 10 minutes to complete the password change
+    expire = now + timedelta(minutes=10)
+
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "type": "password_change",
+        "exp": expire,
+        "iat": now,
+        "jti": str(uuid.uuid4()),
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
 # =============================================================================
 # Auth Service - Main Service Class
 # =============================================================================
@@ -349,6 +383,27 @@ class AuthService:
         user.failed_login_attempts = 0
         user.locked_until = None
         await self.db.flush()
+
+        # Check if user must change their password before accessing the system
+        if user.must_change_password:
+            password_change_token = create_password_change_token(
+                user_id=str(user.id),
+                settings=self.settings,
+            )
+            # Record successful authentication (but access not yet granted)
+            if self.session_service:
+                await self.session_service.record_login_attempt(
+                    username=username,
+                    success=True,
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                )
+            return {
+                "password_change_required": True,
+                "password_change_token": password_change_token,
+                "message": "Password change required before first access",
+            }
 
         # Generate tokens
         access_token = create_access_token(
@@ -643,6 +698,100 @@ class AuthService:
         return {
             "message": f"All sessions revoked for user {user_id}",
             "revoked_count": revoked_count,
+        }
+
+    async def force_change_password(
+        self,
+        token: str,
+        new_password: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Change password for a user who has must_change_password=True.
+
+        Validates the scoped password_change token, enforces password complexity,
+        updates the password, clears the must_change_password flag, and issues
+        normal access/refresh tokens so the user is immediately logged in.
+
+        Args:
+            token: The password_change JWT token issued at login.
+            new_password: The new password (must meet complexity requirements).
+            ip_address: Client IP for session registration.
+            user_agent: Client user agent for session registration.
+
+        Returns:
+            Dict with access_token, refresh_token, and token_type.
+
+        Raises:
+            AuthenticationError: If the token is invalid or expired.
+            PasswordValidationError: If the new password doesn't meet requirements.
+        """
+        # Validate password complexity first
+        is_valid, error_msg = validate_password_complexity(new_password)
+        if not is_valid:
+            raise PasswordValidationError(error_msg)
+
+        # Decode and validate the scoped token
+        try:
+            payload = decode_token(token, self.settings)
+        except (JWTError, TypeError, ValueError):
+            raise AuthenticationError("Invalid or expired password change token")
+
+        if payload.get("type") != "password_change":
+            raise AuthenticationError("Invalid token type")
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise AuthenticationError("Invalid token payload")
+
+        # Find the user
+        result = await self.db.execute(
+            select(User).filter_by(id=user_id, deleted_at=None)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise AuthenticationError("User not found")
+
+        if not user.is_active:
+            raise AuthenticationError("Account is inactive")
+
+        if not user.must_change_password:
+            raise AuthenticationError("Password change is not required for this account")
+
+        # Update password and clear the flag
+        user.password_hash = hash_password(new_password, self.settings)
+        user.must_change_password = False
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        await self.db.flush()
+
+        # Issue normal tokens so the user is immediately logged in
+        access_token = create_access_token(
+            user_id=str(user.id),
+            role=user.role,
+            settings=self.settings,
+        )
+        refresh_token = create_refresh_token(
+            user_id=str(user.id),
+            settings=self.settings,
+        )
+
+        # Register session in Redis
+        if self.session_service:
+            refresh_payload = decode_token(refresh_token, self.settings)
+            jti = refresh_payload.get("jti", "")
+            await self.session_service.register_session(
+                user_id=str(user.id),
+                jti=jti,
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
         }
 
 

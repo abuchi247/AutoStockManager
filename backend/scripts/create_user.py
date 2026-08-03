@@ -28,7 +28,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 VALID_ROLES = ["Admin", "Manager", "Salesperson", "Storekeeper"]
 
 
-async def create_user(username: str, password: str, email: str, role: str) -> None:
+async def create_user(username: str, password: str, email: str, role: str, must_change_password: bool = True) -> None:
     """Create a new user or report if one already exists."""
     role = role.capitalize()
     if role not in VALID_ROLES:
@@ -61,8 +61,8 @@ async def create_user(username: str, password: str, email: str, role: str) -> No
 
         await session.execute(
             text("""
-                INSERT INTO users (id, username, email, password_hash, role, is_active, failed_login_attempts, created_at, updated_at)
-                VALUES (:id, :username, :email, :password_hash, :role, :is_active, :failed_login_attempts, :created_at, :updated_at)
+                INSERT INTO users (id, username, email, password_hash, role, is_active, failed_login_attempts, must_change_password, created_at, updated_at)
+                VALUES (:id, :username, :email, :password_hash, :role, :is_active, :failed_login_attempts, :must_change_password, :created_at, :updated_at)
             """),
             {
                 "id": user_id,
@@ -72,16 +72,20 @@ async def create_user(username: str, password: str, email: str, role: str) -> No
                 "role": role,
                 "is_active": True,
                 "failed_login_attempts": 0,
+                "must_change_password": must_change_password,
                 "created_at": now,
                 "updated_at": now,
             },
         )
         await session.commit()
         print(f"✓ User created successfully")
-        print(f"  Username: {username}")
-        print(f"  Email:    {email}")
-        print(f"  Role:     {role}")
-        print(f"  Password: {password}")
+        print(f"  Username:              {username}")
+        print(f"  Email:                 {email}")
+        print(f"  Role:                  {role}")
+        print(f"  Password:              {password}")
+        print(f"  Must change password:  {must_change_password}")
+        if must_change_password:
+            print(f"  (User will be required to set a new password on first login)")
 
 
 def main():
@@ -90,9 +94,21 @@ def main():
     parser.add_argument("--password", "-p", required=True, help="Password (min 8 chars, 1 upper, 1 lower, 1 digit)")
     parser.add_argument("--email", "-e", required=True, help="Email address")
     parser.add_argument("--role", "-r", default="ADMIN", choices=VALID_ROLES, help="User role (default: ADMIN)")
+    parser.add_argument(
+        "--no-force-change",
+        action="store_true",
+        default=False,
+        help="Skip forced password change on first login (default: user must change password)",
+    )
 
     args = parser.parse_args()
-    asyncio.run(create_user(args.username, args.password, args.email, args.role))
+    asyncio.run(create_user(
+        args.username,
+        args.password,
+        args.email,
+        args.role,
+        must_change_password=not args.no_force_change,
+    ))
 
 
 if __name__ == "__main__":

@@ -131,13 +131,14 @@ async def create_user(
             detail="Email already exists",
         )
 
-    # Create user
+    # Create user — new users must change their password on first login
     new_user = User(
         username=request.username,
         email=request.email,
         password_hash=hash_password(request.password, settings),
         role=request.role.value,
         is_active=request.is_active,
+        must_change_password=True,
         created_by=str(current_user.id),
     )
     db.add(new_user)

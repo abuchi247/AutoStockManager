@@ -17,6 +17,7 @@ from app.database import close_db, engine, init_db
 from app.health import check_dependencies
 from app.error_tracking import create_error_tracker
 from app.exception_handlers import install_exception_handlers
+from app.initial_admin import ensure_initial_admin
 from app.logging_config import configure_logging
 from app.middleware.rate_limit import create_rate_limiter, rate_limit_exceeded_handler
 from app.middleware.request_id import RequestIDMiddleware
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     await init_db()
     await get_redis_client()  # Initialize Redis connection
+    await ensure_initial_admin()  # Create admin if no users exist
     yield
     # Shutdown
     await close_arq_pool()

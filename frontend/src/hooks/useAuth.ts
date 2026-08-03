@@ -21,6 +21,11 @@ import type {
   UserRole,
 } from '@/lib/types';
 
+export interface PasswordChangeRequired {
+  passwordChangeRequired: true;
+  passwordChangeToken: string;
+}
+
 export interface AuthState {
   user: StoredUser | null;
   isAuthenticated: boolean;
@@ -106,7 +111,21 @@ export function useAuth(): UseAuthReturn {
 
     try {
       const response = await api.post<LoginResponse>('/auth/login', credentials);
-      const { access_token, user: responseUser } = response.data;
+      const data = response.data;
+
+      // If the backend requires a password change, throw a structured error
+      // that the login page can detect and redirect accordingly.
+      if (data.password_change_required && data.password_change_token) {
+        const err = new Error('Password change required') as Error & {
+          passwordChangeRequired: boolean;
+          passwordChangeToken: string;
+        };
+        err.passwordChangeRequired = true;
+        err.passwordChangeToken = data.password_change_token;
+        throw err;
+      }
+
+      const { access_token, user: responseUser } = data;
       if (!access_token) throw new Error('Login response did not contain an access token');
 
       // The refresh token, if returned by an older backend, is deliberately
@@ -123,6 +142,16 @@ export function useAuth(): UseAuthReturn {
       setStoredUser(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: unknown) {
+      // Re-throw password change errors so the login page can handle them
+      if (
+        err &&
+        typeof err === 'object' &&
+        'passwordChangeRequired' in err &&
+        (err as { passwordChangeRequired: boolean }).passwordChangeRequired
+      ) {
+        setIsLoading(false);
+        throw err;
+      }
       const message = extractErrorMessage(err);
       setError(message);
       throw new Error(message);
