@@ -28,3 +28,50 @@ exceptions:
       Migrating to pyjwt/joserfc is tracked but requires significant refactoring.
     expires: 2026-10-31
     reviewer: abuchiobiegbu
+
+  - id: PYSEC-2026-2263
+    package: pyasn1
+    severity: medium
+    reason: >
+      Transitive dependency of python-jose which pins pyasn1<0.5.0. Cannot be
+      independently upgraded. Will be resolved when python-jose is replaced with
+      pyjwt/joserfc. Our usage does not process untrusted ASN.1 input.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
+
+  - id: PYSEC-2026-3455
+    package: pyasn1
+    severity: medium
+    reason: >
+      Transitive dependency of python-jose which pins pyasn1<0.5.0. Cannot be
+      independently upgraded. Will be resolved when python-jose is replaced.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
+
+  - id: PYSEC-2026-3456
+    package: pyasn1
+    severity: medium
+    reason: >
+      Transitive dependency of python-jose which pins pyasn1<0.5.0. Cannot be
+      independently upgraded. Will be resolved when python-jose is replaced.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
+
+  - id: PYSEC-2026-3457
+    package: pyasn1
+    severity: medium
+    reason: >
+      Transitive dependency of python-jose which pins pyasn1<0.5.0. Cannot be
+      independently upgraded. Will be resolved when python-jose is replaced.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
+
+  - id: PYSEC-2026-1325
+    package: ecdsa
+    severity: medium
+    reason: >
+      Transitive dependency of python-jose. No fixed version available for ecdsa.
+      Our JWT implementation uses HMAC (HS256) exclusively and does not perform
+      ECDSA signature verification. Will be resolved when python-jose is replaced.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu

@@ -40,8 +40,8 @@ httpx==0.28.1
 sentry-sdk==2.19.2
 
 # Testing
-pytest==8.4.2
-pytest-asyncio==0.25.0
+pytest==9.0.3
+pytest-asyncio==0.26.0
 hypothesis==6.122.3
 aiosqlite==0.20.0
 # Used by the deployment-configuration contract tests
