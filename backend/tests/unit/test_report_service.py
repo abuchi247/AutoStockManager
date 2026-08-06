@@ -243,13 +243,16 @@ class TestPDFExport:
     def test_export_sales_report_pdf_contains_report_data(
         self, report_service, sales_filters
     ):
-        """PDF HTML fallback should contain report structure."""
+        """PDF export should contain report data (tested via HTML fallback)."""
         report = SalesReportResult(
             filters=sales_filters,
             total_sales=Decimal("5000.00"),
             sale_count=10,
         )
-        result = report_service.export_sales_report_pdf(report)
+        # Mock WeasyPrint away so we can verify the HTML content
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr(report_service, "_html_to_pdf", lambda html: html.encode("utf-8"))
+            result = report_service.export_sales_report_pdf(report)
         html_content = result.decode("utf-8")
         assert "Sales Report" in html_content
         assert "5000.00" in html_content
@@ -270,7 +273,10 @@ class TestPDFExport:
             total_sales_revenue=Decimal("100000.00"),
             gross_margin=Decimal("40000.00"),
         )
-        result = report_service.export_financial_summary_pdf(report)
+        # Mock WeasyPrint away so we can verify the HTML content
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr(report_service, "_html_to_pdf", lambda html: html.encode("utf-8"))
+            result = report_service.export_financial_summary_pdf(report)
         html_content = result.decode("utf-8")
         assert "Financial Summary" in html_content
         assert "100000.00" in html_content

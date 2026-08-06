@@ -160,6 +160,7 @@ def user(cookie_settings) -> User:
     record.is_locked = False
     record.locked_until = None
     record.failed_login_attempts = 0
+    record.must_change_password = False
     record.created_at = datetime.now(timezone.utc)
     record.updated_at = datetime.now(timezone.utc)
     return record

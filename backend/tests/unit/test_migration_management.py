@@ -47,7 +47,7 @@ def _load_amount_paid_migration():
 
 
 def test_amount_paid_migration_is_the_head_after_current_baseline():
-    """The existing 0006 baseline has a reviewed 0007 upgrade for amount_paid."""
+    """The migration chain is linear and 0008 is the current head."""
     revisions = {}
     for path in VERSIONS_ROOT.glob("*.py"):
         if path.name == "__init__.py":
@@ -55,9 +55,9 @@ def test_amount_paid_migration_is_the_head_after_current_baseline():
         revision = _literal_assignment(path, "revision")
         revisions[revision] = _literal_assignment(path, "down_revision")
 
-    assert revisions["0007"] == "0006"
+    assert revisions["0008"] == "0007"
     parents = {parent for parent in revisions.values() if parent is not None}
-    assert {revision for revision in revisions if revision not in parents} == {"0007"}
+    assert {revision for revision in revisions if revision not in parents} == {"0008"}
 
 
 def test_amount_paid_upgrade_adds_missing_column():

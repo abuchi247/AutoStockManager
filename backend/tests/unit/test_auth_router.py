@@ -63,6 +63,7 @@ def test_user(test_settings):
     user.is_locked = False
     user.locked_until = None
     user.failed_login_attempts = 0
+    user.must_change_password = False
     user.created_at = datetime.now(timezone.utc)
     user.updated_at = datetime.now(timezone.utc)
     return user
