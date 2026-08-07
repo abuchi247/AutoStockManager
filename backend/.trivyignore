@@ -1,0 +1,14 @@
+# Trivy vulnerability ignore list
+# --------------------------------
+# CVEs listed here are accepted risks documented in .security-exceptions.yml.
+# Only ignore CVEs that have no available fix or are blocked by a known
+# dependency constraint. Review before each expiry date.
+
+# pyasn1 CVEs — transitive dependency of python-jose which pins pyasn1<0.5.0.
+# Cannot be upgraded until python-jose is replaced with pyjwt/joserfc.
+# Our JWT implementation uses HS256 only and does not process untrusted ASN.1.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-30922
+CVE-2026-59884
+CVE-2026-59885
+CVE-2026-59886

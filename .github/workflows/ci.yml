@@ -284,6 +284,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+          trivyignores: backend/.trivyignore
           format: table
 
       - name: Scan frontend container
