@@ -62,6 +62,12 @@ USER appuser
 # Expose only the application port
 EXPOSE 8000
 
+# Docker-level health check so orchestrators (ECS, Swarm, Kubernetes liveness
+# probes via exec) can detect a stuck or crashed process without an external
+# probe service. The /health endpoint performs DB + Redis readiness checks.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
 # Build metadata labels (overridden at build time via --build-arg)
 ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
