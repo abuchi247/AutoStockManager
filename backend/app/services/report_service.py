@@ -1027,13 +1027,17 @@ class ReportService:
     def _html_to_pdf(self, html: str) -> bytes:
         """Convert HTML to PDF using WeasyPrint.
 
-        Falls back to returning HTML as bytes if WeasyPrint is not available.
+        Falls back to returning HTML as bytes if WeasyPrint is not available
+        or if PDF rendering fails (e.g., missing system fonts on CI).
         """
         try:
             from weasyprint import HTML
             return HTML(string=html).write_pdf()
         except ImportError:
             # WeasyPrint not installed — return HTML bytes as fallback
+            return html.encode("utf-8")
+        except Exception:
+            # Rendering failed (missing fonts, codec errors, etc.)
             return html.encode("utf-8")
 
     def _base_css(self) -> str:

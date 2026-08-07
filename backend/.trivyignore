@@ -1,0 +1,28 @@
+# Trivy vulnerability ignore list
+# --------------------------------
+# CVEs listed here are accepted risks documented in .security-exceptions.yml.
+# Only ignore CVEs that have no available fix or are blocked by a known
+# dependency constraint. Review before each expiry date.
+
+# pyasn1 CVEs — transitive dependency of python-jose which pins pyasn1<0.5.0.
+# Cannot be upgraded until python-jose is replaced with pyjwt/joserfc.
+# Our JWT implementation uses HS256 only and does not process untrusted ASN.1.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-30922
+CVE-2026-59884
+CVE-2026-59885
+CVE-2026-59886
+
+# jaraco.context — pip build tool, not imported or used at runtime.
+# The path traversal vulnerability requires a malicious package archive during
+# install, which is mitigated by our pinned requirements.txt with hashed deps.
+# Will be resolved when pip upgrades its bundled version.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-23949
+
+# wheel — pip build tool, not a runtime dependency.
+# The privilege escalation requires running 'pip wheel' with untrusted input,
+# which we do not do. Our images are built from a pinned requirements.txt.
+# Will be resolved when the base image ships a patched pip.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-24049

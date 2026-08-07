@@ -7,7 +7,7 @@
 ###############################################################################
 
 # ---------- Stage 1: Dependencies ----------
-FROM node:20-alpine AS deps
+FROM node:20-alpine3.22 AS deps
 
 WORKDIR /app
 
@@ -32,9 +32,12 @@ ENV NEXT_PUBLIC_BUILD_DATE=${BUILD_DATE}
 RUN npm run build
 
 # ---------- Stage 3: Runtime ----------
-FROM node:20-alpine AS runtime
+FROM node:20-alpine3.22 AS runtime
 
 ENV NODE_ENV=production
+
+# Apply latest OS security patches before locking the image down
+RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
 
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

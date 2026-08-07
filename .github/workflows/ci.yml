@@ -13,8 +13,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/autostockmanager/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/autostockmanager/frontend
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
@@ -213,12 +213,14 @@ jobs:
         working-directory: frontend
         run: |
           echo "Scanning frontend Node.js dependencies..."
-          # npm audit returns non-zero for any vulnerability; we threshold at high
-          npm audit --audit-level=high || {
+          # Audit only production (non-dev) dependencies at high severity.
+          # Dev toolchains (vitest, eslint, playwright) are excluded because
+          # their vulnerabilities are not reachable in the deployed bundle.
+          npm audit --audit-level=high --omit=dev || {
             echo ""
             echo "──────────────────────────────────────────────────────────"
-            echo "HIGH or CRITICAL vulnerabilities found in frontend deps."
-            echo "Review .security-exceptions.yml for accepted risks."
+            echo "HIGH or CRITICAL vulnerabilities found in production frontend deps."
+            echo "Run: npm audit --audit-level=high --omit=dev"
             echo "──────────────────────────────────────────────────────────"
             exit 1
           }
@@ -275,21 +277,25 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Install Trivy scanner
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
           severity: CRITICAL,HIGH
           exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: backend/.trivyignore
           format: table
 
       - name: Scan frontend container
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.commit_sha }}
           severity: CRITICAL,HIGH
           exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: frontend/.trivyignore
           format: table
 
       - name: Verify container metadata
