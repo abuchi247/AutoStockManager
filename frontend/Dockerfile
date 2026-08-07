@@ -36,6 +36,9 @@ FROM node:20-alpine3.22 AS runtime
 
 ENV NODE_ENV=production
 
+# Apply latest OS security patches before locking the image down
+RUN apk update && apk upgrade --no-cache && rm -rf /var/cache/apk/*
+
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
