@@ -1,19 +1,21 @@
 # Trivy vulnerability ignore list — frontend container
 # -------------------------------------------------------
-# These CVEs are in node_modules within the built image. They are either
-# development-only tools that don't run at runtime, or pinned transitively
-# by eslint-config-next / Next.js internals.
+# These CVEs are in node_modules within the built image. They fall into two
+# categories:
+# 1. npm's own bundled dependencies (tar, minimatch, cross-spawn, etc.) —
+#    npm is not used at runtime in the production container; only Node.js server.js
+#    runs. These packages are development/install-time tools.
+# 2. Build tooling pinned by eslint-config-next / Next.js internals that do
+#    not run in the production server process.
 # All are documented and tracked. Review before each expiry date.
 
-# brace-expansion — pinned by eslint-config-next and Next.js build tooling.
-# Does not run at runtime in the production Node.js server process.
+# brace-expansion — pinned by eslint-config-next / Next.js internal tooling.
 # Reviewed: 2026-08-07. Expires: 2026-10-31.
 CVE-2026-13149
 CVE-2026-14257
 CVE-2026-69152
 
-# cross-spawn — build tool dependency pinned by eslint-config-next.
-# Not reachable in production runtime.
+# cross-spawn — build tool pinned by eslint-config-next.
 # Reviewed: 2026-08-07. Expires: 2026-10-31.
 CVE-2024-21538
 
@@ -25,6 +27,24 @@ CVE-2025-64756
 # Reviewed: 2026-08-07. Expires: 2026-10-31.
 CVE-2026-69192
 
-# minimatch — pinned by eslint-config-next.
+# minimatch — pinned by eslint-config-next and npm's own bundled modules.
+# npm is not executed at runtime in the production container.
 # Reviewed: 2026-08-07. Expires: 2026-10-31.
 CVE-2026-26996
+CVE-2026-27903
+CVE-2026-27904
+
+# tar (node-tar) — bundled with npm (the package manager in the Node.js image).
+# npm is not invoked at container runtime; the production container only runs
+# `node server.js`. These vulnerabilities require processing a malicious tar
+# archive via `npm install`, which never happens at runtime.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-59873
+CVE-2026-23745
+CVE-2026-23950
+CVE-2026-24842
+CVE-2026-26960
+CVE-2026-29786
+CVE-2026-31802
+CVE-2026-48815
+CVE-2026-59874
