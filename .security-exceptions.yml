@@ -66,6 +66,16 @@ exceptions:
     expires: 2026-10-31
     reviewer: abuchiobiegbu
 
+  - id: PYSEC-2026-1845
+    package: pytest
+    severity: medium
+    reason: >
+      pytest 9.0.3 fixes this but no compatible pytest-asyncio release supports
+      pytest>=9 yet. This is a test-only dependency with no production exposure.
+      Will be upgraded once pytest-asyncio releases a version compatible with pytest 9.
+    expires: 2026-10-31
+    reviewer: abuchiobiegbu
+
   - id: PYSEC-2026-1325
     package: ecdsa
     severity: medium
