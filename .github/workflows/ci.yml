@@ -13,8 +13,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/autostockmanager/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/autostockmanager/frontend
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
