@@ -213,12 +213,14 @@ jobs:
         working-directory: frontend
         run: |
           echo "Scanning frontend Node.js dependencies..."
-          # npm audit returns non-zero for any vulnerability; we threshold at high
-          npm audit --audit-level=high || {
+          # Audit only production (non-dev) dependencies at high severity.
+          # Dev toolchains (vitest, eslint, playwright) are excluded because
+          # their vulnerabilities are not reachable in the deployed bundle.
+          npm audit --audit-level=high --omit=dev || {
             echo ""
             echo "──────────────────────────────────────────────────────────"
-            echo "HIGH or CRITICAL vulnerabilities found in frontend deps."
-            echo "Review .security-exceptions.yml for accepted risks."
+            echo "HIGH or CRITICAL vulnerabilities found in production frontend deps."
+            echo "Run: npm audit --audit-level=high --omit=dev"
             echo "──────────────────────────────────────────────────────────"
             exit 1
           }
