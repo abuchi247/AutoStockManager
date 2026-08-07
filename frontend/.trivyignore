@@ -1,0 +1,30 @@
+# Trivy vulnerability ignore list — frontend container
+# -------------------------------------------------------
+# These CVEs are in node_modules within the built image. They are either
+# development-only tools that don't run at runtime, or pinned transitively
+# by eslint-config-next / Next.js internals.
+# All are documented and tracked. Review before each expiry date.
+
+# brace-expansion — pinned by eslint-config-next and Next.js build tooling.
+# Does not run at runtime in the production Node.js server process.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-13149
+CVE-2026-14257
+CVE-2026-69152
+
+# cross-spawn — build tool dependency pinned by eslint-config-next.
+# Not reachable in production runtime.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2024-21538
+
+# glob — pinned by Next.js internal tooling.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2025-64756
+
+# ip-address — pinned by a deep transitive dep.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-69192
+
+# minimatch — pinned by eslint-config-next.
+# Reviewed: 2026-08-07. Expires: 2026-10-31.
+CVE-2026-26996

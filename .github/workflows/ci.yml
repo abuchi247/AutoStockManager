@@ -295,6 +295,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+          trivyignores: frontend/.trivyignore
           format: table
 
       - name: Verify container metadata
