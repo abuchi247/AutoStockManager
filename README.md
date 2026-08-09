@@ -64,13 +64,12 @@ This system digitizes and streamlines operations for auto spare parts businesses
    ```bash
    docker-compose up --build
    ```
-   This starts PostgreSQL, Redis, the FastAPI backend, the ARQ background worker, and the Next.js frontend.
+   This builds and starts all five containers: PostgreSQL, Redis, the FastAPI backend, the ARQ background worker, and the Next.js frontend. The frontend is built inside Docker using the production standalone build — no local Node.js installation required.
 
-4. **Apply database migrations**. The backend container runs this command before Uvicorn and aborts if it fails. To run it manually or as a deployment step:
+4. **Database migrations** run automatically inside the backend container before Uvicorn accepts traffic. To re-run them manually (e.g. after adding migrations):
    ```bash
    docker exec autostockmanager-backend alembic upgrade head
    ```
-   Alembic is the only schema-management path; application startup does not call `create_all` or execute inline DDL. Concurrent migration commands are serialized by a PostgreSQL advisory lock.
 
 5. **Retrieve the initial admin password**. On a fresh database (no users), the backend auto-creates an `admin` account with a random temporary password and prints it to the container logs exactly once:
    ```bash
@@ -94,6 +93,8 @@ This system digitizes and streamlines operations for auto spare parts businesses
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Docs (Swagger): http://localhost:8000/docs
+
+> **Local development with hot-reload:** if you want live code reloading on the frontend, stop the frontend container (`docker-compose stop frontend`) and run `npm run dev` in the `frontend/` directory instead. The backend services stay in Docker.
 
 ### Initial Admin Provisioning
 
@@ -516,8 +517,9 @@ cd frontend && npm run lint
 # Bundle size budget check
 cd frontend && npm run perf:bundle
 
-# End-to-end tests (Playwright — requires running backend + frontend)
-cd frontend && E2E_USERNAME=admin E2E_PASSWORD='Admin123!' npm run e2e
+# End-to-end tests (Playwright — requires running backend + frontend, and a user
+# with --no-force-change so Playwright can log in directly)
+cd frontend && E2E_USERNAME=testuser E2E_PASSWORD='TestPass1!' npm run e2e
 
 # Accessibility audit via Lighthouse
 cd frontend && npm run perf:lighthouse
@@ -557,13 +559,20 @@ Private — All rights reserved.
 
 The Playwright suite covers browser login and creation/cancellation of an isolated draft sale. It creates a unique location, spare part, and stock adjustment through the authenticated API, then removes the fixture records after the test; it does not use shared production data.
 
-Install dependencies and browsers once, then run a production-like frontend build and the suite from `frontend/`:
+Create a dedicated test user first (bypassing the forced password change so Playwright can log in directly):
+
+```bash
+docker exec autostockmanager-backend python scripts/create_user.py \
+  -u testuser -p TestPass1! -r Salesperson -e test@example.com --no-force-change
+```
+
+Then install dependencies and run the suite:
 
 ```bash
 npm ci
 npx playwright install chromium
 npm run build
-E2E_USERNAME=admin E2E_PASSWORD='Admin123!' npm run e2e
+E2E_USERNAME=testuser E2E_PASSWORD='TestPass1!' npm run e2e
 ```
 
 The API must be available at `E2E_API_URL` (default `http://127.0.0.1:8000/api/v1`) and the frontend at `PLAYWRIGHT_BASE_URL` (default `http://127.0.0.1:3000`). Set `PLAYWRIGHT_SKIP_WEBSERVER=true` when an already-running frontend should be reused. CI supplies `E2E_USERNAME` and `E2E_PASSWORD` through encrypted repository secrets and starts disposable PostgreSQL, Redis, and backend services before running the suite. The CI workflow is `.github/workflows/frontend-e2e.yml`.
