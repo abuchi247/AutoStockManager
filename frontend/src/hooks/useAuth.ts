@@ -82,9 +82,21 @@ export function useAuth(): UseAuthReturn {
       if (!access_token) return false;
 
       setAccessToken(access_token);
-      const restoredUser = userFromToken(access_token, getStoredUser());
-      setStoredUser(restoredUser);
-      setUser(restoredUser);
+
+      // Fetch the real profile so the sidebar shows username/email, not the
+      // UUID that is all the JWT carries. Fall back to token-decoded data if
+      // the /me call fails (e.g. a transient network error).
+      try {
+        const profile = await api.get<UserProfile>('/users/me');
+        const restoredUser = userFromProfile(profile.data);
+        setStoredUser(restoredUser);
+        setUser(restoredUser);
+      } catch {
+        const restoredUser = userFromToken(access_token, getStoredUser());
+        setStoredUser(restoredUser);
+        setUser(restoredUser);
+      }
+
       return true;
     } catch {
       clearAuth();
@@ -128,17 +140,27 @@ export function useAuth(): UseAuthReturn {
       const { access_token, user: responseUser } = data;
       if (!access_token) throw new Error('Login response did not contain an access token');
 
-      // The refresh token, if returned by an older backend, is deliberately
-      // ignored. The server owns it in an HttpOnly cookie.
       setAccessToken(access_token);
-      const authenticatedUser = responseUser
-        ? userFromProfile(responseUser)
-        : userFromToken(access_token, {
+
+      // Prefer the profile object the backend returned (if any), otherwise
+      // fetch /users/me so we always show a real username, never a raw UUID.
+      let authenticatedUser: StoredUser;
+      if (responseUser) {
+        authenticatedUser = userFromProfile(responseUser);
+      } else {
+        try {
+          const profile = await api.get<UserProfile>('/users/me');
+          authenticatedUser = userFromProfile(profile.data);
+        } catch {
+          // Absolute fallback: use the typed credential the user just entered
+          authenticatedUser = userFromToken(access_token, {
             id: '',
             username: credentials.username,
             email: '',
             role: 'admin',
           });
+        }
+      }
       setStoredUser(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: unknown) {

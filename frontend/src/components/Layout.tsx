@@ -155,21 +155,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </ul>
         </nav>
 
-        {/* User info at bottom */}
+        {/* User profile card — click to view/edit profile */}
         <div className="border-t border-white/10 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#667eea] text-xs font-medium text-white">
+          <Link
+            href="/profile"
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/10 group"
+            aria-label="View your profile"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#667eea] text-xs font-semibold text-white group-hover:bg-[#764ba2] transition-colors">
               {user?.username?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="flex-1 truncate">
-              <p className="truncate text-sm font-medium text-white">
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium text-white leading-tight">
                 {user?.username || 'User'}
               </p>
-              <p className="truncate text-xs capitalize text-gray-400">
+              <p className="truncate text-xs capitalize text-gray-400 leading-tight mt-0.5">
                 {user?.role || 'unknown'}
               </p>
             </div>
-          </div>
+            {/* Chevron hint */}
+            <svg className="h-3.5 w-3.5 shrink-0 text-gray-500 group-hover:text-gray-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       </aside>
 
@@ -203,6 +212,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
+            </Link>
+
+            {/* User identity — click to profile */}
+            <Link
+              href="/profile"
+              className="hidden lg:flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              aria-label="View your profile"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#667eea] text-[10px] font-semibold text-white">
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <span className="font-medium">{user?.username || 'User'}</span>
             </Link>
 
             {/* Logout */}

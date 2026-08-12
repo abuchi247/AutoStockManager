@@ -19,6 +19,21 @@ from app.models.user import UserRole
 # =============================================================================
 
 
+class PasswordChangeRequest(BaseModel):
+    """Request body for PUT /api/v1/users/me/password."""
+
+    current_password: str = Field(
+        ...,
+        description="The user's current password (required for verification)",
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        description="New password (min 8 chars, uppercase, lowercase, digit)",
+        examples=["NewSecurePass1!"],
+    )
+
+
 class UserCreate(BaseModel):
     """Request body for POST /api/v1/users (create new user)."""
 
