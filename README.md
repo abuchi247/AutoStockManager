@@ -90,11 +90,28 @@ This system digitizes and streamlines operations for auto spare parts businesses
    This creates 10 parent categories (Brakes, Filters, Engine Parts, etc.) with 35 subcategories.
 
 8. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Docs (Swagger): http://localhost:8000/docs
 
-> **Local development with hot-reload:** if you want live code reloading on the frontend, stop the frontend container (`docker-compose stop frontend`) and run `npm run dev` in the `frontend/` directory instead. The backend services stay in Docker.
+   | Service | URL |
+   |---------|-----|
+   | Frontend (UI) | http://localhost:3000 |
+   | Backend API | http://localhost:8000 |
+   | Health check | http://localhost:8000/health |
+   | API Docs (Swagger) | http://localhost:8000/docs |
+
+9. **Get your admin password.** On a fresh database the backend auto-creates an `admin` account and prints the temporary password to the container logs exactly once:
+   ```bash
+   docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"
+   ```
+   Log in at http://localhost:3000 with username `admin` and that password. You will be prompted to set a new password before accessing the system.
+
+10. **Restart from scratch** (wipes all data and rebuilds the images):
+    ```bash
+    docker compose down -v          # stops containers and deletes all volumes
+    docker compose up --build -d    # rebuilds images and starts fresh
+    docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"  # get new password
+    ```
+
+> **Local development with hot-reload:** if you want live code reloading on the frontend, stop the frontend container (`docker compose stop frontend`) and run `npm run dev` in the `frontend/` directory instead. The backend services stay in Docker.
 
 ### Database backups
 
