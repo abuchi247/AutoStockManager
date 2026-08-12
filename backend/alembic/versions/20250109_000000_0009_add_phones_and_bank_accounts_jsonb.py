@@ -23,14 +23,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1. Add the two new JSONB columns (server default = empty array).
+    # 1. Add the two new JSONB columns.
+    #    server_default must be expressed as sa.text() so Alembic emits the
+    #    literal SQL fragment  DEFAULT '[]'::jsonb  without extra quoting.
     op.add_column(
         "business_settings",
         sa.Column(
             "phones",
             JSONB,
             nullable=True,
-            server_default="'[]'::jsonb",
+            server_default=sa.text("'[]'::jsonb"),
             comment='[{"label":"Main","number":"08012345678"}]',
         ),
     )
@@ -40,7 +42,7 @@ def upgrade() -> None:
             "bank_accounts",
             JSONB,
             nullable=True,
-            server_default="'[]'::jsonb",
+            server_default=sa.text("'[]'::jsonb"),
             comment='[{"bank_name":"...","account_number":"...","account_name":"..."}]',
         ),
     )
