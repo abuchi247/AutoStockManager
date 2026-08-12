@@ -298,7 +298,7 @@ async def update_sale(
             detail="Sale not found",
         )
 
-    if sale.status != SaleStatus.DRAFT.value and sale.status != "DRAFT":
+    if sale.status not in (SaleStatus.DRAFT, SaleStatus.DRAFT.value):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only draft sales can be edited",
@@ -518,13 +518,13 @@ async def cancel_sale(
             detail="Sale not found",
         )
 
-    if sale.status != SaleStatus.DRAFT.value and sale.status != "DRAFT":
+    if sale.status not in (SaleStatus.DRAFT, SaleStatus.DRAFT.value):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only draft sales can be cancelled. Use returns for confirmed sales.",
         )
 
-    sale.status = "CANCELLED"
+    sale.status = SaleStatus.CANCELLED
     sale.updated_by = str(current_user.id)
     await db.commit()
 

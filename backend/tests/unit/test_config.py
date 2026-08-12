@@ -86,6 +86,9 @@ class TestProductionConfigurationValidation:
             jwt_secret_key="a" * 32,
             postgres_password="a-real-database-password",
             database_url="postgresql+asyncpg://postgres:unused@db:5432/erp",
+            smtp_host="smtp.example.com",
+            smtp_from_email="no-reply@example.com",
+            cors_origins=["https://app.example.com"],
         )
 
         assert settings.environment == "production"

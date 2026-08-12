@@ -51,6 +51,9 @@ htmlcov/
 coverage/
 .nyc_output/
 
+# Hypothesis test data (unicode maps, example databases — auto-generated, not source)
+.hypothesis/
+
 # Build
 *.egg
 *.whl

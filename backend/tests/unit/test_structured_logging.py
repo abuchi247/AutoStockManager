@@ -57,7 +57,14 @@ def _settings(**overrides) -> Settings:
         "jwt_secret_key": "a" * 32,
         "postgres_password": "a-real-database-password",
     }
-    return Settings(**{**defaults, **overrides})
+    merged = {**defaults, **overrides}
+    # Supply production-required fields when building a production Settings object
+    # so tests that exercise production log behaviour don't fail on config validation.
+    if merged.get("environment") == "production":
+        merged.setdefault("smtp_host", "smtp.example.com")
+        merged.setdefault("smtp_from_email", "no-reply@example.com")
+        merged.setdefault("cors_origins", ["https://app.example.com"])
+    return Settings(**merged)
 
 
 def _emit(

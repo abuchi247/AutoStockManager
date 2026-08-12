@@ -19,6 +19,9 @@ def production_settings() -> Settings:
         jwt_secret_key="production-test-secret-" + "x" * 32,
         postgres_password="production-database-password",
         database_url="postgresql+asyncpg://postgres:unused@db:5432/erp",
+        smtp_host="smtp.example.com",
+        smtp_from_email="no-reply@example.com",
+        cors_origins=["https://app.example.com"],
     )
 
 

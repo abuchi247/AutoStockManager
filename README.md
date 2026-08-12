@@ -339,7 +339,7 @@ railway link --service <backend-service-name>
 railway variable set DATABASE_URL=<railway-postgres-url>
 railway variable set REDIS_URL=<railway-redis-url>
 railway variable set JWT_SECRET_KEY=<your-strong-secret>
-railway variable set CORS_ORIGINS='["*"]'
+railway variable set CORS_ORIGINS='["https://<frontend-service>.up.railway.app"]'
 railway variable set ENVIRONMENT=production
 railway variable set JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 railway variable set JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
@@ -450,7 +450,7 @@ The migration runner holds a PostgreSQL advisory lock, so only one instance appl
 | Backend returns 502 | Ensure `PORT=8000` is set as a Railway service variable. The Dockerfile hardcodes port 8000. |
 | Login fails | Run `cd backend && railway run python3 scripts/setup_db.py` to initialize tables and create admin |
 | Frontend can't reach backend | Verify `NEXT_PUBLIC_API_URL` uses `https://` (not `http://`) and includes `/api/v1` |
-| CORS errors in browser | Set `CORS_ORIGINS=["*"]` on the backend service, or add the frontend URL specifically |
+| CORS errors in browser | Set `CORS_ORIGINS` to the exact frontend URL, e.g. `'["https://<frontend>.up.railway.app"]'`. Using `["*"]` is **not permitted** in production and will be rejected at startup. |
 | Variable change has no effect (frontend) | `NEXT_PUBLIC_*` vars are build-time; redeploy the frontend after changing |
 | `railway run` fails with "No such file" | Make sure you're in the `backend/` directory locally when running commands |
 | New columns/tables missing after deploy | Add a reviewed Alembic revision and run `alembic upgrade head`; the API will not apply schema changes implicitly |

@@ -102,6 +102,27 @@ class NotificationService:
         await self.db.refresh(notification)
         return notification
 
+    async def get_notification(self, notification_id: UUID) -> Notification:
+        """Fetch a single notification by ID without mutating it.
+
+        Args:
+            notification_id: UUID of the notification to retrieve.
+
+        Returns:
+            The Notification instance.
+
+        Raises:
+            NotificationNotFoundError: If no notification with that ID exists.
+        """
+        stmt = select(Notification).filter(Notification.id == notification_id)
+        result = await self.db.execute(stmt)
+        notification = result.scalar_one_or_none()
+
+        if notification is None:
+            raise NotificationNotFoundError(notification_id)
+
+        return notification
+
     async def mark_read(self, notification_id: UUID) -> Notification:
         """Mark a single notification as read.
 

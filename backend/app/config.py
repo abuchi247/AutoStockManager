@@ -185,6 +185,20 @@ class Settings(BaseSettings):
             if normalized_database_password in DATABASE_PASSWORD_PLACEHOLDERS:
                 invalid_settings.append("POSTGRES_PASSWORD/DATABASE_URL")
 
+        # SMTP is required in production for password reset emails.
+        # Without it, the ARQ worker will fail silently on every reset request.
+        if not self.smtp_host or not self.smtp_from_email:
+            invalid_settings.append("SMTP_HOST/SMTP_FROM_EMAIL")
+
+        # CORS wildcard or localhost origins are insecure in production and
+        # can be exploited by any website to make credentialed API requests.
+        insecure_cors = {"*", "http://localhost", "https://localhost"}
+        for origin in self.cors_origins:
+            normalized = origin.strip().lower()
+            if normalized in insecure_cors or normalized.startswith("http://localhost:") or normalized.startswith("https://localhost:"):
+                invalid_settings.append("cors_origins")
+                break
+
         # A non-Secure refresh cookie can be sent over plain HTTP, which defeats
         # the point of moving the credential out of JavaScript's reach.
         if self.refresh_cookie_secure is False:

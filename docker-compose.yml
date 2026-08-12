@@ -24,7 +24,7 @@ services:
       - JWT_SECRET_KEY=${SECRET_KEY:-dev-secret-key-not-for-production}
       - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - 'CORS_ORIGINS=["http://localhost:3000"]'
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - JOB_QUEUE_NAME=${JOB_QUEUE_NAME:-arq:queue}
       - JOB_MAX_TRIES=${JOB_MAX_TRIES:-5}

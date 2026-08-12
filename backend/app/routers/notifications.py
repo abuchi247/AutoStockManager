@@ -118,19 +118,21 @@ async def mark_notification_read(
     service = NotificationService(db=db)
 
     try:
-        notification = await service.mark_read(notification_id)
+        notification = await service.get_notification(notification_id)
     except NotificationNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification not found",
         )
 
-    # Verify the notification belongs to the current user
+    # Verify ownership BEFORE mutating state so no DB write occurs for
+    # a forbidden request.
     if notification.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only mark your own notifications as read",
         )
 
+    await service.mark_read(notification_id)
     await db.commit()
     return NotificationResponse.from_notification(notification)

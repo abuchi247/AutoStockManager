@@ -625,7 +625,10 @@ function BusinessSettingsSection() {
           </label>
           <div className="flex items-center gap-4">
             {settings.logo_base64 && (
-              /* Explicit dimensions + lazy decoding keep the logo from shifting layout. */
+              /* Explicit dimensions + lazy decoding keep the logo from shifting layout.
+                 next/image does not support arbitrary data: URIs without unoptimized prop,
+                 so we use a plain <img> here intentionally. */
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={settings.logo_base64}
                 alt="Business logo"
