@@ -6,15 +6,17 @@ This script is idempotent — safe to run multiple times. It will:
 2. Create an admin user (if one doesn't exist)
 3. Seed default categories (if none exist)
 
-Usage:
-    # Inside the container or with railway run:
-    python scripts/setup_db.py
+On a normal container startup both steps 2 and 3 happen automatically via the
+application lifespan hook (initial_admin.py and initial_data.py). Use this
+script when you need to run setup outside of a container restart — e.g. when
+deploying to Railway or running CI against a fresh database.
 
-    # Or with Docker:
+Usage:
+    # Inside the container:
     docker exec autostockmanager-backend python scripts/setup_db.py
 
-    # Or with Railway CLI:
-    cd backend && railway run python3 scripts/setup_db.py
+    # Railway CLI (from backend/ directory):
+    railway run python3 scripts/setup_db.py
 """
 
 import asyncio
@@ -30,23 +32,10 @@ sys.path.insert(0, ".")
 
 from app.database import async_session_factory, engine  # noqa: E402
 from app.migration_runner import run_migrations  # noqa: E402
+from app.initial_data import ensure_default_categories, DEFAULT_CATEGORIES  # noqa: E402
 
 
-DEFAULT_CATEGORIES = {
-    "Brakes": ["Brake Pads", "Brake Discs", "Brake Fluid"],
-    "Filters": ["Oil Filters", "Air Filters", "Fuel Filters", "Cabin Filters"],
-    "Engine Parts": ["Pistons", "Gaskets", "Timing Belts", "Spark Plugs"],
-    "Electrical": ["Batteries", "Alternators", "Starters", "Sensors"],
-    "Suspension": ["Shock Absorbers", "Springs", "Control Arms"],
-    "Body Parts": ["Bumpers", "Fenders", "Mirrors", "Lights"],
-    "Transmission": ["Clutch", "Gearbox", "CV Joints"],
-    "Cooling": ["Radiators", "Water Pumps", "Thermostats", "Hoses"],
-    "Exhaust": ["Mufflers", "Catalytic Converters", "Exhaust Pipes"],
-    "Fuel System": ["Fuel Pumps", "Injectors", "Fuel Lines"],
-}
-
-
-async def setup():
+async def setup() -> None:
     """Run full database setup."""
     print("=" * 60)
     print("Auto Spare Parts ERP — Database Setup")
@@ -70,8 +59,11 @@ async def setup():
             now = datetime.now(timezone.utc)
             await session.execute(
                 text("""
-                    INSERT INTO users (id, username, email, password_hash, role, is_active, failed_login_attempts, created_at, updated_at)
-                    VALUES (:id, :u, :e, :pw, :r, TRUE, 0, :now, :now)
+                    INSERT INTO users
+                        (id, username, email, password_hash, role,
+                         is_active, failed_login_attempts, created_at, updated_at)
+                    VALUES
+                        (:id, :u, :e, :pw, :r, TRUE, 0, :now, :now)
                 """),
                 {
                     "id": uuid.uuid4(),
@@ -85,37 +77,13 @@ async def setup():
             await session.commit()
             print("  ✓ Admin user created (admin / Admin123!)")
 
-    # Step 3: Seed categories
+    # Step 3: Seed categories — delegates to the same function the lifespan
+    # calls so the category data is always consistent with initial_data.py.
     print("\n[3/3] Seeding categories...")
-    async with async_session_factory() as session:
-        result = await session.execute(text("SELECT COUNT(*) FROM categories"))
-        count = result.scalar() or 0
-        if count > 0:
-            print(f"  ✓ Categories already exist ({count} found), skipping")
-        else:
-            now = datetime.now(timezone.utc)
-            created = 0
-            for parent_name, subs in DEFAULT_CATEGORIES.items():
-                parent_id = uuid.uuid4()
-                await session.execute(
-                    text("""
-                        INSERT INTO categories (id, name, parent_id, description, is_active, created_at, updated_at)
-                        VALUES (:id, :name, NULL, :desc, TRUE, :now, :now)
-                    """),
-                    {"id": parent_id, "name": parent_name, "desc": f"Auto spare parts - {parent_name}", "now": now},
-                )
-                created += 1
-                for sub_name in subs:
-                    await session.execute(
-                        text("""
-                            INSERT INTO categories (id, name, parent_id, description, is_active, created_at, updated_at)
-                            VALUES (:id, :name, :pid, :desc, TRUE, :now, :now)
-                        """),
-                        {"id": uuid.uuid4(), "name": sub_name, "pid": parent_id, "desc": f"{parent_name} - {sub_name}", "now": now},
-                    )
-                    created += 1
-            await session.commit()
-            print(f"  ✓ Seeded {created} categories")
+    await ensure_default_categories()
+    total_parents = len(DEFAULT_CATEGORIES)
+    total_subs = sum(len(v) for v in DEFAULT_CATEGORIES.values())
+    print(f"  ✓ Categories ready ({total_parents} parent, {total_subs} subcategories)")
 
     await engine.dispose()
 
