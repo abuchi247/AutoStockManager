@@ -8,7 +8,6 @@
 # because Compose merges `volumes`/`ports` rather than replacing them):
 #   docker compose -f docker-compose.production.yml up -d
 ###############################################################################
-version: "3.8"
 
 services:
   backend:
@@ -73,6 +72,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # The worker runs arq (no HTTP server), so the backend image's HEALTHCHECK
+    # (which probes /health on port 8000) is not applicable here.
+    healthcheck:
+      disable: true
     networks:
       - app-network
     restart: unless-stopped

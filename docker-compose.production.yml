@@ -112,6 +112,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # The worker runs arq (no HTTP server), so the backend image's HEALTHCHECK
+    # (which probes /health on port 8000) is not applicable here.
+    healthcheck:
+      disable: true
     networks:
       - app-network
     <<: *hardening
