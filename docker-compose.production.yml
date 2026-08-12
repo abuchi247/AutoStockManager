@@ -19,6 +19,7 @@
 #   SECRET_KEY REDIS_PASSWORD
 #   CORS_ORIGINS FRONTEND_BASE_URL NEXT_PUBLIC_API_URL
 #   SMTP_HOST SMTP_FROM_EMAIL (SMTP_USERNAME/SMTP_PASSWORD when authenticated)
+#   BACKUP_RETAIN (optional, default 30) BACKUP_SCHEDULE (optional, default daily 02:00 UTC)
 # See OPERATIONS_RUNBOOK.md sections 2 and 3.
 ###############################################################################
 
@@ -155,6 +156,67 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # Scheduled database backup
+  #
+  # Runs pg_dump daily at 02:00 UTC and stores compressed custom-format dumps
+  # in the named volume `backup-data`. Mount or copy from there to off-site
+  # storage using your deployment platform's backup tooling or a sidecar.
+  #
+  # Tune with environment variables:
+  #   BACKUP_RETAIN   Number of daily dumps to keep locally (default: 30)
+  #   BACKUP_SCHEDULE Cron expression (default: daily at 02:00 UTC)
+  #
+  # Run an immediate on-demand backup (e.g. before a release):
+  #   docker compose -f docker-compose.production.yml run --rm backup-runner
+  #
+  # The scheduler (ofelia) reads the job from the backup-runner container's
+  # labels so both services must be running for the schedule to fire.
+  # ---------------------------------------------------------------------------
+  backup-runner:
+    image: postgres:15-alpine
+    container_name: autostockmanager-backup-runner
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_DIR: /backups
+      BACKUP_RETAIN: ${BACKUP_RETAIN:-30}
+      BACKUP_LABEL: ${BACKUP_LABEL:-}
+    volumes:
+      - backup-data:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+      - ./scripts/restore.sh:/restore.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    security_opt:
+      - no-new-privileges:true
+    # ofelia reads this label to schedule the job
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.backup.schedule: "${BACKUP_SCHEDULE:-0 2 * * *}"
+      ofelia.job-exec.backup.command: "sh /backup.sh"
+
+  backup-scheduler:
+    image: mcuadros/ofelia:latest
+    container_name: autostockmanager-backup-scheduler
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - backup-runner
+    networks:
+      - app-network
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: autostockmanager-redis
@@ -181,6 +243,10 @@ volumes:
   postgres-data:
     driver: local
   redis-data:
+    driver: local
+  # Backup dumps are stored in this named volume. Mount or copy to off-site
+  # storage using your deployment platform's backup tooling or object storage.
+  backup-data:
     driver: local
 
 networks:

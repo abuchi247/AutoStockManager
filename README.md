@@ -96,6 +96,22 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 > **Local development with hot-reload:** if you want live code reloading on the frontend, stop the frontend container (`docker-compose stop frontend`) and run `npm run dev` in the `frontend/` directory instead. The backend services stay in Docker.
 
+### Database backups
+
+Run an on-demand backup at any time (results go to `./backups/` on the host):
+
+```bash
+docker-compose run --rm --profile backup backup
+```
+
+Label it before a release to make it easy to find later:
+
+```bash
+docker-compose run --rm --profile backup -e BACKUP_LABEL=pre-release backup
+```
+
+In production, `docker-compose.production.yml` includes a scheduled backup service that runs automatically every day at 02:00 UTC. See [OPERATIONS_RUNBOOK.md §4](OPERATIONS_RUNBOOK.md#4-backup-and-restore) for restore instructions, off-site storage, and restore verification.
+
 ### Initial Admin Provisioning
 
 The system follows security best practices for initial credentials:

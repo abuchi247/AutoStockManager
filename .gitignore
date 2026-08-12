@@ -55,3 +55,8 @@ coverage/
 *.egg
 *.whl
 Screenshot*.png
+
+# Database backups (local development dumps — never commit these)
+backups/
+*.dump
+*.dump.sha256

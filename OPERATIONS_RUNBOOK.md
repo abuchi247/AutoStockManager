@@ -129,26 +129,126 @@ docker compose -f docker-compose.production.yml run --rm backend alembic downgra
 
 If a migration fails, the migration job and deployment must fail closed: keep the old application serving only if its schema remains safe, or remove traffic according to the deployment plan. Never start an application against a partially migrated schema. Capture the failure and revision in the deployment record, fix or replace the migration, restore the pre-migration backup when data was changed, and rerun the reviewed migration. Do not manually patch production with ad hoc SQL and do not mark a failed revision as applied.
 
-## 4. Backup and restore expectations
+## 4. Backup and restore
 
 PostgreSQL is the source of truth for financial, inventory, audit, and user data. Redis contains sessions, rate-limit state, and background-job state; it is not a substitute for a PostgreSQL backup.
 
-Production must have:
+### Automated daily backups (production)
 
-- Automated PostgreSQL backups with a documented retention period that meets the business recovery-point objective.
-- Point-in-time recovery or an equivalent managed-database capability where required by the service-level objective.
-- An encrypted copy in a separate failure domain/account, with access restricted to recovery operators.
-- Monitoring for backup success, age, storage capacity, and restore-point availability.
-- A restore drill at a scheduled interval. Record the restore duration, recovered migration revision, and integrity checks.
-
-Take an on-demand backup before each release that changes the schema or performs a destructive data operation. A self-managed PostgreSQL example is:
+The production Compose stack includes a scheduled backup service. Start the full stack with backup enabled:
 
 ```bash
-pg_dump --format=custom --no-owner --file=autostockmanager-pre-release-<commit>.dump "$PGDATABASE_URL"
-pg_restore --list autostockmanager-pre-release-<commit>.dump
+docker compose -f docker-compose.production.yml up -d
 ```
 
-`PGDATABASE_URL` must be a short-lived, libpq-compatible `postgresql://...` value supplied by the secret manager; the application's `postgresql+asyncpg://...` URL is not accepted by every `pg_dump` version. Use the managed provider's backup and restore workflow when PostgreSQL is managed. Do not place dump files in the repository or an unencrypted local folder. Test restoration into an isolated database before using it for recovery. Redis may be backed up according to its operational role, but restoring PostgreSQL alone is the authoritative recovery path for ERP records.
+This starts `backup-scheduler` (ofelia cron) and `backup-runner`. Ofelia reads the schedule label from `backup-runner` and executes `sh /backup.sh` inside that container at the configured time.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BACKUP_SCHEDULE` | `0 2 * * *` | Cron expression — daily at 02:00 UTC |
+| `BACKUP_RETAIN` | `30` | Number of daily dumps to keep locally |
+
+Backup files land in the `backup-data` Docker named volume:
+- `autostockmanager-YYYY-MM-DDTHH-MM-SS.dump` — pg_dump custom format
+- `autostockmanager-YYYY-MM-DDTHH-MM-SS.dump.sha256` — SHA-256 checksum
+- `latest.dump` — symlink to the most recent backup
+- `backup.log` — append-only log of every backup run
+
+Check backup logs:
+```bash
+docker compose -f docker-compose.production.yml exec backup-runner cat /backups/backup.log
+```
+
+List available backups:
+```bash
+docker compose -f docker-compose.production.yml exec backup-runner ls -lh /backups/
+```
+
+### On-demand backup (before a release or ad-hoc)
+
+Development stack:
+```bash
+# Run a backup against the development postgres container
+docker-compose run --rm --profile backup backup
+
+# With a pre-release label
+docker-compose run --rm --profile backup -e BACKUP_LABEL=pre-release backup
+# → creates: autostockmanager-2026-08-09T12-00-00.pre-release.dump
+```
+
+Production stack:
+```bash
+docker compose -f docker-compose.production.yml run --rm backup-runner
+docker compose -f docker-compose.production.yml run --rm -e BACKUP_LABEL=pre-release backup-runner
+```
+
+The backup lands in `./backups/` (dev) or the `backup-data` volume (production).
+
+### Off-site storage
+
+The `backup-data` named volume stores backups on the Docker host. Move copies off-site to survive host failure:
+
+```bash
+# Copy the latest backup to S3
+docker run --rm \
+  -v autostockmanager_backup-data:/backups:ro \
+  -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  amazon/aws-cli s3 cp /backups/latest.dump \
+    "s3://${BACKUP_BUCKET}/autostockmanager/$(date -u +%Y/%m/%d)/latest.dump"
+```
+
+For managed PostgreSQL services (Railway, Supabase, RDS), use the platform's point-in-time backup and restore instead of the self-managed script.
+
+### Restore
+
+**Never restore directly into the live production database without a reviewed maintenance plan. Always restore to an isolated test database first.**
+
+```bash
+# 1. Verify backup integrity
+docker-compose run --rm --profile backup -e PGDATABASE=autostockmanager_restore \
+  bash -c "sha256sum --check /backups/latest.dump.sha256"
+
+# 2. Restore into an isolated test database
+PGDATABASE=autostockmanager_restore \
+  docker-compose run --rm --profile backup backup \
+  sh /restore.sh /backups/latest.dump
+
+# 3. Run the restore script directly (shows interactive 5-second warning)
+docker exec autostockmanager-postgres sh /restore.sh /backups/latest.dump
+```
+
+Or using the restore script locally:
+```bash
+PGHOST=localhost PGPORT=5432 \
+PGDATABASE=autostockmanager_restore \
+PGUSER=postgres PGPASSWORD=<password> \
+bash scripts/restore.sh ./backups/latest.dump
+```
+
+After restore, always verify:
+```bash
+# 1. Check the Alembic revision matches the backup
+docker exec autostockmanager-backend alembic current
+
+# 2. Check the health endpoint
+curl http://localhost:8000/health
+
+# 3. Spot-check critical table counts
+docker exec autostockmanager-postgres psql \
+  -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "SELECT COUNT(*) FROM sales; SELECT COUNT(*) FROM spare_parts; SELECT COUNT(*) FROM users;"
+```
+
+### Production backup requirements
+
+- Automated daily backups with a documented retention period that meets the business recovery-point objective.
+- Point-in-time recovery or an equivalent managed-database capability where required by the service-level objective.
+- An encrypted copy in a separate failure domain/account, with access restricted to recovery operators.
+- Monitoring for backup success, age, storage capacity, and restore-point availability (alert on `backup.log` age > 25 hours).
+- A restore drill at a scheduled interval. Record the restore duration, recovered migration revision, and integrity checks.
+
+Take an on-demand backup before each release that changes the schema or performs a destructive data operation.
 
 ## 5. Health, readiness, and API documentation
 
@@ -319,10 +419,10 @@ The supported baseline is the pinned dependency set in `frontend/package-lock.js
 
 | Component | Supported baseline |
 |---|---|
-| Next.js | `14.0.4` (App Router) |
+| Next.js | `16.3.0` (App Router) |
 | React / React DOM | `18.2.0` |
 | TypeScript | `5.3.3` |
-| Node.js container runtime | `20` (`node:20-alpine`) |
+| Node.js container runtime | `20` (`node:20-alpine3.22`) |
 | Python | `3.11` |
 | PostgreSQL | `15` (`postgres:15-alpine` in Compose) |
 | Redis | `7` (`redis:7-alpine` in Compose) |
