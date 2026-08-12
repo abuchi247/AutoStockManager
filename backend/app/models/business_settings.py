@@ -3,6 +3,19 @@ Business Settings model.
 
 Stores company/business information used on invoices, receipts, and reports.
 This is a single-row table — only one business profile exists per installation.
+
+Phone numbers and bank accounts are stored as JSONB arrays so an operator can
+maintain several contacts and payment channels without schema changes:
+
+  phones:        [{"label": "Main", "number": "08012345678"}, ...]
+  bank_accounts: [{"bank_name": "First Bank",
+                   "account_number": "0123456789",
+                   "account_name": "Chidi Auto Parts Ltd"}, ...]
+
+The legacy scalar columns (phone, bank_name, bank_account_number,
+bank_account_name) are retained so existing deployments are not broken.
+Migration 0009 moves any data in those columns into the JSONB arrays and
+the application exclusively reads/writes the arrays going forward.
 """
 
 import uuid
@@ -10,18 +23,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import DateTime, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
 
 class BusinessSettings(Base):
-    """Single-row table storing business profile information.
-
-    Used to populate invoice headers, report footers, and other
-    documents that require business identification.
-    """
+    """Single-row table storing business profile information."""
 
     __tablename__ = "business_settings"
 
@@ -45,12 +54,24 @@ class BusinessSettings(Base):
         comment="Business address",
     )
 
-    phone: Mapped[Optional[str]] = mapped_column(
-        String(50),
+    # ── Multi-value contacts (JSONB arrays) ──────────────────────────────────
+    # Each element: {"label": str, "number": str}
+    phones: Mapped[Optional[list]] = mapped_column(
+        JSONB,
         nullable=True,
-        comment="Business phone number",
+        default=list,
+        comment='Phone numbers: [{"label": "Main", "number": "08012345678"}]',
     )
 
+    # Each element: {"bank_name": str, "account_number": str, "account_name": str}
+    bank_accounts: Mapped[Optional[list]] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment='Bank accounts: [{"bank_name": "...", "account_number": "...", "account_name": "..."}]',
+    )
+
+    # ── Scalar fields ────────────────────────────────────────────────────────
     email: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
@@ -82,22 +103,32 @@ class BusinessSettings(Base):
         comment="Custom footer text for invoices",
     )
 
+    # ── Legacy scalar columns — kept for backward-compatibility ──────────────
+    # Migration 0009 copies any values here into the JSONB arrays above.
+    # These columns are no longer written by the application but are preserved
+    # so a downgrade does not lose data.
+    phone: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="[DEPRECATED] Single phone — superseded by phones JSONB array",
+    )
+
     bank_name: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
-        comment="Bank name for payment instructions",
+        comment="[DEPRECATED] Bank name — superseded by bank_accounts JSONB array",
     )
 
     bank_account_number: Mapped[Optional[str]] = mapped_column(
         String(100),
         nullable=True,
-        comment="Bank account number",
+        comment="[DEPRECATED] Account number — superseded by bank_accounts JSONB array",
     )
 
     bank_account_name: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
-        comment="Account holder name",
+        comment="[DEPRECATED] Account holder — superseded by bank_accounts JSONB array",
     )
 
     updated_at: Mapped[datetime] = mapped_column(

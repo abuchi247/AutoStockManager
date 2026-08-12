@@ -30,30 +30,13 @@ router = APIRouter(prefix="/api/v1/invoices", tags=["Invoices"])
 
 
 def _get_invoice_service(db: AsyncSession) -> InvoiceService:
-    """Create an InvoiceService instance."""
+    """Create an InvoiceService instance (no business settings — fallback)."""
     return InvoiceService(db=db)
 
 
 async def _get_invoice_service_with_settings(db: AsyncSession) -> InvoiceService:
     """Create an InvoiceService with business settings loaded from DB."""
-    from app.models.business_settings import BusinessSettings
-    from app.utils.pdf_generator import CompanyDetails
-
-    result = await db.execute(select(BusinessSettings).limit(1))
-    settings = result.scalar_one_or_none()
-
-    company = None
-    if settings:
-        company = CompanyDetails(
-            name=settings.business_name,
-            address=settings.address or "",
-            phone=settings.phone or "",
-            email=settings.email or "",
-            tax_id=settings.tax_id or "",
-            logo_base64=settings.logo_base64,
-        )
-
-    return InvoiceService(db=db, company=company)
+    return await InvoiceService.from_db(db)
 
 
 # =============================================================================

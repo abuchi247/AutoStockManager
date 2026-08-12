@@ -34,10 +34,25 @@ class CompanyDetails:
 
     name: str = "Auto Spare Parts Ltd"
     address: str = "123 Industrial Road, Lagos, Nigeria"
-    phone: str = "+234 801 234 5678"
     email: str = "info@autospareparts.com"
     tax_id: str = "TIN-12345678"
-    logo_base64: Optional[str] = None  # Base64-encoded logo image
+    logo_base64: Optional[str] = None
+
+    # Multiple phone numbers — list of {"label": str, "number": str}
+    phones: list[dict] = field(default_factory=list)
+
+    # Multiple bank accounts — list of {"bank_name": str, "account_number": str, "account_name": str}
+    bank_accounts: list[dict] = field(default_factory=list)
+
+    @property
+    def phone(self) -> str:
+        """Return all phone numbers as a single string for backward-compat templates."""
+        if not self.phones:
+            return ""
+        return "  |  ".join(
+            f"{p.get('label', '')}: {p.get('number', '')}" if p.get('label') else p.get('number', '')
+            for p in self.phones
+        )
 
 
 @dataclass
@@ -189,6 +204,24 @@ def _render_a4_html(data: InvoiceData) -> str:
     if data.customer.tax_id:
         customer_info += f"<br/>Tax ID: {data.customer.tax_id}"
 
+    # Bank accounts section for invoice footer
+    bank_accounts_html = ""
+    if data.company.bank_accounts:
+        rows = "".join(
+            f"<tr><td><strong>{ba.get('bank_name','')}</strong></td>"
+            f"<td>{ba.get('account_number','')}</td>"
+            f"<td>{ba.get('account_name','')}</td></tr>"
+            for ba in data.company.bank_accounts
+        )
+        bank_accounts_html = f"""
+        <div class="bank-details">
+            <h4>Bank Details</h4>
+            <table class="bank-table">
+                <thead><tr><th>Bank</th><th>Account No.</th><th>Account Name</th></tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>"""
+
     html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -330,6 +363,28 @@ def _render_a4_html(data: InvoiceData) -> str:
             margin: 0 0 5px 0;
             color: #2c3e50;
         }}
+        .bank-details {{
+            margin-top: 12px;
+        }}
+        .bank-details h4 {{
+            margin: 0 0 4px 0;
+            color: #2c3e50;
+            font-size: 9pt;
+        }}
+        .bank-table {{
+            border-collapse: collapse;
+            font-size: 8.5pt;
+        }}
+        .bank-table th {{
+            background: #ecf0f1;
+            padding: 3px 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }}
+        .bank-table td {{
+            padding: 3px 8px;
+            border: 1px solid #ddd;
+        }}
         .codes {{
             text-align: right;
         }}
@@ -421,6 +476,7 @@ def _render_a4_html(data: InvoiceData) -> str:
             <h4>Payment Terms</h4>
             <p>{data.payment_terms}</p>
             <p style="margin-top: 10px; font-size: 8pt;">Thank you for your business!</p>
+            {bank_accounts_html}
         </div>
         <div class="codes">
             {qr_section}
@@ -469,6 +525,15 @@ def _render_thermal_html(data: InvoiceData) -> str:
         if not logo_src.startswith("data:"):
             logo_src = f"data:image/png;base64,{logo_src}"
         thermal_logo_section = f'<img src="{logo_src}" style="width:50px;height:50px;margin:0 auto 5px;display:block;object-fit:contain;" alt="Logo" />'
+
+    # Thermal bank accounts (compact)
+    thermal_bank_html = ""
+    if data.company.bank_accounts:
+        lines = "".join(
+            f"<p>{ba.get('bank_name','')} | {ba.get('account_number','')} | {ba.get('account_name','')}</p>"
+            for ba in data.company.bank_accounts
+        )
+        thermal_bank_html = f"<div style='margin-top:4px;text-align:left;'><strong>Bank Details:</strong>{lines}</div>"
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -622,6 +687,7 @@ def _render_thermal_html(data: InvoiceData) -> str:
 
     <div class="footer">
         <p>Terms: {data.payment_terms}</p>
+        {thermal_bank_html}
         {qr_section}
         {barcode_section}
         <p>Thank you for your business!</p>

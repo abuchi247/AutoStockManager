@@ -46,8 +46,8 @@ def _load_amount_paid_migration():
     return module
 
 
-def test_amount_paid_migration_is_the_head_after_current_baseline():
-    """The migration chain is linear and 0008 is the current head."""
+def test_migration_chain_is_linear_with_single_head():
+    """The migration chain is linear and 0009 is the current head."""
     revisions = {}
     for path in VERSIONS_ROOT.glob("*.py"):
         if path.name == "__init__.py":
@@ -55,9 +55,14 @@ def test_amount_paid_migration_is_the_head_after_current_baseline():
         revision = _literal_assignment(path, "revision")
         revisions[revision] = _literal_assignment(path, "down_revision")
 
+    # Verify the chain is intact up to the previous confirmed head
     assert revisions["0008"] == "0007"
+    assert revisions["0009"] == "0008"
+
+    # There must be exactly one revision that is not a parent of any other —
+    # that is the head. Update this assertion whenever a new migration is added.
     parents = {parent for parent in revisions.values() if parent is not None}
-    assert {revision for revision in revisions if revision not in parents} == {"0008"}
+    assert {revision for revision in revisions if revision not in parents} == {"0009"}
 
 
 def test_amount_paid_upgrade_adds_missing_column():

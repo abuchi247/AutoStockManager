@@ -407,68 +407,281 @@ export default function SettingsPage() {
   );
 }
 
-// --- Business Settings Component ---
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface PhoneEntry {
+  label: string;
+  number: string;
+}
+
+interface BankAccountEntry {
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+}
 
 interface BusinessSettingsData {
   id?: string;
   business_name: string;
   address: string;
-  phone: string;
   email: string;
   tax_id: string;
   website: string;
   logo_base64: string;
   invoice_footer: string;
-  bank_name: string;
-  bank_account_number: string;
-  bank_account_name: string;
+  phones: PhoneEntry[];
+  bank_accounts: BankAccountEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Reusable list-editor sub-components
+// ---------------------------------------------------------------------------
+
+interface PhoneListEditorProps {
+  phones: PhoneEntry[];
+  onChange: (phones: PhoneEntry[]) => void;
+  disabled?: boolean;
+}
+
+function PhoneListEditor({ phones, onChange, disabled }: PhoneListEditorProps) {
+  function update(index: number, field: keyof PhoneEntry, value: string) {
+    const next = phones.map((p, i) => (i === index ? { ...p, [field]: value } : p));
+    onChange(next);
+  }
+
+  function add() {
+    if (phones.length >= 10) return;
+    onChange([...phones, { label: '', number: '' }]);
+  }
+
+  function remove(index: number) {
+    onChange(phones.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="space-y-2">
+      {phones.map((phone, i) => (
+        <div key={i} className="flex items-start gap-2">
+          <div className="w-28 shrink-0">
+            <input
+              type="text"
+              aria-label={`Phone ${i + 1} label`}
+              placeholder='e.g. "Main"'
+              value={phone.label}
+              onChange={(e) => update(i, 'label', e.target.value)}
+              disabled={disabled}
+              maxLength={50}
+              className="h-9 w-full rounded-md border border-gray-300 px-2.5 text-sm focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10 disabled:opacity-50"
+            />
+          </div>
+          <div className="flex-1">
+            <input
+              type="tel"
+              aria-label={`Phone ${i + 1} number`}
+              placeholder="08012345678"
+              value={phone.number}
+              onChange={(e) => update(i, 'number', e.target.value)}
+              disabled={disabled}
+              maxLength={30}
+              className="h-9 w-full rounded-md border border-gray-300 px-2.5 text-sm focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10 disabled:opacity-50"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            disabled={disabled}
+            aria-label={`Remove phone ${i + 1}`}
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500 disabled:opacity-40 transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ))}
+
+      {phones.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No phone numbers added yet.</p>
+      )}
+
+      {phones.length < 10 && (
+        <button
+          type="button"
+          onClick={add}
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#667eea] hover:text-[#764ba2] disabled:opacity-40 transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add phone number
+        </button>
+      )}
+
+      {phones.length > 0 && (
+        <p className="text-xs text-gray-400">
+          <span className="font-medium">Label</span>{' '}is optional (e.g. &ldquo;Main&rdquo;, &ldquo;WhatsApp&rdquo;, &ldquo;Abuja Branch&rdquo;).
+          {phones.length >= 10 && ' Maximum of 10 reached.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface BankAccountListEditorProps {
+  accounts: BankAccountEntry[];
+  onChange: (accounts: BankAccountEntry[]) => void;
+  disabled?: boolean;
+}
+
+function BankAccountListEditor({ accounts, onChange, disabled }: BankAccountListEditorProps) {
+  function update(index: number, field: keyof BankAccountEntry, value: string) {
+    const next = accounts.map((a, i) => (i === index ? { ...a, [field]: value } : a));
+    onChange(next);
+  }
+
+  function add() {
+    if (accounts.length >= 10) return;
+    onChange([...accounts, { bank_name: '', account_number: '', account_name: '' }]);
+  }
+
+  function remove(index: number) {
+    onChange(accounts.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="space-y-3">
+      {accounts.map((acct, i) => (
+        <div key={i} className="relative rounded-lg border border-gray-200 bg-gray-50 p-3">
+          {/* Remove button */}
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            disabled={disabled}
+            aria-label={`Remove bank account ${i + 1}`}
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40 transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Account {i + 1}
+          </p>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Bank Name</label>
+              <input
+                type="text"
+                placeholder='e.g. "First Bank"'
+                value={acct.bank_name}
+                onChange={(e) => update(i, 'bank_name', e.target.value)}
+                disabled={disabled}
+                maxLength={100}
+                className="h-9 w-full rounded-md border border-gray-300 bg-white px-2.5 text-sm focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Account Number</label>
+              <input
+                type="text"
+                placeholder="0123456789"
+                value={acct.account_number}
+                onChange={(e) => update(i, 'account_number', e.target.value)}
+                disabled={disabled}
+                maxLength={30}
+                className="h-9 w-full rounded-md border border-gray-300 bg-white px-2.5 text-sm focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Account Name</label>
+              <input
+                type="text"
+                placeholder="Chidi Auto Parts Ltd"
+                value={acct.account_name}
+                onChange={(e) => update(i, 'account_name', e.target.value)}
+                disabled={disabled}
+                maxLength={255}
+                className="h-9 w-full rounded-md border border-gray-300 bg-white px-2.5 text-sm focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10 disabled:opacity-50"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {accounts.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No bank accounts added yet.</p>
+      )}
+
+      {accounts.length < 10 && (
+        <button
+          type="button"
+          onClick={add}
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#667eea] hover:text-[#764ba2] disabled:opacity-40 transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add bank account
+        </button>
+      )}
+
+      {accounts.length >= 10 && (
+        <p className="text-xs text-gray-400">Maximum of 10 bank accounts reached.</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Business Settings section
+// ---------------------------------------------------------------------------
+
+const EMPTY_SETTINGS: BusinessSettingsData = {
+  business_name: '',
+  address: '',
+  email: '',
+  tax_id: '',
+  website: '',
+  logo_base64: '',
+  invoice_footer: '',
+  phones: [],
+  bank_accounts: [],
+};
+
+function normaliseSettings(data: Partial<BusinessSettingsData>): BusinessSettingsData {
+  return {
+    ...EMPTY_SETTINGS,
+    ...data,
+    business_name: data.business_name ?? '',
+    address: data.address ?? '',
+    email: data.email ?? '',
+    tax_id: data.tax_id ?? '',
+    website: data.website ?? '',
+    logo_base64: data.logo_base64 ?? '',
+    invoice_footer: data.invoice_footer ?? '',
+    phones: Array.isArray(data.phones) ? data.phones : [],
+    bank_accounts: Array.isArray(data.bank_accounts) ? data.bank_accounts : [],
+  };
 }
 
 function BusinessSettingsSection() {
-  const [settings, setSettings] = useState<BusinessSettingsData>({
-    business_name: '',
-    address: '',
-    phone: '',
-    email: '',
-    tax_id: '',
-    website: '',
-    logo_base64: '',
-    invoice_footer: '',
-    bank_name: '',
-    bank_account_number: '',
-    bank_account_name: '',
-  });
+  const [settings, setSettings] = useState<BusinessSettingsData>(EMPTY_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const data = await get<BusinessSettingsData>('/business-settings');
-        // Normalize null values to empty strings for form state
-        setSettings({
-          ...data,
-          business_name: data.business_name || '',
-          address: data.address || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          tax_id: data.tax_id || '',
-          website: data.website || '',
-          logo_base64: data.logo_base64 || '',
-          invoice_footer: data.invoice_footer || '',
-          bank_name: data.bank_name || '',
-          bank_account_number: data.bank_account_number || '',
-          bank_account_name: data.bank_account_name || '',
-        });
-      } catch {
-        // First time — no settings exist yet, use defaults
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchSettings();
+    get<BusinessSettingsData>('/business-settings')
+      .then((data) => setSettings(normaliseSettings(data)))
+      .catch(() => { /* first boot — no row yet */ })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const handleSave = async () => {
@@ -477,38 +690,25 @@ function BusinessSettingsSection() {
     setSuccessMsg(null);
     try {
       const { id: _id, ...payload } = settings;
-      // Only send logo_base64 if it has content (avoid sending large empty/null values)
       const cleanPayload = {
         ...payload,
         logo_base64: payload.logo_base64 || null,
+        // Strip entries where required fields are empty
+        phones: payload.phones.filter((p) => p.number.trim() !== ''),
+        bank_accounts: payload.bank_accounts.filter(
+          (b) => b.bank_name.trim() !== '' || b.account_number.trim() !== '',
+        ),
       };
       const data = await put<BusinessSettingsData>('/business-settings', cleanPayload);
-      // Update state with processed response (logo may be resized)
-      setSettings({
-        ...data,
-        business_name: data.business_name || '',
-        address: data.address || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        tax_id: data.tax_id || '',
-        website: data.website || '',
-        logo_base64: data.logo_base64 || '',
-        invoice_footer: data.invoice_footer || '',
-        bank_name: data.bank_name || '',
-        bank_account_number: data.bank_account_number || '',
-        bank_account_name: data.bank_account_name || '',
-      });
+      setSettings(normaliseSettings(data));
       setSuccessMsg('Business settings saved successfully');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: unknown) {
       let message = 'Failed to save settings';
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { detail?: string }; status?: number } };
-        if (axiosErr.response?.data?.detail) {
-          message = axiosErr.response.data.detail;
-        } else if (axiosErr.response?.status) {
-          message = `Request failed with status code ${axiosErr.response.status}`;
-        }
+        message = axiosErr.response?.data?.detail
+          ?? (axiosErr.response?.status ? `Request failed with status ${axiosErr.response.status}` : message);
       } else if (err instanceof Error) {
         message = err.message;
       }
@@ -521,29 +721,23 @@ function BusinessSettingsSection() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 500 * 1024) {
-      setError('Logo must be under 500KB');
-      return;
-    }
+    if (file.size > 500 * 1024) { setError('Logo must be under 500 KB'); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      setSettings({ ...settings, logo_base64: reader.result as string });
-    };
+    reader.onload = () => setSettings((s) => ({ ...s, logo_base64: reader.result as string }));
     reader.readAsDataURL(file);
   };
 
   if (isLoading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
-        <div className="flex items-center justify-center py-8">
-          <LoadingSpinner />
-        </div>
+        <div className="flex items-center justify-center py-8"><LoadingSpinner /></div>
       </div>
     );
   }
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+      {/* Section header */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900">Business Profile</h2>
         <p className="mt-1 text-sm text-gray-500">
@@ -551,87 +745,88 @@ function BusinessSettingsSection() {
         </p>
       </div>
 
-      {error && (
-        <div className="mb-4">
-          <Alert variant="error" onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        </div>
-      )}
+      {error && <div className="mb-4"><Alert variant="error" onClose={() => setError(null)}>{error}</Alert></div>}
+      {successMsg && <div className="mb-4"><Alert variant="success" onClose={() => setSuccessMsg(null)}>{successMsg}</Alert></div>}
 
-      {successMsg && (
-        <div className="mb-4">
-          <Alert variant="success" onClose={() => setSuccessMsg(null)}>
-            {successMsg}
-          </Alert>
-        </div>
-      )}
+      <div className="space-y-8">
 
-      <div className="space-y-6">
-        {/* Basic Info */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="Business Name"
-            value={settings.business_name}
-            onChange={(e) => setSettings({ ...settings, business_name: e.target.value })}
-            placeholder="e.g. Chidi Auto Parts Ltd"
-            required
-          />
-          <Input
-            label="Phone"
-            value={settings.phone}
-            onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-            placeholder="e.g. 08012345678"
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={settings.email}
-            onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-            placeholder="e.g. info@business.com"
-          />
-          <Input
-            label="Tax ID (TIN/VAT)"
-            value={settings.tax_id}
-            onChange={(e) => setSettings({ ...settings, tax_id: e.target.value })}
-            placeholder="e.g. TIN-12345678"
-          />
-          <Input
-            label="Website"
-            value={settings.website}
-            onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-            placeholder="e.g. www.business.com"
-          />
-        </div>
-
-        {/* Address */}
+        {/* ── Basic info ───────────────────────────────────────────────── */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Address
-          </label>
-          <textarea
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
-            rows={2}
-            value={settings.address}
-            onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-            placeholder="Business address..."
+          <h3 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            Business Details
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Business Name"
+              value={settings.business_name}
+              onChange={(e) => setSettings((s) => ({ ...s, business_name: e.target.value }))}
+              placeholder="e.g. Chidi Auto Parts Ltd"
+              required
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={settings.email}
+              onChange={(e) => setSettings((s) => ({ ...s, email: e.target.value }))}
+              placeholder="e.g. info@business.com"
+            />
+            <Input
+              label="Tax ID (TIN / VAT)"
+              value={settings.tax_id}
+              onChange={(e) => setSettings((s) => ({ ...s, tax_id: e.target.value }))}
+              placeholder="e.g. TIN-12345678"
+            />
+            <Input
+              label="Website"
+              value={settings.website}
+              onChange={(e) => setSettings((s) => ({ ...s, website: e.target.value }))}
+              placeholder="e.g. www.business.com"
+            />
+          </div>
+
+          {/* Address */}
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+            <textarea
+              rows={2}
+              value={settings.address}
+              onChange={(e) => setSettings((s) => ({ ...s, address: e.target.value }))}
+              placeholder="Business address..."
+              className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10"
+            />
+          </div>
+        </div>
+
+        {/* ── Phone numbers ────────────────────────────────────────────── */}
+        <div>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Phone Numbers
+            </h3>
+            <span className="text-xs text-gray-400">{settings.phones.length} / 10</span>
+          </div>
+          <div className="mb-1.5 hidden grid-cols-[7rem_1fr_2.25rem] gap-2 px-0.5 sm:grid">
+            <span className="text-xs font-medium text-gray-500">Label (optional)</span>
+            <span className="text-xs font-medium text-gray-500">Number</span>
+          </div>
+          <PhoneListEditor
+            phones={settings.phones}
+            onChange={(phones) => setSettings((s) => ({ ...s, phones }))}
+            disabled={isSaving}
           />
         </div>
 
-        {/* Logo */}
+        {/* ── Logo ─────────────────────────────────────────────────────── */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <h3 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
             Business Logo
-          </label>
+          </h3>
           <div className="flex items-center gap-4">
             {settings.logo_base64 && (
-              /* Explicit dimensions + lazy decoding keep the logo from shifting layout.
-                 next/image does not support arbitrary data: URIs without unoptimized prop,
-                 so we use a plain <img> here intentionally. */
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={settings.logo_base64}
-                alt="Business logo"
+                alt="Business logo preview"
                 width={64}
                 height={64}
                 loading="lazy"
@@ -646,13 +841,13 @@ function BusinessSettingsSection() {
                 onChange={handleLogoUpload}
                 className="block text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
               />
-              <p className="mt-1 text-xs text-gray-400">PNG, JPEG, or SVG. Max 500KB.</p>
+              <p className="mt-1 text-xs text-gray-400">PNG, JPEG, or SVG — max 500 KB</p>
             </div>
             {settings.logo_base64 && (
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setSettings({ ...settings, logo_base64: '' })}
+                onClick={() => setSettings((s) => ({ ...s, logo_base64: '' }))}
               >
                 Remove
               </Button>
@@ -660,46 +855,39 @@ function BusinessSettingsSection() {
           </div>
         </div>
 
-        {/* Bank Details */}
+        {/* ── Bank accounts ────────────────────────────────────────────── */}
         <div>
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">Bank Details (shown on invoices)</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Input
-              label="Bank Name"
-              value={settings.bank_name}
-              onChange={(e) => setSettings({ ...settings, bank_name: e.target.value })}
-              placeholder="e.g. First Bank"
-            />
-            <Input
-              label="Account Number"
-              value={settings.bank_account_number}
-              onChange={(e) => setSettings({ ...settings, bank_account_number: e.target.value })}
-              placeholder="e.g. 0123456789"
-            />
-            <Input
-              label="Account Name"
-              value={settings.bank_account_name}
-              onChange={(e) => setSettings({ ...settings, bank_account_name: e.target.value })}
-              placeholder="e.g. Chidi Auto Parts Ltd"
-            />
+          <div className="mb-3 flex items-baseline justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Bank Accounts
+            </h3>
+            <span className="text-xs text-gray-400">{settings.bank_accounts.length} / 10</span>
           </div>
-        </div>
-
-        {/* Invoice Footer */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Invoice Footer Text
-          </label>
-          <textarea
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
-            rows={2}
-            value={settings.invoice_footer}
-            onChange={(e) => setSettings({ ...settings, invoice_footer: e.target.value })}
-            placeholder="e.g. Thank you for your patronage"
+          <p className="mb-3 text-xs text-gray-500">
+            All accounts are printed on invoices so customers can choose where to pay.
+          </p>
+          <BankAccountListEditor
+            accounts={settings.bank_accounts}
+            onChange={(bank_accounts) => setSettings((s) => ({ ...s, bank_accounts }))}
+            disabled={isSaving}
           />
         </div>
 
-        {/* Save Button */}
+        {/* ── Invoice footer ───────────────────────────────────────────── */}
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            Invoice Footer
+          </h3>
+          <textarea
+            rows={2}
+            value={settings.invoice_footer}
+            onChange={(e) => setSettings((s) => ({ ...s, invoice_footer: e.target.value }))}
+            placeholder="e.g. Thank you for your patronage. All sales are final."
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-[#667eea] focus:outline-none focus:ring-2 focus:ring-[#667eea]/10"
+          />
+        </div>
+
+        {/* Save */}
         <div>
           <Button onClick={handleSave} isLoading={isSaving}>
             Save Business Settings

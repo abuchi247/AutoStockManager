@@ -104,10 +104,36 @@ class InvoiceService:
         Args:
             db: Async database session.
             company: Company details to display on invoices.
-                     Defaults to standard company info if not provided.
+                     Fetched from business_settings if not provided.
         """
         self.db = db
         self.company = company or CompanyDetails()
+
+    @classmethod
+    async def from_db(cls, db: AsyncSession) -> "InvoiceService":
+        """Create an InvoiceService with company details loaded from the DB."""
+        from sqlalchemy import select as _select
+        from app.models.business_settings import BusinessSettings
+
+        result = await db.execute(_select(BusinessSettings).limit(1))
+        bs = result.scalar_one_or_none()
+
+        if bs is None:
+            return cls(db=db)
+
+        phones = bs.phones if isinstance(bs.phones, list) else []
+        bank_accounts = bs.bank_accounts if isinstance(bs.bank_accounts, list) else []
+
+        company = CompanyDetails(
+            name=bs.business_name or "My Business",
+            address=bs.address or "",
+            email=bs.email or "",
+            tax_id=bs.tax_id or "",
+            logo_base64=bs.logo_base64,
+            phones=phones,
+            bank_accounts=bank_accounts,
+        )
+        return cls(db=db, company=company)
 
     async def generate_invoice_pdf(
         self,
