@@ -7,6 +7,7 @@ import { Button, Badge, Alert, LoadingSpinner, Modal, Input, Select } from '@/co
 import type { BadgeVariant, SelectOption } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -62,7 +63,7 @@ export default function PurchaseOrderDetailPage() {
       const response = await get<PurchaseOrder>(`/purchase-orders/${id}`);
       setOrder({ ...response, status: response.status?.toLowerCase() as PurchaseOrderStatus });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load purchase order';
+      const message = extractApiError(err, 'Failed to load purchase order');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -94,7 +95,7 @@ export default function PurchaseOrderDetailPage() {
       await post(`/purchase-orders/${id}/approve`, {});
       fetchOrder();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to approve purchase order';
+      const message = extractApiError(err, 'Failed to approve purchase order');
       setError(message);
     } finally {
       setActionLoading(null);
@@ -118,7 +119,7 @@ export default function PurchaseOrderDetailPage() {
       setShowCancelModal(false);
       fetchOrder();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to cancel purchase order';
+      const message = extractApiError(err, 'Failed to cancel purchase order');
       setError(message);
     } finally {
       setActionLoading(null);
@@ -170,7 +171,7 @@ export default function PurchaseOrderDetailPage() {
       setShowReceiveModal(false);
       fetchOrder();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to receive purchase order';
+      const message = extractApiError(err, 'Failed to receive purchase order');
       setError(message);
     } finally {
       setActionLoading(null);

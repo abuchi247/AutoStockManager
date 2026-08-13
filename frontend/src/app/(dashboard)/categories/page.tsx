@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { get, post, put, del } from '@/lib/api';
+import { extractApiError } from '@/lib/validation/errors';
 import {
   Button,
   Input,
@@ -83,7 +84,7 @@ export default function CategoriesPage() {
       setCategories(response.data);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load categories';
+      const message = extractApiError(err, 'Failed to load categories');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -110,7 +111,7 @@ export default function CategoriesPage() {
       setNewCategory({ name: '', parent_id: '', description: '', is_active: true });
       fetchCategories();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create category';
+      const message = extractApiError(err, 'Failed to create category');
       setCreateError(message);
     } finally {
       setIsCreating(false);
@@ -134,7 +135,7 @@ export default function CategoriesPage() {
       setEditCategory(null);
       fetchCategories();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update category';
+      const message = extractApiError(err, 'Failed to update category');
       setEditError(message);
     } finally {
       setIsEditing(false);
@@ -150,7 +151,7 @@ export default function CategoriesPage() {
       setDeleteTarget(null);
       fetchCategories();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to delete category';
+      const message = extractApiError(err, 'Failed to delete category');
       setError(message);
     } finally {
       setIsDeleting(false);

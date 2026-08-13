@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { get, post } from '@/lib/api';
+import { extractApiError } from '@/lib/validation/errors';
 import {
   DataTable,
   Button,
@@ -125,7 +126,7 @@ export default function AuditsPage() {
       })));
       setTotalPages(response.meta.total_pages ?? 1);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load audit sessions';
+      const message = extractApiError(err, 'Failed to load audit sessions');
       setError(message);
     } finally {
       setIsLoading(false);

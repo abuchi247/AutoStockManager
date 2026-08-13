@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
+import { extractApiError } from '@/lib/validation/errors';
 import {
   Button,
   Badge,
@@ -89,7 +90,7 @@ export default function AuditDetailPage() {
       const response = await get<AuditSession>(`/audits/${auditId}`);
       setAudit(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load audit session';
+      const message = extractApiError(err, 'Failed to load audit session');
       setError(message);
     } finally {
       setIsLoading(false);

@@ -21,6 +21,7 @@ import type {
   AccountStatus,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 interface SupplierBalance {
   supplier_id: string;
@@ -96,7 +97,7 @@ export default function SupplierDetailPage() {
       const data = await get<Supplier>(`/suppliers/${id}`);
       setSupplier(data);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load supplier';
+      const message = extractApiError(err, 'Failed to load supplier');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -160,7 +161,7 @@ export default function SupplierDetailPage() {
       setSupplier(updated);
       setShowEditModal(false);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update supplier';
+      const message = extractApiError(err, 'Failed to update supplier');
       setEditError(message);
     } finally {
       setIsSaving(false);

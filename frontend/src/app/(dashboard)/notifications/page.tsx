@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { Notification, PaginatedResponse } from '@/lib/types';
+import { extractApiError } from '@/lib/validation/errors';
 
 type NotificationTypeVariant = 'warning' | 'danger' | 'info';
 
@@ -66,7 +67,7 @@ export default function NotificationsPage() {
       setTotal(response.meta.total);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load notifications';
+      const message = extractApiError(err, 'Failed to load notifications');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -85,7 +86,7 @@ export default function NotificationsPage() {
         prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
       );
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to mark all as read';
+      const message = extractApiError(err, 'Failed to mark all as read');
       setError(message);
     } finally {
       setIsMarkingAll(false);
@@ -106,7 +107,7 @@ export default function NotificationsPage() {
         )
       );
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to mark notification as read';
+      const message = extractApiError(err, 'Failed to mark notification as read');
       setError(message);
     } finally {
       setMarkingId(null);

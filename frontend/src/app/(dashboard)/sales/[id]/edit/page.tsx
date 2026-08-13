@@ -30,6 +30,7 @@ import type {
   Sale,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 interface LineItem {
   id: string;
@@ -230,7 +231,7 @@ export default function EditSalePage() {
         router.push(`/sales/${saleId}`);
       }, 1000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save sale';
+      const message = extractApiError(err, 'Failed to save sale');
       setError(message);
     } finally {
       setIsSaving(false);

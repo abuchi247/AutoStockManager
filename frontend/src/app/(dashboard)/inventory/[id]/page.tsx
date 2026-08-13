@@ -15,6 +15,7 @@ import {
 import type { SelectOption } from '@/components';
 import type { SparePart, SparePartUpdate, Category } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 export default function InventoryDetailPage() {
   const router = useRouter();
@@ -93,7 +94,7 @@ export default function InventoryDetailPage() {
       const response = await get<SparePart & { total_stock?: number }>(`/spare-parts/${partId}`);
       setPart(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load spare part';
+      const message = extractApiError(err, 'Failed to load spare part');
       setError(message);
     } finally {
       setIsLoading(false);

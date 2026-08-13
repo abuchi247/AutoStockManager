@@ -15,6 +15,7 @@ import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { BadgeVariant } from '@/components';
 import type { Transfer, TransferStatus } from '@/lib/types';
+import { extractApiError } from '@/lib/validation/errors';
 import { useAuth } from '@/hooks/useAuth';
 
 interface TimelineEvent {
@@ -116,7 +117,7 @@ export default function TransferDetailPage() {
       const response = await get<Transfer>(`/transfers/${transferId}`);
       setTransfer({ ...response, status: response.status?.toLowerCase() as TransferStatus });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load transfer';
+      const message = extractApiError(err, 'Failed to load transfer');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -135,7 +136,7 @@ export default function TransferDetailPage() {
       setSuccessMsg('Transfer approved successfully');
       fetchTransfer();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to approve transfer';
+      const message = extractApiError(err, 'Failed to approve transfer');
       setError(message);
     } finally {
       setActionLoading(null);
@@ -150,7 +151,7 @@ export default function TransferDetailPage() {
       setSuccessMsg('Transfer marked as received');
       fetchTransfer();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to mark transfer as received';
+      const message = extractApiError(err, 'Failed to mark transfer as received');
       setError(message);
     } finally {
       setActionLoading(null);
@@ -170,7 +171,7 @@ export default function TransferDetailPage() {
       setSuccessMsg('Transfer cancelled');
       fetchTransfer();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to cancel transfer';
+      const message = extractApiError(err, 'Failed to cancel transfer');
       setError(message);
     } finally {
       setActionLoading(null);

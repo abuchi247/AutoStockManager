@@ -24,6 +24,7 @@ import {
 import type { BadgeVariant, SelectOption } from '@/components';
 import type { Sale, SaleItem, SaleStatus, SaleReturnRequest } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
   const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
@@ -90,7 +91,7 @@ export default function SaleDetailPage() {
       // Backend returns uppercase status (DRAFT, CONFIRMED), normalize to lowercase
       setSale({ ...response, status: response.status?.toLowerCase() as SaleStatus });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load sale details';
+      const message = extractApiError(err, 'Failed to load sale details');
       setError(message);
     } finally {
       setIsLoading(false);

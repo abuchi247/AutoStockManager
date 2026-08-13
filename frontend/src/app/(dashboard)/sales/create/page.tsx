@@ -33,6 +33,7 @@ import { formatCurrency } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { saleCreateSchema } from '@/lib/validation/schemas';
+import { extractApiError } from '@/lib/validation/errors';
 
 interface LineItem {
   id: string;
@@ -212,7 +213,7 @@ export default function CreateSalePage() {
         router.push(`/sales/${sale.id}`);
       }, 1000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save sale';
+      const message = extractApiError(err, 'Failed to save sale');
       setError(message);
     } finally {
       setIsSaving(false);

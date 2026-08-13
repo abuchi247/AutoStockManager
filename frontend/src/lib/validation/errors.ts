@@ -89,3 +89,38 @@ export function validateWithSchema<T>(schema: { safeParse: (value: unknown) => {
   }
   return { errors };
 }
+
+/**
+ * Extract a human-readable error message from any thrown API error.
+ *
+ * Priority:
+ * 1. Session-expired flag set by the Axios interceptor → "session expired" message
+ * 2. FastAPI's response body detail string
+ * 3. HTTP status code fallbacks (401, 403, 404, 422, 5xx)
+ * 4. JavaScript Error.message
+ * 5. Generic fallback
+ */
+export function extractApiError(err: unknown, fallback = 'An unexpected error occurred.'): string {
+  // Session expired — interceptor already redirects to /login
+  if (err && typeof err === 'object' && 'sessionExpired' in err) {
+    return 'Your session has expired. Redirecting to login…';
+  }
+
+  // FastAPI response body
+  const bodyMessage = mapFastAPIErrorMessage(err);
+  if (bodyMessage) return bodyMessage;
+
+  // HTTP status code
+  if (err && typeof err === 'object' && 'response' in err) {
+    const status = (err as { response?: { status?: number } }).response?.status;
+    if (status === 401) return 'Your session has expired. Please log in again.';
+    if (status === 403) return 'You do not have permission to perform this action.';
+    if (status === 404) return 'The requested item was not found.';
+    if (status === 409) return 'A conflict occurred — this item may already exist.';
+    if (status === 422) return 'The form data is invalid. Please check your inputs.';
+    if (status && status >= 500) return 'A server error occurred. Please try again shortly.';
+  }
+
+  if (err instanceof Error) return err.message;
+  return fallback;
+}

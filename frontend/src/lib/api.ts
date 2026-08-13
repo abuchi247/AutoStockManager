@@ -109,7 +109,13 @@ api.interceptors.response.use(
       processQueue(refreshError, null);
       clearAuth();
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        // Attach a flag so catch blocks on API callers can show a helpful
+        // "session expired" message before the redirect fires.
+        const sessionError = new Error('Your session has expired. Please log in again.');
+        (sessionError as Error & { sessionExpired: boolean }).sessionExpired = true;
+        // Use replace so the back button doesn't return to a broken state.
+        window.location.replace('/login');
+        return Promise.reject(sessionError);
       }
       return Promise.reject(refreshError);
     } finally {

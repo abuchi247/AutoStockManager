@@ -23,6 +23,7 @@ import type {
   AccountStatus,
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
+import { extractApiError } from '@/lib/validation/errors';
 
 type TabKey = 'purchases' | 'ledger' | 'aging';
 
@@ -104,7 +105,7 @@ export default function CustomerDetailPage() {
       const response = await get<Customer>(`/customers/${customerId}`);
       setCustomer(response);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load customer';
+      const message = extractApiError(err, 'Failed to load customer');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -229,7 +230,7 @@ export default function CustomerDetailPage() {
       setSuccessMessage('Customer updated successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update customer';
+      const message = extractApiError(err, 'Failed to update customer');
       setError(message);
     } finally {
       setIsSaving(false);
@@ -260,7 +261,7 @@ export default function CustomerDetailPage() {
       if (activeTab === 'ledger') fetchLedger();
       if (activeTab === 'aging') fetchAging();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to record payment';
+      const message = extractApiError(err, 'Failed to record payment');
       setPaymentError(message);
     } finally {
       setIsRecordingPayment(false);

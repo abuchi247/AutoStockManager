@@ -20,6 +20,7 @@ import {
 } from '@/components';
 import type { Column, SelectOption } from '@/components';
 import type { Location, LocationType, PaginatedResponse } from '@/lib/types';
+import { extractApiError } from '@/lib/validation/errors';
 
 function getTypeBadge(type: LocationType): React.ReactNode {
   const variants: Record<LocationType, 'info' | 'success' | 'warning'> = {
@@ -94,7 +95,7 @@ export default function LocationsPage() {
       setLocations(response.data);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load locations';
+      const message = extractApiError(err, 'Failed to load locations');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -119,7 +120,7 @@ export default function LocationsPage() {
       });
       fetchLocations();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to create location';
+      const message = extractApiError(err, 'Failed to create location');
       setCreateError(message);
     } finally {
       setIsCreating(false);
@@ -141,7 +142,7 @@ export default function LocationsPage() {
       setEditLocation(null);
       fetchLocations();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to update location';
+      const message = extractApiError(err, 'Failed to update location');
       setEditError(message);
     } finally {
       setIsEditing(false);
@@ -157,7 +158,7 @@ export default function LocationsPage() {
       setDeleteTarget(null);
       fetchLocations();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to delete location';
+      const message = extractApiError(err, 'Failed to delete location');
       setError(message);
     } finally {
       setIsDeleting(false);

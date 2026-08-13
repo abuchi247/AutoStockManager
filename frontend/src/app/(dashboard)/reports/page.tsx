@@ -25,6 +25,7 @@ import {
 } from '@/components';
 import type { SelectOption } from '@/components';
 import type { ReportType } from '@/lib/types';
+import { extractApiError } from '@/lib/validation/errors';
 
 const ReportResultsTable = dynamic(
   () => import('@/components/reports/ReportResultsTable').then((mod) => mod.ReportResultsTable),
@@ -129,7 +130,7 @@ export default function ReportsPage() {
       else data = [];
       setReportData(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to generate report');
+      setError(extractApiError(err, 'Failed to generate report'));
     }
   }, [reportType, reportQuery]);
 

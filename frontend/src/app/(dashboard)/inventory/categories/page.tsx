@@ -10,6 +10,7 @@ import {
   LoadingSpinner,
 } from '@/components';
 import type { Category } from '@/lib/types';
+import { extractApiError } from '@/lib/validation/errors';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,7 +38,7 @@ export default function CategoriesPage() {
       const response = await get<{ data: Category[] }>('/spare-parts/categories');
       setCategories(response.data);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load categories';
+      const message = extractApiError(err, 'Failed to load categories');
       setError(message);
     } finally {
       setIsLoading(false);
@@ -90,7 +91,7 @@ export default function CategoriesPage() {
       setShowModal(false);
       fetchCategories();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save category';
+      const message = extractApiError(err, 'Failed to save category');
       setSaveError(message);
     } finally {
       setIsSaving(false);
@@ -106,7 +107,7 @@ export default function CategoriesPage() {
       setDeletingCategory(null);
       fetchCategories();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to delete category';
+      const message = extractApiError(err, 'Failed to delete category');
       setError(message);
       setShowDeleteModal(false);
     } finally {
