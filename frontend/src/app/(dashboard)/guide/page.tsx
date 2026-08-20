@@ -46,16 +46,17 @@ const GUIDE_SECTIONS: Section[] = [
     steps: [
       {
         title: '1. Configure your business profile',
-        description: 'Set your company name, logo, address, tax ID, and bank details. This information appears on every invoice you generate.',
+        description: 'Set your company name, logo, address, tax ID, phone numbers, and bank accounts. This information appears on every invoice you generate.',
         details: [
           'Go to Settings → Business Profile tab',
-          'Fill in: business name, phone, email, address, tax ID',
+          'Fill in: business name, email, address, tax ID, and website',
+          'Add phone numbers — you can add up to 10 (e.g. "Main: 08012345678", "WhatsApp: 09087654321")',
+          'Add bank accounts — you can add up to 10; all of them print on invoices so customers can choose where to pay',
           'Upload your logo (PNG or JPEG, max 500 KB — auto-resized for invoices)',
-          'Add bank details that will appear at the bottom of invoices',
-          'Add an optional invoice footer message (e.g. payment terms)',
+          'Add an optional invoice footer message (e.g. "Thank you for your patronage")',
           'Click Save Business Settings',
         ],
-        tip: 'You can update this at any time. Existing invoices are not changed, but you can regenerate them to use the latest settings.',
+        tip: 'You can update this at any time. Existing invoices are not changed, but you can regenerate them from the sale detail page to pick up the latest settings.',
         link: '/settings',
         linkLabel: 'Go to Settings',
       },
@@ -470,7 +471,9 @@ const GUIDE_SECTIONS: Section[] = [
         description: 'Update company information that appears on invoices and reports.',
         details: [
           'Go to Settings → Business Profile tab',
-          'Update name, address, phone, email, tax ID, bank details, logo, and footer text',
+          'Update: name, address, email, tax ID, logo, and invoice footer',
+          'Phone numbers: click "Add phone number" to add more — label each one (e.g. "Main", "WhatsApp", "Abuja Branch") — up to 10 supported',
+          'Bank accounts: click "Add bank account" to add more — all accounts are printed on every invoice — up to 10 supported',
           'Changes apply to all invoices generated from that point forward',
           'To update an existing invoice: open the sale → click Regenerate Invoice',
         ],
