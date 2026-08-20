@@ -23,6 +23,7 @@ import type {
   PaginatedResponse,
 } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { getCurrency, setCurrency, CURRENCY_OPTIONS } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
@@ -67,13 +68,7 @@ const USER_STATUS_OPTIONS: SelectOption[] = [
 export default function SettingsPage() {
   const router = useRouter();
   const { hasRole, user: currentUser, isLoading: authLoading } = useAuth();
-
-  // Redirect non-admin users (only after auth is loaded)
-  useEffect(() => {
-    if (!authLoading && !hasRole('admin')) {
-      router.replace('/dashboard');
-    }
-  }, [hasRole, router, authLoading]);
+  const { allowed } = useRequireRole('admin');
 
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -214,10 +209,8 @@ export default function SettingsPage() {
     },
   ];
 
-  // Don't render content for non-admins or while auth is loading
-  if (authLoading || !hasRole('admin')) {
-    return null;
-  }
+  // Don't render content for non-admins
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

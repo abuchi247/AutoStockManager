@@ -27,6 +27,7 @@ import { formatCurrency } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { purchaseOrderCreateSchema } from '@/lib/validation/schemas';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -59,6 +60,8 @@ const PO_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function PurchasesPage() {
+  const { allowed } = useRequireRole(['admin', 'manager']);
+
   const router = useRouter();
 
   // ── All useState hooks declared first, before any derived values ─────────
@@ -191,6 +194,8 @@ export default function PurchasesPage() {
       ),
     },
   ];
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

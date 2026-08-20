@@ -23,6 +23,7 @@ import type {
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { supplierCreateSchema } from '@/lib/validation/schemas';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -46,6 +47,8 @@ const SUPPLIER_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function SuppliersPage() {
+  const { allowed } = useRequireRole(['admin', 'manager']);
+
   const router = useRouter();
 
   const [page, setPage] = useState(1);
@@ -135,6 +138,8 @@ export default function SuppliersPage() {
       render: (item) => getStatusBadge(item.account_status),
     },
   ];
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

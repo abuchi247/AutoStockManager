@@ -34,6 +34,7 @@ import type {
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { transferCreateSchema } from '@/lib/validation/schemas';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
@@ -65,6 +66,8 @@ function formatDate(dateStr: string): string {
 }
 
 export default function TransfersPage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+
   const router = useRouter();
 
   // ── All useState hooks first, before any derived values ──────────────────
@@ -181,6 +184,8 @@ export default function TransfersPage() {
       render: (item) => <span>{formatDate(item.created_at)}</span>,
     },
   ];
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

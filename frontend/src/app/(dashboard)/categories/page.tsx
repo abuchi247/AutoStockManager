@@ -19,6 +19,7 @@ import {
   Alert,
 } from '@/components';
 import type { SelectOption } from '@/components';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 interface CategoryItem {
   id: string;
@@ -39,6 +40,8 @@ interface CategoryListResponse {
 }
 
 export default function CategoriesPage() {
+  const { allowed } = useRequireRole(['admin', 'manager']);
+
   const pageSize = 5;
 
   // ── All state and hooks declared at the top, unconditionally ─────────────
@@ -275,6 +278,8 @@ export default function CategoriesPage() {
 
   // ── Build tree: show parent categories (children nested inside each parent)
   const topLevelCategories = categories;
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

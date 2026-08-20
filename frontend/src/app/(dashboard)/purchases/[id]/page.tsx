@@ -8,6 +8,7 @@ import type { BadgeVariant, SelectOption } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -35,6 +36,8 @@ interface ReceiveItem {
 }
 
 export default function PurchaseOrderDetailPage() {
+  const { allowed } = useRequireRole(['admin', 'manager']);
+
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -211,6 +214,8 @@ export default function PurchaseOrderDetailPage() {
   const canApprove = order.status === 'draft';
   const canReceive = order.status === 'approved' || order.status === 'ordered' || order.status === 'partially_received';
   const canCancel = order.status === 'draft' || order.status === 'approved';
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

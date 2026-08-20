@@ -34,6 +34,7 @@ import { formatCurrency } from '@/lib/currency';
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { saleCreateSchema } from '@/lib/validation/schemas';
 import { extractApiError } from '@/lib/validation/errors';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 interface LineItem {
   id: string;
@@ -54,6 +55,8 @@ const SALE_PAYMENT_OPTIONS = [
 ];
 
 export default function CreateSalePage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+
   const router = useRouter();
 
   // Form state
@@ -289,6 +292,8 @@ export default function CreateSalePage() {
   );
 
   const paymentOptions = SALE_PAYMENT_OPTIONS;
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

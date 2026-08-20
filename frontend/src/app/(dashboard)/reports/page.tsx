@@ -26,6 +26,7 @@ import {
 import type { SelectOption } from '@/components';
 import type { ReportType } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 const ReportResultsTable = dynamic(
   () => import('@/components/reports/ReportResultsTable').then((mod) => mod.ReportResultsTable),
@@ -72,6 +73,8 @@ function getDefaultEndDate(): string {
 }
 
 export default function ReportsPage() {
+  const { allowed } = useRequireRole(['admin', 'manager']);
+
   const searchParams = useSearchParams();
 
   // Form state — initialized from URL params if present
@@ -177,6 +180,8 @@ export default function ReportsPage() {
     },
     [reportType, startDate, endDate, buildParams]
   );
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

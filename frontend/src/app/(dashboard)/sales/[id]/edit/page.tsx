@@ -31,6 +31,7 @@ import type {
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 interface LineItem {
   id: string;
@@ -50,6 +51,8 @@ const SALE_PAYMENT_OPTIONS = [
 ];
 
 export default function EditSalePage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+
   const router = useRouter();
   const params = useParams();
   const saleId = params.id as string;
@@ -300,6 +303,8 @@ export default function EditSalePage() {
       </div>
     );
   }
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

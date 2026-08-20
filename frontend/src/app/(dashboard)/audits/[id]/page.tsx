@@ -21,6 +21,7 @@ import {
   LoadingSpinner,
 } from '@/components';
 import type { BadgeVariant } from '@/components';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import type {
   AuditSession,
   AuditStatus,
@@ -64,6 +65,8 @@ interface ReconciliationItem {
 }
 
 export default function AuditDetailPage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+
   const router = useRouter();
   const params = useParams();
   const auditId = params.id as string;
@@ -223,6 +226,8 @@ export default function AuditDetailPage() {
 
   const canSubmitCounts = audit.status === 'in_progress';
   const canApprove = audit.status === 'pending_approval';
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

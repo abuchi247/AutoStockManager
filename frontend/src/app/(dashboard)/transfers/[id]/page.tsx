@@ -17,6 +17,7 @@ import type { BadgeVariant } from '@/components';
 import type { Transfer, TransferStatus } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
 import { useAuth } from '@/hooks/useAuth';
+import { useRequireRole } from '@/hooks/useRequireRole';
 
 interface TimelineEvent {
   label: string;
@@ -99,6 +100,8 @@ function buildTimeline(transfer: Transfer): TimelineEvent[] {
 }
 
 export default function TransferDetailPage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+
   const params = useParams();
   const router = useRouter();
   const { hasRole } = useAuth();
@@ -204,6 +207,8 @@ export default function TransferDetailPage() {
     hasRole(['storekeeper', 'manager', 'admin']);
 
   const timeline = buildTimeline(transfer);
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

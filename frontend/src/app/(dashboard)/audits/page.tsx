@@ -24,6 +24,7 @@ import {
   LoadingSpinner,
 } from '@/components';
 import type { Column, SelectOption, BadgeVariant } from '@/components';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import type {
   AuditSession,
   AuditType,
@@ -77,6 +78,8 @@ interface StartAuditForm {
 }
 
 export default function AuditsPage() {
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+
   const router = useRouter();
 
   const [audits, setAudits] = useState<AuditSession[]>([]);
@@ -252,6 +255,8 @@ export default function AuditsPage() {
       render: (item) => <span>{formatDate(item.created_at)}</span>,
     },
   ];
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">
