@@ -31,6 +31,9 @@ export default function CategoriesPage() {
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const closeModal = useCallback(() => { setShowModal(false); }, []);
+  const closeDeleteModal = useCallback(() => { setShowDeleteModal(false); }, []);
+
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -193,7 +196,7 @@ export default function CategoriesPage() {
       {/* Create/Edit Modal */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={closeModal}
         title={editingCategory ? 'Edit Category' : 'Create Category'}
         footer={
           <>
@@ -250,7 +253,7 @@ export default function CategoriesPage() {
       {/* Delete confirmation */}
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={closeDeleteModal}
         title="Delete Category"
         footer={
           <>

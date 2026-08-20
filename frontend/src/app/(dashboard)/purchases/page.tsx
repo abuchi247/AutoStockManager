@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePaginatedQuery, useResourceQuery, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
@@ -48,9 +48,20 @@ function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
 }
 
+const PO_STATUS_OPTIONS: SelectOption[] = [
+  { value: '', label: 'All Statuses' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'ORDERED', label: 'Ordered' },
+  { value: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
+  { value: 'RECEIVED', label: 'Received' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+];
+
 export default function PurchasesPage() {
   const router = useRouter();
 
+  // ── All useState hooks declared first, before any derived values ─────────
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [statusFilter, setStatusFilter] = useState('');
@@ -58,19 +69,31 @@ export default function PurchasesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const ordersQuery = usePaginatedQuery<PurchaseOrder>(queryKeys.purchases.list({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection }), `/purchase-orders?${toQueryString({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection })}`);
-  const suppliersQuery = useResourceQuery<PaginatedResponse<Supplier>>(queryKeys.suppliers.list({ page_size: 100 }), '/suppliers?page_size=100', { enabled: showCreateModal });
-  const createOrder = useCreateMutation<PurchaseOrderCreate>('/purchase-orders', [queryKeys.purchases.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
-  const orders = normalizeList(ordersQuery.data).data.map((po) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus }));
-  const suppliers = suppliersQuery.data?.data ?? [];
-  const isLoading = ordersQuery.isLoading;
-  const error = ordersQuery.error?.message ?? null;
-  const totalPages = normalizeList(ordersQuery.data).totalPages;
+  // Form state for the create PO modal
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [poNotes, setPoNotes] = useState('');
   const [poItems, setPoItems] = useState<PurchaseOrderItemCreate[]>([
     { spare_part_id: '', quantity_ordered: '' as unknown as number, unit_cost: '' as unknown as number },
   ]);
+
+  // ── Query hooks ──────────────────────────────────────────────────────────
+  const ordersQuery = usePaginatedQuery<PurchaseOrder>(queryKeys.purchases.list({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection }), `/purchase-orders?${toQueryString({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection })}`);
+  const suppliersQuery = useResourceQuery<PaginatedResponse<Supplier>>(queryKeys.suppliers.list({ page_size: 100 }), '/suppliers?page_size=100', { enabled: showCreateModal });
+  const createOrder = useCreateMutation<PurchaseOrderCreate>('/purchase-orders', [queryKeys.purchases.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
+
+  // ── Derived values (non-hooks) ───────────────────────────────────────────
+  const orders = normalizeList(ordersQuery.data).data.map((po) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus }));
+  const suppliers = useMemo(() => suppliersQuery.data?.data ?? [], [suppliersQuery.data]);
+  const isLoading = ordersQuery.isLoading;
+  const error = ordersQuery.error?.message ?? null;
+  const totalPages = normalizeList(ordersQuery.data).totalPages;
+
+  // ── Stable close handler ─────────────────────────────────────────────────
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    resetCreateForm();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const handleSort = (field: string) => {
@@ -120,20 +143,12 @@ export default function PurchasesPage() {
     setCreateError(null);
   };
 
-  const statusOptions: SelectOption[] = [
-    { value: '', label: 'All Statuses' },
-    { value: 'DRAFT', label: 'Draft' },
-    { value: 'APPROVED', label: 'Approved' },
-    { value: 'ORDERED', label: 'Ordered' },
-    { value: 'PARTIALLY_RECEIVED', label: 'Partially Received' },
-    { value: 'RECEIVED', label: 'Received' },
-    { value: 'CANCELLED', label: 'Cancelled' },
-  ];
+  const statusOptions = PO_STATUS_OPTIONS;
 
-  const supplierOptions: SelectOption[] = suppliers.map((s) => ({
-    value: s.id,
-    label: s.name,
-  }));
+  const supplierOptions = useMemo(
+    () => suppliers.map((s) => ({ value: s.id, label: s.name })),
+    [suppliers]
+  );
 
   const columns: Column<PurchaseOrder>[] = [
     {
@@ -228,21 +243,12 @@ export default function PurchasesPage() {
       {/* Create PO Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          resetCreateForm();
-        }}
+        onClose={closeCreateModal}
         title="Create Purchase Order"
         size="xl"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                resetCreateForm();
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button

@@ -9,7 +9,7 @@
  * Requirements: 4.2, 4.4, 4.5, 4.6
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePaginatedQuery, useResourceQuery, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue';
@@ -67,6 +67,7 @@ function formatDate(dateStr: string): string {
 export default function TransfersPage() {
   const router = useRouter();
 
+  // ── All useState hooks first, before any derived values ──────────────────
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [statusFilter, setStatusFilter] = useState('');
@@ -76,23 +77,34 @@ export default function TransfersPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<TransferCreate>({ spare_part_id: '', source_location_id: '', destination_location_id: '', quantity: 1 });
+  // Part typeahead state
+  const [partSearch, setPartSearch] = useState('');
+  const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
+  const [showPartResults, setShowPartResults] = useState(false);
+
+  // ── Query hooks ──────────────────────────────────────────────────────────
   const transfersQuery = usePaginatedQuery<Transfer>(queryKeys.transfers.list({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection }), `/transfers?${toQueryString({ page, page_size: pageSize, status: statusFilter, sort_by: sortField, sort_direction: sortDirection })}`);
   const locationsQuery = useResourceQuery<PaginatedResponse<Location>>(queryKeys.locations.all, '/locations?page_size=100');
   const createTransfer = useCreateMutation<TransferCreate>('/transfers', [queryKeys.transfers.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
-  const transfers = normalizeList(transfersQuery.data).data.map((t) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus }));
-  const locations = locationsQuery.data?.data ?? [];
-  const isLoading = transfersQuery.isLoading;
-  const error = transfersQuery.error?.message ?? null;
-  const totalPages = normalizeList(transfersQuery.data).totalPages;
-  const [partSearch, setPartSearch] = useState('');
   // Debounced so a typeahead issues one request per pause, not per keystroke.
   // Requirements: 19.3
   const debouncedPartSearch = useDebouncedValue(partSearch);
-  const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
-  const [showPartResults, setShowPartResults] = useState(false);
   const partsQuery = useResourceQuery<PaginatedResponse<SparePart>>(queryKeys.parts.search(debouncedPartSearch), `/spare-parts?search=${encodeURIComponent(debouncedPartSearch)}&page_size=10`, { enabled: debouncedPartSearch.length >= 2, staleTime: 60_000 });
+
+  // ── Derived values (non-hooks) ───────────────────────────────────────────
+  const transfers = normalizeList(transfersQuery.data).data.map((t) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus }));
+  const locations = useMemo(() => locationsQuery.data?.data ?? [], [locationsQuery.data]);
+  const isLoading = transfersQuery.isLoading;
+  const error = transfersQuery.error?.message ?? null;
+  const totalPages = normalizeList(transfersQuery.data).totalPages;
   const partResults = partsQuery.data?.data ?? [];
   const isSearchingParts = partsQuery.isFetching;
+
+  // ── Stable close handler ─────────────────────────────────────────────────
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
 
 
   const handleSort = (field: string) => {
@@ -117,10 +129,10 @@ export default function TransfersPage() {
     });
   };
 
-  const locationOptions: SelectOption[] = locations.map((l) => ({
-    value: l.id,
-    label: `${l.name} (${l.type})`,
-  }));
+  const locationOptions = useMemo(
+    () => locations.map((l) => ({ value: l.id, label: `${l.name} (${l.type})` })),
+    [locations]
+  );
 
   const columns: Column<Transfer>[] = [
     {
@@ -228,21 +240,12 @@ export default function TransfersPage() {
       {/* Create Transfer Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateModal}
         title="Create Transfer"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button

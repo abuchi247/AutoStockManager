@@ -9,7 +9,7 @@
  * Requirements: 11.1, 11.2, 11.3, 11.4
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { get, post } from '@/lib/api';
 import { extractApiError } from '@/lib/validation/errors';
@@ -148,6 +148,10 @@ export default function AuditsPage() {
     }
   };
 
+  const closeStartModal = useCallback(() => {
+    setShowStartModal(false);
+  }, []);
+
   const openStartModal = () => {
     setForm({ location_id: '', audit_type: 'cycle_count', spare_part_ids: '' });
     setCreateError(null);
@@ -202,10 +206,13 @@ export default function AuditsPage() {
     }
   };
 
-  const locationOptions: SelectOption[] = [
-    { value: '', label: 'Select Location' },
-    ...locations.map((loc) => ({ value: loc.id, label: loc.name })),
-  ];
+  const locationOptions = useMemo(
+    () => [
+      { value: '', label: 'Select Location' },
+      ...locations.map((loc) => ({ value: loc.id, label: loc.name })),
+    ],
+    [locations]
+  );
 
   const columns: Column<AuditSession>[] = [
     {
@@ -304,12 +311,12 @@ export default function AuditsPage() {
       {/* Start Audit Modal */}
       <Modal
         isOpen={showStartModal}
-        onClose={() => setShowStartModal(false)}
+        onClose={closeStartModal}
         title="Start New Audit"
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowStartModal(false)}>
+            <Button variant="secondary" onClick={closeStartModal}>
               Cancel
             </Button>
             <Button onClick={handleStartAudit} isLoading={isCreating}>

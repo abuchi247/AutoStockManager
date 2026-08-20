@@ -263,6 +263,19 @@ export default function InventoryDetailPage() {
     return cat?.name || '—';
   };
 
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setDeleteError(null);
+  }, []);
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditError(null);
+  }, []);
+  const closeAdjustModal = useCallback(() => {
+    setShowAdjustModal(false);
+    setAdjustError(null);
+  }, []);
+
   const handleDelete = async () => {
     setIsDeleting(true);
     setDeleteError(null);
@@ -607,10 +620,7 @@ export default function InventoryDetailPage() {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setDeleteError(null);
-        }}
+        onClose={closeDeleteModal}
         title="Delete Spare Part"
         size="sm"
         footer={
@@ -640,10 +650,7 @@ export default function InventoryDetailPage() {
       {/* Edit Modal */}
       <Modal
         isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditError(null);
-        }}
+        onClose={closeEditModal}
         title="Edit Spare Part"
         size="lg"
         footer={
@@ -752,10 +759,7 @@ export default function InventoryDetailPage() {
       {/* Stock Adjustment Modal */}
       <Modal
         isOpen={showAdjustModal}
-        onClose={() => {
-          setShowAdjustModal(false);
-          setAdjustError(null);
-        }}
+        onClose={closeAdjustModal}
         title="Adjust Stock"
         size="md"
         footer={

@@ -98,6 +98,11 @@ export default function CustomerDetailPage() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  const closePaymentModal = useCallback(() => {
+    setShowPaymentModal(false);
+    setPaymentError(null);
+  }, []);
+
   const fetchCustomer = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -504,20 +509,11 @@ export default function CustomerDetailPage() {
       {/* Record Payment Modal */}
       <Modal
         isOpen={showPaymentModal}
-        onClose={() => {
-          setShowPaymentModal(false);
-          setPaymentError(null);
-        }}
+        onClose={closePaymentModal}
         title="Record Payment"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowPaymentModal(false);
-                setPaymentError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closePaymentModal}>
               Cancel
             </Button>
             <Button onClick={handleRecordPayment} isLoading={isRecordingPayment}>

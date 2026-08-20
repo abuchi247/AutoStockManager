@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
 import { usePaginatedQuery, useResourceQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
@@ -87,13 +87,9 @@ export default function InventoryPage() {
   const brandsQuery = useResourceQuery<{ data: string[] }>(['spare-parts', 'brands'], '/spare-parts/brands');
   const locationsQuery = useResourceQuery<{ data: Array<{ id: string; name: string }> }>(queryKeys.locations.all, '/locations?page_size=100');
   const createPart = useCreateMutation<SparePartCreate, { id: string }>('/spare-parts', [queryKeys.inventory.all, queryKeys.dashboard.all]);
-  const parts = normalizeList(partsQuery.data).data;
-  const totalPages = normalizeList(partsQuery.data).totalPages;
-  const isLoading = partsQuery.isLoading;
-  const error = partsQuery.error?.message ?? null;
-  const categories: Category[] = (categoriesQuery.data?.data ?? []).flatMap((item) => [item, ...(item.children ?? [])]);
-  const brands = brandsQuery.data?.data ?? [];
-  const locations = locationsQuery.data?.data ?? [];
+
+  // ── More useState hooks — kept here (after query hooks) but before derived
+  // non-hook values to maintain strict Rules-of-Hooks ordering ─────────────
   const [newPart, setNewPart] = useState<SparePartCreate>({ part_number: '', name: '', brand: '', unit_of_measure: 'pcs', cost_price: '' as unknown as number, selling_price: '' as unknown as number, min_stock_level: '' as unknown as number, max_stock_level: 0, reorder_quantity: 0 });
   const [initialStockLocation, setInitialStockLocation] = useState('');
   const [initialStockQty, setInitialStockQty] = useState<number | ''>('');
@@ -101,6 +97,15 @@ export default function InventoryPage() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
+
+  // ── Derived values (non-hooks, after all hooks) ──────────────────────────
+  const parts = normalizeList(partsQuery.data).data;
+  const totalPages = normalizeList(partsQuery.data).totalPages;
+  const isLoading = partsQuery.isLoading;
+  const error = partsQuery.error?.message ?? null;
+  const categories: Category[] = (categoriesQuery.data?.data ?? []).flatMap((item) => [item, ...(item.children ?? [])]);
+  const brands = useMemo(() => brandsQuery.data?.data ?? [], [brandsQuery.data]);
+  const locations = useMemo(() => locationsQuery.data?.data ?? [], [locationsQuery.data]);
 
   const openCreateModal = async () => {
     setShowCreateModal(true);
@@ -175,20 +180,39 @@ export default function InventoryPage() {
     }
   };
 
-  const categoryOptions: SelectOption[] = [
-    { value: '', label: 'All Categories' },
-    ...categories.map((c) => ({ value: c.id, label: c.name })),
-  ];
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: 'All Categories' },
+      ...categories.map((c) => ({ value: c.id, label: c.name })),
+    ],
+    [categories]
+  );
 
-  const brandOptions: SelectOption[] = [
-    { value: '', label: 'All Brands' },
-    ...brands.map((b) => ({ value: b, label: b })),
-  ];
+  const brandOptions = useMemo(
+    () => [
+      { value: '', label: 'All Brands' },
+      ...brands.map((b) => ({ value: b, label: b })),
+    ],
+    [brands]
+  );
 
-  const locationOptions: SelectOption[] = [
-    { value: '', label: 'All Locations' },
-    ...locations.map((l) => ({ value: l.id, label: l.name })),
-  ];
+  const locationOptions = useMemo(
+    () => [
+      { value: '', label: 'All Locations' },
+      ...locations.map((l) => ({ value: l.id, label: l.name })),
+    ],
+    [locations]
+  );
+
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+  }, []);
+
+  const closeBarcodeModal = useCallback(() => {
+    setShowBarcodeModal(false);
+    setBarcodeError(null);
+    setBarcodeInput('');
+  }, []);
 
   const columns: Column<SparePart & { total_stock?: number }>[] = [
     {
@@ -345,21 +369,12 @@ export default function InventoryPage() {
       {/* Create Part Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateModal}
         title="Add New Spare Part"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button onClick={handleCreatePart} isLoading={createPart.isPending}>
@@ -522,23 +537,12 @@ export default function InventoryPage() {
       {/* Barcode Lookup Modal */}
       <Modal
         isOpen={showBarcodeModal}
-        onClose={() => {
-          setShowBarcodeModal(false);
-          setBarcodeError(null);
-          setBarcodeInput('');
-        }}
+        onClose={closeBarcodeModal}
         title="Barcode Lookup"
         size="sm"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowBarcodeModal(false);
-                setBarcodeError(null);
-                setBarcodeInput('');
-              }}
-            >
+            <Button variant="secondary" onClick={closeBarcodeModal}>
               Cancel
             </Button>
             <Button

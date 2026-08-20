@@ -88,6 +88,9 @@ export default function PurchaseOrderDetailPage() {
     fetchOrder();
   }, [fetchOrder]);
 
+  const closeCancelModal = useCallback(() => { setShowCancelModal(false); }, []);
+  const closeReceiveModal = useCallback(() => { setShowReceiveModal(false); }, []);
+
   const handleApprove = async () => {
     setActionLoading('approve');
     setError(null);
@@ -425,7 +428,7 @@ export default function PurchaseOrderDetailPage() {
       {/* Cancel Modal */}
       <Modal
         isOpen={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
+        onClose={closeCancelModal}
         title="Cancel Purchase Order"
         size="sm"
         footer={
@@ -471,7 +474,7 @@ export default function PurchaseOrderDetailPage() {
       {/* Receive Modal */}
       <Modal
         isOpen={showReceiveModal}
-        onClose={() => setShowReceiveModal(false)}
+        onClose={closeReceiveModal}
         title="Receive Items"
         size="lg"
         footer={

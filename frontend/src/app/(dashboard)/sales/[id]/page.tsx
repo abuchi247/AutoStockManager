@@ -83,6 +83,10 @@ export default function SaleDetailPage() {
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [invoiceFormat, setInvoiceFormat] = useState<'A4' | 'THERMAL'>('A4');
 
+  const closeReturnModal = useCallback(() => {
+    setShowReturnModal(false);
+  }, []);
+
   const fetchSale = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -637,12 +641,12 @@ export default function SaleDetailPage() {
       {/* Return Modal */}
       <Modal
         isOpen={showReturnModal}
-        onClose={() => setShowReturnModal(false)}
+        onClose={closeReturnModal}
         title="Process Return"
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowReturnModal(false)}>
+            <Button variant="secondary" onClick={closeReturnModal}>
               Cancel
             </Button>
             <Button

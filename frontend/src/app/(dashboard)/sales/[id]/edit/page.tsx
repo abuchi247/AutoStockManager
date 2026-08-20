@@ -10,7 +10,7 @@
  * Requirements: 5.1, 5.3, 5.4, 5.6, 5.7
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { get, post, put } from '@/lib/api';
 import {
@@ -43,6 +43,11 @@ interface LineItem {
   line_total: number;
   available_stock?: number;
 }
+
+const SALE_PAYMENT_OPTIONS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'CREDIT', label: 'Credit' },
+];
 
 export default function EditSalePage() {
   const router = useRouter();
@@ -273,20 +278,20 @@ export default function EditSalePage() {
     }
   };
 
-  const customerOptions: SelectOption[] = [
-    { value: '', label: 'Walk-in Customer' },
-    ...customers.map((c) => ({ value: c.id, label: c.name })),
-  ];
+  const customerOptions = useMemo(
+    () => [
+      { value: '', label: 'Walk-in (Cash)' },
+      ...customers.map((c: { id: string; name: string }) => ({ value: c.id, label: c.name })),
+    ],
+    [customers]
+  );
 
-  const locationOptions: SelectOption[] = [
-    { value: '', label: 'Select Location' },
-    ...locations.map((l) => ({ value: l.id, label: l.name })),
-  ];
+  const locationOptions = useMemo(
+    () => locations.map((l: { id: string; name: string }) => ({ value: l.id, label: l.name })),
+    [locations]
+  );
 
-  const paymentOptions: SelectOption[] = [
-    { value: 'CASH', label: 'Cash' },
-    { value: 'CREDIT', label: 'Credit' },
-  ];
+  const paymentOptions = SALE_PAYMENT_OPTIONS;
 
   if (isLoading) {
     return (

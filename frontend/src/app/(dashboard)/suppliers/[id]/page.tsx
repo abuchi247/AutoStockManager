@@ -90,6 +90,11 @@ export default function SupplierDetailPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<SupplierUpdate>({});
 
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditError(null);
+  }, []);
+
   const fetchSupplier = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -352,21 +357,12 @@ export default function SupplierDetailPage() {
       {/* Edit Supplier Modal */}
       <Modal
         isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditError(null);
-        }}
+        onClose={closeEditModal}
         title="Edit Supplier"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeEditModal}>
               Cancel
             </Button>
             <Button onClick={handleSave} isLoading={isSaving}>

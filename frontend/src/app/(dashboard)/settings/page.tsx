@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { get, post, put } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +51,18 @@ function getStatusBadge(isActive: boolean): React.ReactNode {
     <Badge variant="danger">Inactive</Badge>
   );
 }
+
+const ROLE_OPTIONS: SelectOption[] = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'salesperson', label: 'Salesperson' },
+  { value: 'storekeeper', label: 'Storekeeper' },
+];
+
+const USER_STATUS_OPTIONS: SelectOption[] = [
+  { value: 'true', label: 'Active' },
+  { value: 'false', label: 'Inactive' },
+];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -103,6 +115,17 @@ export default function SettingsPage() {
     }
   };
 
+  const closeCreateUserModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
+
+  const closeEditUserModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditError(null);
+    setEditingUser(null);
+  }, []);
+
   const handleCreateUser = () => {
     const validation = validateWithSchema(userCreateSchema, newUser);
     if (!validation.data) {
@@ -137,17 +160,7 @@ export default function SettingsPage() {
     updateUser.mutate({ id: editingUser.id, payload }, { onError: (err) => setEditError(err.message), onSuccess: () => { setShowEditModal(false); setEditingUser(null); setEditData({}); } });
   };
 
-  const roleOptions: SelectOption[] = [
-    { value: 'admin', label: 'Admin' },
-    { value: 'manager', label: 'Manager' },
-    { value: 'salesperson', label: 'Salesperson' },
-    { value: 'storekeeper', label: 'Storekeeper' },
-  ];
 
-  const statusOptions: SelectOption[] = [
-    { value: 'true', label: 'Active' },
-    { value: 'false', label: 'Inactive' },
-  ];
 
   const columns: Column<UserProfile>[] = [
     {
@@ -272,21 +285,12 @@ export default function SettingsPage() {
       {/* Create User Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateUserModal}
         title="Create New User"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateUserModal}>
               Cancel
             </Button>
             <Button onClick={handleCreateUser} isLoading={createUser.isPending}>
@@ -331,7 +335,7 @@ export default function SettingsPage() {
             />
             <Select
               label="Role"
-              options={roleOptions}
+              options={ROLE_OPTIONS}
               value={newUser.role}
               onChange={(e) =>
                 setNewUser({ ...newUser, role: e.target.value as UserRole })
@@ -344,23 +348,12 @@ export default function SettingsPage() {
       {/* Edit User Modal */}
       <Modal
         isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditError(null);
-          setEditingUser(null);
-        }}
+        onClose={closeEditUserModal}
         title={`Edit User: ${editingUser?.username || ''}`}
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditError(null);
-                setEditingUser(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeEditUserModal}>
               Cancel
             </Button>
             <Button onClick={handleSaveUser} isLoading={updateUser.isPending}>
@@ -386,7 +379,7 @@ export default function SettingsPage() {
             />
             <Select
               label="Role"
-              options={roleOptions}
+              options={ROLE_OPTIONS}
               value={editData.role || ''}
               onChange={(e) =>
                 setEditData({ ...editData, role: e.target.value as UserRole })
@@ -394,7 +387,7 @@ export default function SettingsPage() {
             />
             <Select
               label="Status"
-              options={statusOptions}
+              options={USER_STATUS_OPTIONS}
               value={String(editData.is_active ?? true)}
               onChange={(e) =>
                 setEditData({ ...editData, is_active: e.target.value === 'true' })

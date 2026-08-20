@@ -42,6 +42,13 @@ function getStatusBadge(status: AccountStatus): React.ReactNode {
 
 
 
+const CUSTOMER_STATUS_OPTIONS: SelectOption[] = [
+  { value: '', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'closed', label: 'Closed' },
+];
+
 export default function CustomersPage() {
   const router = useRouter();
 
@@ -97,6 +104,11 @@ export default function CustomersPage() {
 
   const resetCustomerForm = () => setNewCustomer({ name: '', phone: '', email: '', address: '', tax_id: '', credit_limit: '' as unknown as number });
 
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
+
   const handleCreateCustomer = () => {
     const payload = { ...newCustomer, credit_limit: newCustomer.credit_limit === ('' as unknown as number) ? 0 : (newCustomer.credit_limit || 0) };
     const validation = validateWithSchema(customerCreateSchema, payload);
@@ -108,12 +120,7 @@ export default function CustomersPage() {
     createCustomer.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); resetCustomerForm(); } });
   };
 
-  const statusOptions: SelectOption[] = [
-    { value: '', label: 'All Statuses' },
-    { value: 'active', label: 'Active' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'closed', label: 'Closed' },
-  ];
+
 
   const columns: Column<Customer & { balance?: number }>[] = [
     {
@@ -194,7 +201,7 @@ export default function CustomersPage() {
         </div>
         <div className="w-full sm:w-48">
           <Select
-            options={statusOptions}
+            options={CUSTOMER_STATUS_OPTIONS}
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -240,21 +247,12 @@ export default function CustomersPage() {
       {/* Create Customer Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateModal}
         title="Add New Customer"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button onClick={handleCreateCustomer} isLoading={createCustomer.isPending}>

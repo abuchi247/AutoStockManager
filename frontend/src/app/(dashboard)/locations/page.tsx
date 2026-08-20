@@ -6,7 +6,7 @@
  * Lists all locations (warehouses, shops, transit) with ability to create new ones.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { get, post, put, del } from '@/lib/api';
 import {
@@ -165,11 +165,27 @@ export default function LocationsPage() {
     }
   };
 
-  const typeOptions: SelectOption[] = [
-    { value: 'warehouse', label: 'Warehouse' },
-    { value: 'shop', label: 'Shop' },
-    { value: 'transit', label: 'Transit' },
-  ];
+  const typeOptions: SelectOption[] = useMemo(
+    () => [
+      { value: 'warehouse', label: 'Warehouse' },
+      { value: 'shop', label: 'Shop' },
+      { value: 'transit', label: 'Transit' },
+    ],
+    []
+  );
+
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditError(null);
+  }, []);
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setDeleteTarget(null);
+  }, []);
 
   const columns: Column<Location>[] = [
     {
@@ -272,28 +288,11 @@ export default function LocationsPage() {
       />
 
       {/* Create Location Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
-        title="Add New Location"
-        size="lg"
+      <Modal isOpen={showCreateModal} onClose={closeCreateModal} title="Add New Location" size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleCreateLocation} isLoading={isCreating}>
-              Create Location
-            </Button>
+            <Button variant="secondary" onClick={closeCreateModal}>Cancel</Button>
+            <Button onClick={handleCreateLocation} isLoading={isCreating}>Create Location</Button>
           </>
         }
       >
@@ -339,28 +338,11 @@ export default function LocationsPage() {
       </Modal>
 
       {/* Edit Location Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditError(null);
-        }}
-        title="Edit Location"
-        size="lg"
+      <Modal isOpen={showEditModal} onClose={closeEditModal} title="Edit Location" size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleEditLocation} isLoading={isEditing}>
-              Save Changes
-            </Button>
+            <Button variant="secondary" onClick={closeEditModal}>Cancel</Button>
+            <Button onClick={handleEditLocation} isLoading={isEditing}>Save Changes</Button>
           </>
         }
       >
@@ -422,32 +404,11 @@ export default function LocationsPage() {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setDeleteTarget(null);
-        }}
-        title="Delete Location"
-        size="sm"
+      <Modal isOpen={showDeleteModal} onClose={closeDeleteModal} title="Delete Location" size="sm"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowDeleteModal(false);
-                setDeleteTarget(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleDeleteLocation}
-              isLoading={isDeleting}
-            >
-              Delete
-            </Button>
+            <Button variant="secondary" onClick={closeDeleteModal}>Cancel</Button>
+            <Button variant="danger" onClick={handleDeleteLocation} isLoading={isDeleting}>Delete</Button>
           </>
         }
       >

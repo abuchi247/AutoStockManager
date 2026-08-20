@@ -38,6 +38,13 @@ function getStatusBadge(status: AccountStatus): React.ReactNode {
   return <Badge variant={variants[status]}>{labels[status]}</Badge>;
 }
 
+const SUPPLIER_STATUS_OPTIONS: SelectOption[] = [
+  { value: '', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'closed', label: 'Closed' },
+];
+
 export default function SuppliersPage() {
   const router = useRouter();
 
@@ -70,6 +77,11 @@ export default function SuppliersPage() {
     }
   };
 
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
+
   const handleCreateSupplier = () => {
     const validation = validateWithSchema(supplierCreateSchema, newSupplier);
     if (!validation.data) {
@@ -80,12 +92,7 @@ export default function SuppliersPage() {
     createSupplier.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewSupplier({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', payment_terms: '' }); } });
   };
 
-  const statusOptions: SelectOption[] = [
-    { value: '', label: 'All Statuses' },
-    { value: 'active', label: 'Active' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'closed', label: 'Closed' },
-  ];
+
 
   const columns: Column<Supplier>[] = [
     {
@@ -154,7 +161,7 @@ export default function SuppliersPage() {
         </div>
         <div className="w-full sm:w-48">
           <Select
-            options={statusOptions}
+            options={SUPPLIER_STATUS_OPTIONS}
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -189,21 +196,12 @@ export default function SuppliersPage() {
       {/* Create Supplier Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateModal}
         title="Add New Supplier"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button onClick={handleCreateSupplier} isLoading={createSupplier.isPending}>
