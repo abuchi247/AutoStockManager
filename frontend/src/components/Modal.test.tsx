@@ -38,21 +38,25 @@ describe('Modal keyboard and focus behavior', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByRole('heading', { name: 'Add New Customer' })).toBeInTheDocument();
 
-    // Focus lands on the first focusable control inside the dialog.
-    const closeButton = screen.getByRole('button', { name: 'Close modal' });
-    expect(closeButton).toHaveFocus();
+    // Focus lands on the first non-close-button focusable inside the dialog
+    // (the Name input), NOT the × button. This is the correct behaviour —
+    // the × button being first caused focus to jump there on every keystroke.
+    const nameInput = screen.getByLabelText('Name');
+    expect(nameInput).toHaveFocus();
 
-    // Tab from the last control wraps back to the first instead of escaping.
+    // Tab from the last control wraps back to the first focusable (Close button)
+    // rather than escaping the dialog.
+    const closeButton = screen.getByRole('button', { name: 'Close modal' });
     const saveButton = screen.getByRole('button', { name: 'Save' });
     saveButton.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
     expect(closeButton).toHaveFocus();
 
-    // Shift+Tab from the first control wraps to the last.
+    // Shift+Tab from the first focusable wraps to the last.
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(saveButton).toHaveFocus();
 
-    // Escape closes and focus returns to the trigger.
+    // Escape closes the dialog and focus returns to the trigger.
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();

@@ -7,7 +7,7 @@
  * Supports create, edit, and delete operations.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { get, post, put, del } from '@/lib/api';
 import { extractApiError } from '@/lib/validation/errors';
 import {
@@ -39,12 +39,15 @@ interface CategoryListResponse {
 }
 
 export default function CategoriesPage() {
+  const pageSize = 5;
+
+  // ── All state and hooks declared at the top, unconditionally ─────────────
   const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 5;
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -74,6 +77,7 @@ export default function CategoriesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CategoryItem | null>(null);
 
+  // ── Fetch paginated categories for the table ─────────────────────────────
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -84,18 +88,39 @@ export default function CategoriesPage() {
       setCategories(response.data);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
-      const message = extractApiError(err, 'Failed to load categories');
-      setError(message);
+      setError(extractApiError(err, 'Failed to load categories'));
     } finally {
       setIsLoading(false);
     }
   }, [page]);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  // ── Fetch all top-level categories for the parent dropdown ───────────────
+  const fetchAllCategories = useCallback(async () => {
+    try {
+      const response = await get<CategoryListResponse>(
+        '/categories?page_size=500&parent_only=true'
+      );
+      setAllCategories(response.data);
+    } catch {
+      // Non-critical — dropdown will just be empty
+    }
+  }, []);
 
-  const handleCreateCategory = async () => {
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  useEffect(() => { fetchAllCategories(); }, [fetchAllCategories]);
+
+  // ── Memoised parent options — stable reference, no new array on every render
+  const parentOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: 'None (Top-level)' },
+      ...allCategories
+        .filter((c) => !c.parent_id)
+        .map((c) => ({ value: c.id, label: c.name })),
+    ],
+    [allCategories]
+  );
+
+  const handleCreateCategory = useCallback(async () => {
     setIsCreating(true);
     setCreateError(null);
     try {
@@ -111,14 +136,13 @@ export default function CategoriesPage() {
       setNewCategory({ name: '', parent_id: '', description: '', is_active: true });
       fetchCategories();
     } catch (err: unknown) {
-      const message = extractApiError(err, 'Failed to create category');
-      setCreateError(message);
+      setCreateError(extractApiError(err, 'Failed to create category'));
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [newCategory, fetchCategories]);
 
-  const handleEditCategory = async () => {
+  const handleEditCategory = useCallback(async () => {
     if (!editCategory) return;
     setIsEditing(true);
     setEditError(null);
@@ -135,14 +159,13 @@ export default function CategoriesPage() {
       setEditCategory(null);
       fetchCategories();
     } catch (err: unknown) {
-      const message = extractApiError(err, 'Failed to update category');
-      setEditError(message);
+      setEditError(extractApiError(err, 'Failed to update category'));
     } finally {
       setIsEditing(false);
     }
-  };
+  }, [editCategory, fetchCategories]);
 
-  const handleDeleteCategory = async () => {
+  const handleDeleteCategory = useCallback(async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
@@ -151,14 +174,13 @@ export default function CategoriesPage() {
       setDeleteTarget(null);
       fetchCategories();
     } catch (err: unknown) {
-      const message = extractApiError(err, 'Failed to delete category');
-      setError(message);
+      setError(extractApiError(err, 'Failed to delete category'));
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [deleteTarget, fetchCategories]);
 
-  const openEditModal = (cat: CategoryItem) => {
+  const openEditModal = useCallback((cat: CategoryItem) => {
     setEditCategory({
       id: cat.id,
       name: cat.name,
@@ -168,12 +190,26 @@ export default function CategoriesPage() {
     });
     setEditError(null);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const openDeleteModal = (cat: CategoryItem) => {
+  const openDeleteModal = useCallback((cat: CategoryItem) => {
     setDeleteTarget(cat);
     setShowDeleteModal(true);
-  };
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreateError(null);
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditError(null);
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+  }, []);
 
   // Render category row with indentation based on parent_id
   const renderCategoryRow = (cat: CategoryItem, level: number = 0): React.ReactNode[] => {
@@ -237,31 +273,8 @@ export default function CategoriesPage() {
     return rows;
   };
 
-  // Build tree: show parent categories (children are nested inside each parent)
+  // ── Build tree: show parent categories (children nested inside each parent)
   const topLevelCategories = categories;
-
-  // Also fetch all categories (unpaginated) for the parent dropdown in create/edit
-  const [allCategories, setAllCategories] = useState<CategoryItem[]>([]);
-  const fetchAllCategories = useCallback(async () => {
-    try {
-      const response = await get<CategoryListResponse>('/categories?page_size=500&parent_only=true');
-      setAllCategories(response.data);
-    } catch {
-      // Non-critical
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAllCategories();
-  }, [fetchAllCategories]);
-
-  // Get flat list of top-level categories for parent dropdown
-  const parentOptions: SelectOption[] = [
-    { value: '', label: 'None (Top-level)' },
-    ...allCategories
-      .filter((c) => !c.parent_id)
-      .map((c) => ({ value: c.id, label: c.name })),
-  ];
 
   return (
     <div className="space-y-6">
@@ -364,21 +377,12 @@ export default function CategoriesPage() {
       {/* Create Category Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setCreateError(null);
-        }}
+        onClose={closeCreateModal}
         title="Add New Category"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                setCreateError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeCreateModal}>
               Cancel
             </Button>
             <Button onClick={handleCreateCategory} isLoading={isCreating}>
@@ -429,21 +433,12 @@ export default function CategoriesPage() {
       {/* Edit Category Modal */}
       <Modal
         isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditError(null);
-        }}
+        onClose={closeEditModal}
         title="Edit Category"
         size="lg"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditError(null);
-              }}
-            >
+            <Button variant="secondary" onClick={closeEditModal}>
               Cancel
             </Button>
             <Button onClick={handleEditCategory} isLoading={isEditing}>
@@ -510,22 +505,15 @@ export default function CategoriesPage() {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={closeDeleteModal}
         title="Delete Category"
         size="sm"
         footer={
           <>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteModal(false)}
-            >
+            <Button variant="secondary" onClick={closeDeleteModal}>
               Cancel
             </Button>
-            <Button
-              variant="danger"
-              onClick={handleDeleteCategory}
-              isLoading={isDeleting}
-            >
+            <Button variant="danger" onClick={handleDeleteCategory} isLoading={isDeleting}>
               Delete
             </Button>
           </>

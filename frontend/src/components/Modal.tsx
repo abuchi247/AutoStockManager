@@ -39,6 +39,12 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // Keep a stable ref to onClose so the focus-trap effect never re-fires
+  // just because the parent re-rendered and created a new inline function.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   // Focus management: move focus into the dialog, keep Tab inside it while it is
   // open, and return focus to the trigger on close.
@@ -50,11 +56,18 @@ export function Modal({
     const focusables = () =>
       Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []);
 
-    (focusables()[0] ?? dialogRef.current)?.focus();
+    // Focus the first non-close-button focusable element, falling back to the
+    // dialog container itself. This prevents the × button from stealing focus
+    // on every render when the modal's onClose prop reference changes.
+    const allFocusable = focusables();
+    const firstInput = allFocusable.find(
+      (el) => el.getAttribute('aria-label') !== 'Close modal'
+    );
+    (firstInput ?? allFocusable[0] ?? dialogRef.current)?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -87,7 +100,9 @@ export function Modal({
       document.body.style.overflow = '';
       previouslyFocused.current?.focus?.();
     };
-  }, [isOpen, onClose]);
+  // Only re-run when the modal opens or closes — never because onClose changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
