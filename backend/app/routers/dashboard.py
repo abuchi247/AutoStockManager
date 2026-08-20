@@ -15,8 +15,8 @@ Satisfies Requirements: 13.1, 13.2, 13.4
 from fastapi import APIRouter, Depends, status
 
 from app.dependencies import CurrentUser, DbSession
-from app.middleware.auth import get_current_user
-from app.models.user import User
+from app.middleware.auth import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.schemas.report import DashboardKPIResponse, TopSellingProductSchema
 from app.services.dashboard_service import DashboardService
 
@@ -263,3 +263,94 @@ def _get_period_start(period: str):
         return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
     else:  # "all"
         return None
+
+
+def _period_label(period: str) -> str:
+    """Human-readable label for a period code."""
+    return {
+        "1m": "This Month",
+        "3m": "Last 3 Months",
+        "6m": "Last 6 Months",
+        "1y": "Last 12 Months",
+        "all": "All Time",
+    }.get(period, period)
+
+
+@router.get(
+    "/profit-summary",
+    status_code=status.HTTP_200_OK,
+    summary="Get profit summary",
+    description=(
+        "Returns revenue, COGS, gross margin, margin %, and sale count "
+        "for the selected period. Admin and Manager only."
+    ),
+)
+async def get_profit_summary(
+    db: DbSession,
+    current_user: User = Depends(
+        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+    ),
+    period: str = "1m",
+) -> dict:
+    """Return a profit summary for the dashboard.
+
+    Calculates:
+      - total_revenue   = SUM(Sale.total_amount)   for confirmed sales in period
+      - total_cogs      = SUM(SaleItem.cost_of_goods_sold) for those items
+      - gross_margin    = revenue − cogs
+      - margin_pct      = gross_margin / revenue × 100  (0 when no sales)
+      - sale_count      = number of confirmed sales in period
+
+    Only Admin and Manager roles may call this endpoint.
+    Period options: 1m (current calendar month), 3m, 6m, 1y, all.
+    """
+    from decimal import Decimal
+    from sqlalchemy import func, select, and_
+    from app.models.sale import Sale, SaleItem, SaleStatus
+
+    start_dt = _get_period_start(period)
+
+    # ── Revenue ──────────────────────────────────────────────────────────────
+    revenue_conditions = [Sale.status == SaleStatus.CONFIRMED]
+    if start_dt:
+        revenue_conditions.append(Sale.created_at >= start_dt)
+
+    rev_stmt = select(
+        func.coalesce(func.sum(Sale.total_amount), Decimal("0")),
+        func.count(Sale.id),
+    ).where(and_(*revenue_conditions))
+    rev_result = await db.execute(rev_stmt)
+    rev_row = rev_result.one()
+    total_revenue = rev_row[0] or Decimal("0.00")
+    sale_count = int(rev_row[1])
+
+    # ── COGS ──────────────────────────────────────────────────────────────────
+    cogs_conditions = [Sale.status == SaleStatus.CONFIRMED]
+    if start_dt:
+        cogs_conditions.append(Sale.created_at >= start_dt)
+
+    cogs_stmt = select(
+        func.coalesce(
+            func.sum(SaleItem.cost_of_goods_sold), Decimal("0")
+        )
+    ).join(Sale, SaleItem.sale_id == Sale.id).where(and_(*cogs_conditions))
+    cogs_result = await db.execute(cogs_stmt)
+    total_cogs = cogs_result.scalar() or Decimal("0.00")
+
+    # ── Derived ───────────────────────────────────────────────────────────────
+    gross_margin = total_revenue - total_cogs
+    margin_pct = (
+        (gross_margin / total_revenue * Decimal("100")).quantize(Decimal("0.01"))
+        if total_revenue > 0
+        else Decimal("0.00")
+    )
+
+    return {
+        "period": period,
+        "period_label": _period_label(period),
+        "total_revenue": float(total_revenue),
+        "total_cogs": float(total_cogs),
+        "gross_margin": float(gross_margin),
+        "margin_pct": float(margin_pct),
+        "sale_count": sale_count,
+    }

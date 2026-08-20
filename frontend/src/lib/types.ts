@@ -587,6 +587,16 @@ export interface DashboardKPIs {
   }> | null;
 }
 
+export interface ProfitSummary {
+  period: string;
+  period_label: string;
+  total_revenue: number;
+  total_cogs: number;
+  gross_margin: number;
+  margin_pct: number;
+  sale_count: number;
+}
+
 // --- Reports ---
 
 export type ReportType = 'sales' | 'inventory' | 'customer' | 'supplier' | 'financial';

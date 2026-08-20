@@ -380,6 +380,22 @@ const GUIDE_SECTIONS: Section[] = [
         linkLabel: 'Go to Dashboard',
       },
       {
+        title: 'Profit Summary (Admin & Manager only)',
+        description: 'A financial health widget showing revenue, cost of goods, and gross profit for any period — visible only to Admin and Manager roles.',
+        details: [
+          'Four metric cards: Revenue, Cost of Goods Sold (COGS), Gross Profit, and Margin %',
+          'Margin colour coding: green ≥ 20% (healthy), amber 10–19% (moderate), red < 10% (low)',
+          'Waterfall bar chart shows how revenue splits into COGS and gross profit at a glance',
+          'Period filter: This Month, 3 Months, 6 Months, 1 Year, All Time',
+          'Sale count shown under Revenue so you know how many transactions the margin is based on',
+          'Click "View full Financial Report" to drill into the detailed report with CSV/PDF export',
+          'Salespersons and Storekeepers do not see this widget — it is not shown and the API call is not made',
+        ],
+        tip: 'Gross Profit = Revenue − Cost of Goods Sold. COGS is calculated using FIFO cost layers at the time each sale is confirmed.',
+        link: '/dashboard',
+        linkLabel: 'Go to Dashboard',
+      },
+      {
         title: 'Generating reports',
         description: 'Detailed reports with date filters and export options.',
         details: [

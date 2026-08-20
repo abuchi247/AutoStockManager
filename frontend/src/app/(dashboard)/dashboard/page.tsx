@@ -17,7 +17,7 @@ import { useResourceQuery, queryKeys } from '@/lib/queries';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert } from '@/components/Alert';
 import { formatCurrency } from '@/lib/currency';
-import type { DashboardKPIs } from '@/lib/types';
+import type { DashboardKPIs, ProfitSummary } from '@/lib/types';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -122,6 +122,9 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Profit Summary — Admin and Manager only */}
+      <ProfitSummaryWidget />
+
       {/* Stock Value by Location */}
       {stockValue && stockValue.locations.length > 0 && (
         <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
@@ -157,6 +160,175 @@ export default function DashboardPage() {
 
       {/* Top Customers */}
       <TopCustomersWidget />
+    </div>
+  );
+}
+
+// --- Profit Summary Widget (Admin / Manager only) ---
+
+function ProfitSummaryWidget() {
+  const { hasRole } = useAuth();
+  const [period, setPeriod] = useState('1m');
+
+  // Only fetch when the user actually has access — avoids a 403 in the console
+  // for Salespersons and Storekeepers.
+  const canView = hasRole(['admin', 'manager']);
+
+  const query = useResourceQuery<ProfitSummary>(
+    queryKeys.dashboard.profitSummary(period),
+    `/dashboard/profit-summary?period=${period}`,
+    { enabled: canView, staleTime: 5 * 60 * 1000 },
+  );
+
+  // Not visible to this role — render nothing.
+  if (!canView) return null;
+
+  const data = query.data;
+  const isLoading = query.isLoading;
+  const isError = query.isError;
+
+  // ── Margin colour: green ≥ 20%, amber 10–19%, red < 10%
+  const marginColour =
+    (data?.margin_pct ?? 0) >= 20
+      ? 'text-green-600'
+      : (data?.margin_pct ?? 0) >= 10
+      ? 'text-amber-600'
+      : 'text-red-600';
+
+  return (
+    <div className="rounded-lg bg-white p-4 sm:p-6 shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+      {/* Header row */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+        <div>
+          <h2 className="text-base font-semibold text-[#333]">Profit Summary</h2>
+          {data && (
+            <p className="mt-0.5 text-xs text-gray-500">{data.period_label}</p>
+          )}
+        </div>
+        <PeriodFilter value={period} onChange={setPeriod} />
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      ) : isError ? (
+        <p className="text-sm text-red-600 text-center py-4">
+          Failed to load profit data.
+        </p>
+      ) : !data ? null : (
+        <>
+          {/* KPI row */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+            <ProfitMetric
+              label="Revenue"
+              value={formatCurrency(data.total_revenue)}
+              colour="text-gray-900"
+              sub={`${data.sale_count} sale${data.sale_count !== 1 ? 's' : ''}`}
+            />
+            <ProfitMetric
+              label="Cost of Goods"
+              value={formatCurrency(data.total_cogs)}
+              colour="text-gray-700"
+            />
+            <ProfitMetric
+              label="Gross Profit"
+              value={formatCurrency(data.gross_margin)}
+              colour={data.gross_margin >= 0 ? 'text-green-700' : 'text-red-600'}
+            />
+            <ProfitMetric
+              label="Margin"
+              value={`${data.margin_pct.toFixed(1)}%`}
+              colour={marginColour}
+              sub={
+                data.margin_pct >= 20
+                  ? 'Healthy'
+                  : data.margin_pct >= 10
+                  ? 'Moderate'
+                  : 'Low'
+              }
+            />
+          </div>
+
+          {/* Waterfall bar */}
+          {data.total_revenue > 0 && (
+            <div className="space-y-2">
+              <WaterfallBar
+                label="Revenue"
+                value={data.total_revenue}
+                max={data.total_revenue}
+                colour="bg-blue-500"
+              />
+              <WaterfallBar
+                label="COGS"
+                value={data.total_cogs}
+                max={data.total_revenue}
+                colour="bg-orange-400"
+              />
+              <WaterfallBar
+                label="Gross Profit"
+                value={Math.max(0, data.gross_margin)}
+                max={data.total_revenue}
+                colour="bg-emerald-500"
+              />
+            </div>
+          )}
+
+          {/* Link to full financial report */}
+          <div className="mt-5 flex justify-end">
+            <a
+              href={`/reports?type=financial`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#667eea] hover:underline"
+            >
+              View full Financial Report
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+interface ProfitMetricProps {
+  label: string;
+  value: string;
+  colour: string;
+  sub?: string;
+}
+function ProfitMetric({ label, value, colour, sub }: ProfitMetricProps) {
+  return (
+    <div className="rounded-lg bg-gray-50 px-3 py-3">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-lg font-bold leading-tight ${colour}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+interface WaterfallBarProps {
+  label: string;
+  value: number;
+  max: number;
+  colour: string;
+}
+function WaterfallBar({ label, value, max, colour }: WaterfallBarProps) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-24 shrink-0 text-xs text-gray-500 text-right">{label}</span>
+      <div className="flex-1 h-5 rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${colour} transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+          role="presentation"
+        />
+      </div>
+      <span className="w-24 shrink-0 text-xs font-medium text-gray-700 text-right">
+        {formatCurrency(value)}
+      </span>
     </div>
   );
 }

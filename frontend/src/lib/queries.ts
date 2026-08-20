@@ -19,6 +19,7 @@ export const queryKeys = {
     stockValue: () => ['dashboard', 'stock-value'] as const,
     topProducts: (period: string) => ['dashboard', 'top-products', period] as const,
     topCustomers: (period: string) => ['dashboard', 'top-customers', period] as const,
+    profitSummary: (period: string) => ['dashboard', 'profit-summary', period] as const,
   },
   inventory: { all: ['inventory'] as const, list: (params: unknown) => ['inventory', 'list', params] as const },
   customers: { all: ['customers'] as const, list: (params: unknown) => ['customers', 'list', params] as const, detail: (id: string) => ['customers', id] as const },
