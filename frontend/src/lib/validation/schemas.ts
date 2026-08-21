@@ -42,9 +42,41 @@ export const sparePartCreateSchema = z.object({
   min_stock_level: nonNegativeNumber.default(0),
   max_stock_level: nonNegativeNumber.default(0),
   reorder_quantity: nonNegativeNumber.default(0),
-});
+}).refine(
+  (data) => data.selling_price >= data.cost_price,
+  {
+    message: 'Selling price cannot be lower than cost price',
+    path: ['selling_price'],
+  }
+);
 
-export const sparePartUpdateSchema = sparePartCreateSchema.partial();
+export const sparePartUpdateSchema = z.object({
+  part_number: requiredText(100, 'Part number'),
+  barcode: optionalText(255),
+  name: requiredText(500, 'Name'),
+  description: optionalText(2000),
+  brand: optionalText(255),
+  category_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  subcategory_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  vehicle_compatibility: z.array(z.string()).optional(),
+  unit_of_measure: z.string().max(50).optional(),
+  cost_price: nonNegativeNumber.optional(),
+  selling_price: nonNegativeNumber.optional(),
+  min_stock_level: nonNegativeNumber.optional(),
+  max_stock_level: nonNegativeNumber.optional(),
+  reorder_quantity: nonNegativeNumber.optional(),
+}).partial().refine(
+  (data) => {
+    if (data.selling_price != null && data.cost_price != null) {
+      return data.selling_price >= data.cost_price;
+    }
+    return true;
+  },
+  {
+    message: 'Selling price cannot be lower than cost price',
+    path: ['selling_price'],
+  }
+);
 
 export const saleItemCreateSchema = z.object({
   spare_part_id: uuid,

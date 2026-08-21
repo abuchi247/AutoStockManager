@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # =============================================================================
@@ -102,6 +102,21 @@ class SparePartCreate(BaseModel):
         examples=[50],
     )
 
+    @model_validator(mode="after")
+    def selling_price_must_not_be_below_cost(self) -> "SparePartCreate":
+        """Ensure selling price is not lower than cost price.
+
+        Prevents accidental loss-making pricing. Best practice for retail ERP
+        systems — pricing mistakes should be caught at data entry, not after
+        invoices have been generated.
+        """
+        if self.selling_price < self.cost_price:
+            raise ValueError(
+                "Selling price cannot be lower than cost price. "
+                f"Cost is {self.cost_price}, selling is {self.selling_price}."
+            )
+        return self
+
 
 class SparePartUpdate(BaseModel):
     """Request body for PUT /api/v1/spare-parts/{id} (partial update)."""
@@ -175,6 +190,17 @@ class SparePartUpdate(BaseModel):
         ge=0,
         description="Default quantity to reorder",
     )
+
+    @model_validator(mode="after")
+    def validate_selling_vs_cost_on_update(self) -> "SparePartUpdate":
+        """When both prices are provided in the update, validate the relationship."""
+        if self.selling_price is not None and self.cost_price is not None:
+            if self.selling_price < self.cost_price:
+                raise ValueError(
+                    "Selling price cannot be lower than cost price. "
+                    f"Cost is {self.cost_price}, selling is {self.selling_price}."
+                )
+        return self
 
 
 class SparePartSearch(BaseModel):
