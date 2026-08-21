@@ -3,7 +3,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
-import { usePaginatedQuery, useResourceQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation } from '@/lib/queries';
+import { usePaginatedQuery, useResourceQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation, invalidateQueryKeys } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDebouncedSearch } from '@/lib/hooks/useDebouncedValue';
 import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/pagination';
 import {
@@ -87,6 +88,7 @@ export default function InventoryPage() {
   const brandsQuery = useResourceQuery<{ data: string[] }>(['spare-parts', 'brands'], '/spare-parts/brands');
   const locationsQuery = useResourceQuery<{ data: Array<{ id: string; name: string }> }>(queryKeys.locations.all, '/locations?page_size=100');
   const createPart = useCreateMutation<SparePartCreate, { id: string }>('/spare-parts', [queryKeys.inventory.all, queryKeys.dashboard.all]);
+  const queryClient = useQueryClient();
 
   // ── More useState hooks — kept here (after query hooks) but before derived
   // non-hook values to maintain strict Rules-of-Hooks ordering ─────────────
@@ -146,7 +148,12 @@ export default function InventoryPage() {
       onError: (err) => setCreateError(err.message),
       onSuccess: async (created: { id: string }) => {
         if (initialStockLocation && initialStockQty && Number(initialStockQty) > 0) {
-          try { await post('/stock/adjust', { spare_part_id: created.id, location_id: initialStockLocation, quantity: Number(initialStockQty), reason: 'Initial stock on part creation' }); } catch { /* part remains created */ }
+          try {
+            await post('/stock/adjust', { spare_part_id: created.id, location_id: initialStockLocation, quantity: Number(initialStockQty), reason: 'Initial stock on part creation' });
+            // Re-invalidate inventory cache after stock was added — the first
+            // invalidation from useCreateMutation fires before this POST completes.
+            await invalidateQueryKeys(queryClient, [queryKeys.inventory.all]);
+          } catch { /* part remains created */ }
         }
         setShowCreateModal(false);
         setNewPart({ part_number: '', name: '', brand: '', unit_of_measure: 'pcs', cost_price: '' as unknown as number, selling_price: '' as unknown as number, min_stock_level: '' as unknown as number, max_stock_level: 0, reorder_quantity: 0 });
