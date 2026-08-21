@@ -120,7 +120,7 @@ export default function CustomersPage() {
       return;
     }
     setCreateError(null);
-    createCustomer.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); resetCustomerForm(); } });
+    createCustomer.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); resetCustomerForm(); setSearch(''); } });
   };
 
 

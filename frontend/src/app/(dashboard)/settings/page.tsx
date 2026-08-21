@@ -129,7 +129,7 @@ export default function SettingsPage() {
     }
     const payload = { ...validation.data, role: validation.data.role.charAt(0).toUpperCase() + validation.data.role.slice(1) } as UserCreate;
     setCreateError(null);
-    createUser.mutate(payload, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewUser({ username: '', email: '', password: '', role: 'salesperson' }); } });
+    createUser.mutate(payload, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewUser({ username: '', email: '', password: '', role: 'salesperson' }); setSearch(''); } });
   };
 
   const handleEditUser = (userProfile: UserProfile) => {

@@ -92,7 +92,7 @@ export default function SuppliersPage() {
       return;
     }
     setCreateError(null);
-    createSupplier.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewSupplier({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', payment_terms: '' }); } });
+    createSupplier.mutate(validation.data, { onError: (err) => setCreateError(err.message), onSuccess: () => { setShowCreateModal(false); setNewSupplier({ name: '', contact_person: '', phone: '', email: '', address: '', tax_id: '', payment_terms: '' }); setSearch(''); } });
   };
 
 
