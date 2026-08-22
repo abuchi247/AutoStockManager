@@ -230,6 +230,9 @@ export default function SettingsPage() {
       {/* System Settings Section */}
       <SystemSettingsSection />
 
+      {/* Role Permissions Section */}
+      <RolePermissionsSection />
+
       {/* User Management Section */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
         <div className="mb-6 flex items-center justify-between">
@@ -927,6 +930,290 @@ function SystemSettingsSection() {
           value={currency}
           onChange={handleCurrencyChange}
         />
+      </div>
+    </div>
+  );
+}
+
+
+// --- Role Permissions Component ---
+
+const PERMISSION_LABELS: Record<string, string> = {
+  create_sales: 'Create Sales',
+  confirm_sales: 'Confirm Sales',
+  cancel_sales: 'Cancel Sales',
+  process_returns: 'Process Returns',
+  manage_customers: 'Manage Customers',
+  record_payments: 'Record Payments',
+  credit_adjustments: 'Credit Adjustments',
+  view_reports: 'View Reports',
+  view_profit: 'View Profit Summary',
+  generate_invoices: 'Generate Invoices',
+  manage_inventory: 'Manage Inventory',
+  adjust_stock: 'Adjust Stock',
+  manage_transfers: 'Manage Transfers',
+  approve_transfers: 'Approve Transfers',
+  manage_purchases: 'Manage Purchases',
+  approve_purchases: 'Approve POs',
+  receive_goods: 'Receive Goods (GRN)',
+  manage_suppliers: 'Manage Suppliers',
+  manage_locations: 'Manage Locations',
+  manage_categories: 'Manage Categories',
+  manage_users: 'Manage Users',
+  manage_settings: 'Manage Settings',
+  start_audits: 'Start Audits',
+  approve_audits: 'Approve Audits',
+  view_dashboard: 'View Dashboard',
+  view_notifications: 'View Notifications',
+};
+
+const PERMISSION_GROUPS: { label: string; keys: string[] }[] = [
+  {
+    label: 'Sales',
+    keys: ['create_sales', 'confirm_sales', 'cancel_sales', 'process_returns', 'generate_invoices'],
+  },
+  {
+    label: 'Customers & Credit',
+    keys: ['manage_customers', 'record_payments', 'credit_adjustments'],
+  },
+  {
+    label: 'Inventory & Stock',
+    keys: ['manage_inventory', 'adjust_stock', 'manage_locations', 'manage_categories'],
+  },
+  {
+    label: 'Purchasing',
+    keys: ['manage_purchases', 'approve_purchases', 'receive_goods', 'manage_suppliers'],
+  },
+  {
+    label: 'Transfers & Audits',
+    keys: ['manage_transfers', 'approve_transfers', 'start_audits', 'approve_audits'],
+  },
+  {
+    label: 'Reports & Dashboard',
+    keys: ['view_reports', 'view_profit', 'view_dashboard', 'view_notifications'],
+  },
+  {
+    label: 'Administration',
+    keys: ['manage_users', 'manage_settings'],
+  },
+];
+
+interface RolePermData {
+  role: string;
+  permissions: Record<string, boolean>;
+}
+
+interface RolePermsApiResponse {
+  roles: RolePermData[];
+  all_permissions: string[];
+}
+
+function RolePermissionsSection() {
+  const [rolesData, setRolesData] = useState<RolePermData[]>([]);
+  const [allPermissions, setAllPermissions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [savingRole, setSavingRole] = useState<string | null>(null);
+  const [dirty, setDirty] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    get<RolePermsApiResponse>('/role-permissions')
+      .then((data) => {
+        setRolesData(data.roles);
+        setAllPermissions(data.all_permissions);
+      })
+      .catch(() => setError('Failed to load role permissions'))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const handleToggle = (role: string, key: string) => {
+    if (role === 'Admin') return; // Can't modify Admin
+    setRolesData((prev) =>
+      prev.map((r) =>
+        r.role === role
+          ? { ...r, permissions: { ...r.permissions, [key]: !r.permissions[key] } }
+          : r
+      )
+    );
+    setDirty((prev) => ({ ...prev, [role]: true }));
+    setSuccessMsg(null);
+  };
+
+  const handleSave = async (role: string) => {
+    const roleData = rolesData.find((r) => r.role === role);
+    if (!roleData) return;
+
+    setSavingRole(role);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await put(`/role-permissions/${role}`, { permissions: roleData.permissions });
+      setDirty((prev) => ({ ...prev, [role]: false }));
+      setSuccessMsg(`Permissions for ${role} saved successfully`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save permissions';
+      setError(message);
+    } finally {
+      setSavingRole(null);
+    }
+  };
+
+  const handleSelectAll = (role: string) => {
+    if (role === 'Admin') return;
+    setRolesData((prev) =>
+      prev.map((r) =>
+        r.role === role
+          ? { ...r, permissions: Object.fromEntries(allPermissions.map((k) => [k, true])) }
+          : r
+      )
+    );
+    setDirty((prev) => ({ ...prev, [role]: true }));
+  };
+
+  const handleDeselectAll = (role: string) => {
+    if (role === 'Admin') return;
+    setRolesData((prev) =>
+      prev.map((r) =>
+        r.role === role
+          ? { ...r, permissions: Object.fromEntries(allPermissions.map((k) => [k, false])) }
+          : r
+      )
+    );
+    setDirty((prev) => ({ ...prev, [role]: true }));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+        <div className="flex items-center justify-center py-8"><LoadingSpinner /></div>
+      </div>
+    );
+  }
+
+  // Non-admin roles for the editable columns
+  const editableRoles = rolesData.filter((r) => r.role !== 'Admin');
+  const adminRole = rolesData.find((r) => r.role === 'Admin');
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900">Role Permissions</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Configure what each role can do. Admin always has full access. Changes take effect immediately after saving.
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4"><Alert variant="error" onClose={() => setError(null)}>{error}</Alert></div>
+      )}
+      {successMsg && (
+        <div className="mb-4"><Alert variant="success" onClose={() => setSuccessMsg(null)}>{successMsg}</Alert></div>
+      )}
+
+      {/* Permissions matrix */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="py-3 pr-4 text-left font-medium text-gray-700 sticky left-0 bg-white min-w-[200px]">
+                Permission
+              </th>
+              {adminRole && (
+                <th className="px-3 py-3 text-center font-medium text-gray-400 min-w-[100px]">
+                  Admin
+                  <p className="text-[10px] font-normal text-gray-400">(always all)</p>
+                </th>
+              )}
+              {editableRoles.map((r) => (
+                <th key={r.role} className="px-3 py-3 text-center font-medium text-gray-700 min-w-[110px]">
+                  {r.role}
+                  <div className="mt-1 flex justify-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAll(r.role)}
+                      className="text-[10px] text-blue-600 hover:underline"
+                    >
+                      All
+                    </button>
+                    <span className="text-[10px] text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeselectAll(r.role)}
+                      className="text-[10px] text-blue-600 hover:underline"
+                    >
+                      None
+                    </button>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PERMISSION_GROUPS.map((group) => (
+              <React.Fragment key={group.label}>
+                {/* Group header */}
+                <tr>
+                  <td
+                    colSpan={1 + (adminRole ? 1 : 0) + editableRoles.length}
+                    className="pt-4 pb-1 text-xs font-bold uppercase tracking-wide text-gray-500"
+                  >
+                    {group.label}
+                  </td>
+                </tr>
+                {/* Permission rows */}
+                {group.keys.map((key) => (
+                  <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className="py-2 pr-4 text-gray-700 sticky left-0 bg-white">
+                      {PERMISSION_LABELS[key] || key}
+                    </td>
+                    {/* Admin column — always checked, disabled */}
+                    {adminRole && (
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          disabled
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 opacity-50 cursor-not-allowed"
+                          aria-label={`Admin: ${PERMISSION_LABELS[key]}`}
+                        />
+                      </td>
+                    )}
+                    {/* Editable role columns */}
+                    {editableRoles.map((r) => (
+                      <td key={r.role} className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={r.permissions[key] ?? false}
+                          onChange={() => handleToggle(r.role, key)}
+                          disabled={savingRole === r.role}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+                          aria-label={`${r.role}: ${PERMISSION_LABELS[key]}`}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Save buttons per role */}
+      <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-4">
+        {editableRoles.map((r) => (
+          <Button
+            key={r.role}
+            onClick={() => handleSave(r.role)}
+            isLoading={savingRole === r.role}
+            disabled={!dirty[r.role]}
+            variant={dirty[r.role] ? 'primary' : 'secondary'}
+          >
+            Save {r.role}
+          </Button>
+        ))}
       </div>
     </div>
   );

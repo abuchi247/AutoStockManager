@@ -18,7 +18,7 @@ from app.health import check_dependencies
 from app.error_tracking import create_error_tracker
 from app.exception_handlers import install_exception_handlers
 from app.initial_admin import ensure_initial_admin
-from app.initial_data import ensure_default_categories
+from app.initial_data import ensure_default_categories, ensure_default_role_permissions
 from app.logging_config import configure_logging
 from app.middleware.rate_limit import create_rate_limiter, rate_limit_exceeded_handler
 from app.middleware.request_id import RequestIDMiddleware
@@ -32,6 +32,7 @@ from app.routers.audits import router as audits_router
 from app.routers.auth import router as auth_router
 from app.routers.barcodes import router as barcodes_router
 from app.routers.business_settings import router as business_settings_router
+from app.routers.role_permissions import router as role_permissions_router
 from app.routers.categories import router as categories_router
 from app.routers.credit import router as credit_router
 from app.routers.dashboard import router as dashboard_router
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await get_redis_client()  # Initialize Redis connection
     await ensure_initial_admin()          # Create admin if no users exist
     await ensure_default_categories()     # Seed categories if table is empty
+    await ensure_default_role_permissions()  # Seed role permissions if table is empty
     yield
     # Shutdown
     await close_arq_pool()
@@ -223,6 +225,7 @@ def create_app() -> FastAPI:
     app.include_router(invoices_router)
     app.include_router(notifications_router)
     app.include_router(business_settings_router)
+    app.include_router(role_permissions_router)
 
     return app
 

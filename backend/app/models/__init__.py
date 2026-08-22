@@ -79,6 +79,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.invoice import Invoice, InvoiceFormat
 from app.models.audit_trail import AuditTrail, ActionType
 from app.models.business_settings import BusinessSettings
+from app.models.role_permission import RolePermission
 
 __all__ = [
     "BaseModel",
@@ -128,4 +129,5 @@ __all__ = [
     "AuditTrail",
     "ActionType",
     "BusinessSettings",
+    "RolePermission",
 ]

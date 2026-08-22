@@ -58,11 +58,12 @@ def test_migration_chain_is_linear_with_single_head():
     # Verify the chain is intact up to the previous confirmed head
     assert revisions["0008"] == "0007"
     assert revisions["0009"] == "0008"
+    assert revisions["0010"] == "0009"
 
     # There must be exactly one revision that is not a parent of any other —
     # that is the head. Update this assertion whenever a new migration is added.
     parents = {parent for parent in revisions.values() if parent is not None}
-    assert {revision for revision in revisions if revision not in parents} == {"0009"}
+    assert {revision for revision in revisions if revision not in parents} == {"0010"}
 
 
 def test_amount_paid_upgrade_adds_missing_column():

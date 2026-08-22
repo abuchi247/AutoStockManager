@@ -434,9 +434,7 @@ async def return_sale(
     sale_id: UUID,
     db: DbSession,
     request: Optional[SaleReturnRequest] = None,
-    current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
-    ),
+    current_user: CurrentUser = None,
 ) -> SaleResponse:
     """Process a sales return.
 
@@ -446,6 +444,14 @@ async def return_sale(
     - 5.13: Cost layer timestamp = return processing date
     - 5.14: Never modify or re-open previously consumed/closed cost layers
     """
+    # Dynamic permission check — uses configurable role_permissions table
+    from app.services.permission_service import check_permission
+    if not await check_permission(db, current_user.role, "process_returns"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to process returns. Contact your Admin to enable this.",
+        )
+
     service = _get_sales_service(db, current_user.id)
 
     # Build return_items list for the service

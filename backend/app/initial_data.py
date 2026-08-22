@@ -104,3 +104,109 @@ async def ensure_default_categories() -> None:
         print(f"\n  ✓ Seeded {created} default categories "
               f"({len(DEFAULT_CATEGORIES)} parent, "
               f"{created - len(DEFAULT_CATEGORIES)} subcategories)\n")
+
+
+# ---------------------------------------------------------------------------
+# Default role permissions
+# ---------------------------------------------------------------------------
+
+ALL_PERMISSIONS = [
+    "create_sales",
+    "confirm_sales",
+    "cancel_sales",
+    "process_returns",
+    "manage_customers",
+    "record_payments",
+    "credit_adjustments",
+    "view_reports",
+    "view_profit",
+    "generate_invoices",
+    "manage_inventory",
+    "adjust_stock",
+    "manage_transfers",
+    "approve_transfers",
+    "manage_purchases",
+    "approve_purchases",
+    "receive_goods",
+    "manage_suppliers",
+    "manage_locations",
+    "manage_categories",
+    "manage_users",
+    "manage_settings",
+    "start_audits",
+    "approve_audits",
+    "view_dashboard",
+    "view_notifications",
+]
+
+DEFAULT_ROLE_PERMISSIONS: dict[str, dict[str, bool]] = {
+    "Admin": {p: True for p in ALL_PERMISSIONS},
+    "Manager": {
+        "create_sales": True, "confirm_sales": True, "cancel_sales": True,
+        "process_returns": True, "manage_customers": True, "record_payments": True,
+        "credit_adjustments": True, "view_reports": True, "view_profit": True,
+        "generate_invoices": True, "manage_inventory": True, "adjust_stock": True,
+        "manage_transfers": True, "approve_transfers": True, "manage_purchases": True,
+        "approve_purchases": True, "receive_goods": True, "manage_suppliers": True,
+        "manage_locations": True, "manage_categories": True, "manage_users": False,
+        "manage_settings": False, "start_audits": True, "approve_audits": True,
+        "view_dashboard": True, "view_notifications": True,
+    },
+    "Salesperson": {
+        "create_sales": True, "confirm_sales": True, "cancel_sales": True,
+        "process_returns": False, "manage_customers": True, "record_payments": True,
+        "credit_adjustments": False, "view_reports": False, "view_profit": False,
+        "generate_invoices": True, "manage_inventory": False, "adjust_stock": False,
+        "manage_transfers": False, "approve_transfers": False, "manage_purchases": False,
+        "approve_purchases": False, "receive_goods": False, "manage_suppliers": False,
+        "manage_locations": False, "manage_categories": False, "manage_users": False,
+        "manage_settings": False, "start_audits": False, "approve_audits": False,
+        "view_dashboard": True, "view_notifications": True,
+    },
+    "Storekeeper": {
+        "create_sales": False, "confirm_sales": False, "cancel_sales": False,
+        "process_returns": False, "manage_customers": False, "record_payments": False,
+        "credit_adjustments": False, "view_reports": False, "view_profit": False,
+        "generate_invoices": False, "manage_inventory": True, "adjust_stock": True,
+        "manage_transfers": True, "approve_transfers": False, "manage_purchases": False,
+        "approve_purchases": False, "receive_goods": True, "manage_suppliers": False,
+        "manage_locations": True, "manage_categories": False, "manage_users": False,
+        "manage_settings": False, "start_audits": True, "approve_audits": False,
+        "view_dashboard": True, "view_notifications": True,
+    },
+}
+
+
+async def ensure_default_role_permissions() -> None:
+    """Seed default role permissions if the table is empty."""
+    from app.models.role_permission import RolePermission
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(func.count(RolePermission.id))
+        )
+        existing = result.scalar_one()
+
+        if existing > 0:
+            logger.debug(
+                "default_role_permissions_skipped",
+                extra={"reason": "permissions_exist", "count": existing},
+            )
+            return
+
+        now = datetime.now(timezone.utc)
+        for role, perms in DEFAULT_ROLE_PERMISSIONS.items():
+            rp = RolePermission(
+                id=uuid.uuid4(),
+                role=role,
+                permissions=perms,
+                updated_at=now,
+            )
+            session.add(rp)
+
+        await session.commit()
+        logger.warning(
+            "default_role_permissions_seeded",
+            extra={"roles": list(DEFAULT_ROLE_PERMISSIONS.keys())},
+        )
+        print(f"\n  ✓ Seeded role permissions for {len(DEFAULT_ROLE_PERMISSIONS)} roles\n")
