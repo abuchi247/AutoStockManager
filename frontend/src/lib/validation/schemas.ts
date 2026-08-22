@@ -5,8 +5,8 @@ const requiredText = (max: number, label: string) =>
   z.string({ required_error: `${label} is required` }).trim().min(1, `${label} is required`).max(max, `${label} must be ${max} characters or fewer`);
 const optionalText = (max: number) =>
   z.preprocess((value) => value === '' ? undefined : value, z.string().max(max).optional());
-const nonNegativeNumber = z.number().finite().min(0, 'Must be zero or greater');
-const positiveNumber = z.number().finite().gt(0, 'Must be greater than zero');
+const nonNegativeNumber = z.coerce.number().finite().min(0, 'Must be zero or greater');
+const positiveNumber = z.coerce.number().finite().gt(0, 'Must be greater than zero');
 const optionalNonNegativeNumber = z.preprocess(
   (value) => value === '' || value === undefined ? undefined : value,
   z.number().finite().min(0, 'Must be zero or greater').optional(),
