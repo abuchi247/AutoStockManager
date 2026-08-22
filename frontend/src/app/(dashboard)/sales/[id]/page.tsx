@@ -169,11 +169,7 @@ export default function SaleDetailPage() {
       setSuccess('Sale confirmed successfully. Stock has been deducted.');
       fetchSale();
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to confirm sale. Insufficient stock for one or more items.')
-          : 'Failed to confirm sale. Insufficient stock for one or more items.';
+      const message = extractApiError(err, 'Failed to confirm sale.');
       setError(message);
     } finally {
       setIsConfirming(false);

@@ -270,11 +270,7 @@ export default function EditSalePage() {
         router.push(`/sales/${saleId}`);
       }, 1000);
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to confirm sale. Stock may be insufficient.')
-          : 'Failed to confirm sale. Stock may be insufficient.';
+      const message = extractApiError(err, 'Failed to confirm sale.');
       setError(message);
     } finally {
       setIsConfirming(false);

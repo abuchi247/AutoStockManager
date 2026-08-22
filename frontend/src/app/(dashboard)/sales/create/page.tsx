@@ -256,11 +256,7 @@ export default function CreateSalePage() {
         }, 1000);
       } catch (confirmErr: unknown) {
         // Confirm failed but sale was created as draft — redirect to it
-        const message =
-          confirmErr && typeof confirmErr === 'object' && 'response' in confirmErr
-            ? ((confirmErr as { response?: { data?: { detail?: string } } }).response?.data
-                ?.detail ?? 'Failed to confirm sale. Saved as draft instead.')
-            : 'Failed to confirm sale. Saved as draft instead.';
+        const message = extractApiError(confirmErr, 'Failed to confirm sale. Saved as draft instead.');
         setError(message);
         setTimeout(() => {
           router.push(`/sales/${saleId}`);
