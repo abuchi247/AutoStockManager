@@ -74,6 +74,18 @@ export function useAuth(): UseAuthReturn {
 
   /** Restore a browser session using only the HttpOnly refresh cookie. */
   const refreshSession = useCallback(async (): Promise<boolean> => {
+    // If we already have a valid access token in memory, skip the refresh
+    // call entirely. This prevents burning through rate limits on navigation.
+    const existingToken = getAccessToken();
+    if (existingToken) {
+      // Restore user from localStorage if not already set
+      const stored = getStoredUser();
+      if (stored && !user) {
+        setUser(stored);
+      }
+      return true;
+    }
+
     try {
       const response = await api.post<RefreshResponse>('/auth/refresh', undefined, {
         withCredentials: true,
@@ -98,12 +110,21 @@ export function useAuth(): UseAuthReturn {
       }
 
       return true;
-    } catch {
+    } catch (err: unknown) {
+      // Only clear auth on actual auth failures (401/403), NOT on rate limits
+      // (429) or network errors. A 429 means the session may still be valid —
+      // we just asked too many times.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 429) {
+        // Rate limited — don't log out, just return false and let the user
+        // retry naturally on the next interaction.
+        return false;
+      }
       clearAuth();
       setUser(null);
       return false;
     }
-  }, []);
+  }, [user]);
 
   // A page reload has no access token in memory, so always attempt one
   // cookie-authenticated refresh rather than reading a token from storage.

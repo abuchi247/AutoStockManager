@@ -106,14 +106,21 @@ api.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
       return api(originalRequest);
     } catch (refreshError) {
+      // Only kill the session if the refresh truly failed (401/403). A 429
+      // (rate-limited) means the session might still be valid — don't log out.
+      const refreshStatus = (refreshError as { response?: { status?: number } })?.response?.status;
+      if (refreshStatus === 429) {
+        // Rate limited — reject the original request but don't clear auth.
+        // The user stays logged in and can retry.
+        processQueue(refreshError, null);
+        return Promise.reject(refreshError);
+      }
+
       processQueue(refreshError, null);
       clearAuth();
       if (typeof window !== 'undefined') {
-        // Attach a flag so catch blocks on API callers can show a helpful
-        // "session expired" message before the redirect fires.
         const sessionError = new Error('Your session has expired. Please log in again.');
         (sessionError as Error & { sessionExpired: boolean }).sessionExpired = true;
-        // Use replace so the back button doesn't return to a broken state.
         window.location.replace('/login');
         return Promise.reject(sessionError);
       }
