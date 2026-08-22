@@ -157,7 +157,7 @@ def upgrade() -> None:
         op.execute(
             sa.text(
                 "INSERT INTO role_permissions (id, role, permissions, updated_at) "
-                "VALUES (:id::uuid, :role, :permissions::jsonb, :updated_at)"
+                "VALUES (CAST(:id AS uuid), :role, CAST(:permissions AS jsonb), :updated_at)"
             ).bindparams(
                 id=str(uuid.uuid4()),
                 role=role,
