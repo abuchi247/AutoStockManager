@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.schemas.report import (
     CustomerReportResponse,
@@ -62,7 +63,7 @@ def _get_report_service(db: AsyncSession) -> ReportService:
 async def get_sales_report(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_reports")
     ),
     start_date: date = Query(
         default=None,
@@ -167,7 +168,7 @@ async def get_sales_report(
 async def get_inventory_report(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_reports")
     ),
     location_id: Optional[UUID] = Query(default=None, description="Filter by location"),
     category_id: Optional[UUID] = Query(default=None, description="Filter by category"),
@@ -241,7 +242,7 @@ async def get_inventory_report(
 async def get_customer_report(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_reports")
     ),
     start_date: date = Query(
         default=None,
@@ -334,7 +335,7 @@ async def get_customer_report(
 async def get_supplier_report(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_reports")
     ),
     start_date: date = Query(
         default=None,
@@ -427,7 +428,7 @@ async def get_supplier_report(
 async def get_financial_summary(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_reports")
     ),
     start_date: date = Query(
         default=None,

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.sale import Sale, SaleStatus, PaymentType
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -62,7 +63,7 @@ def _get_sales_service(db: AsyncSession, user_id: UUID) -> SalesService:
 async def list_sales(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("create_sales")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -129,7 +130,7 @@ async def create_sale(
     request: SaleCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("create_sales")
     ),
 ) -> SaleResponse:
     """Create a new sale in DRAFT status.
@@ -189,7 +190,7 @@ async def get_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("confirm_sales")
     ),
 ) -> SaleResponse:
     """Get a single sale by its ID.
@@ -268,7 +269,7 @@ async def update_sale(
     request: SaleCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("create_sales")
     ),
 ) -> SaleResponse:
     """Update a draft sale's customer, payment type, and line items.
@@ -372,7 +373,7 @@ async def confirm_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("cancel_sales")
     ),
 ) -> SaleResponse:
     """Confirm a sale, deducting stock and calculating COGS.
@@ -501,7 +502,7 @@ async def cancel_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("cancel_sales")
     ),
 ) -> SaleResponse:
     """Cancel a draft sale.

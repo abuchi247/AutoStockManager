@@ -18,6 +18,7 @@ from sqlalchemy import select, func
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.location import Location
 from app.models.user import User, UserRole
 from app.models.base import SoftDeleteQuery
@@ -99,7 +100,7 @@ async def create_location(
     request: LocationCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_locations")
     ),
 ) -> LocationResponse:
     """Create a new location.
@@ -171,7 +172,7 @@ async def update_location(
     request: LocationUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_locations")
     ),
 ) -> LocationResponse:
     """Update a location's attributes (partial update)."""

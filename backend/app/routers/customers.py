@@ -21,6 +21,7 @@ from sqlalchemy import select, func
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.customer_credit_ledger import CustomerCreditLedger
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -66,7 +67,7 @@ def _get_customer_service(db) -> CustomerService:
 async def list_customers(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -129,7 +130,7 @@ async def create_customer(
     request: CustomerCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
 ) -> CustomerResponse:
     """Create a new customer.
@@ -205,7 +206,7 @@ async def update_customer(
     request: CustomerUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
 ) -> CustomerResponse:
     """Update a customer's attributes (partial update)."""

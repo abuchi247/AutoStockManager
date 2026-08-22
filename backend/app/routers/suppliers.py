@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
 from app.schemas.supplier import (
@@ -56,7 +57,7 @@ def _get_supplier_service(db) -> SupplierService:
 async def list_suppliers(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -94,7 +95,7 @@ async def create_supplier(
     request: SupplierCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierResponse:
     """Create a new supplier.
@@ -126,7 +127,7 @@ async def get_supplier(
     supplier_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierResponse:
     """Get a single supplier by ID.
@@ -161,7 +162,7 @@ async def update_supplier(
     request: SupplierUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierResponse:
     """Update a supplier's attributes (partial update).
@@ -201,7 +202,7 @@ async def delete_supplier(
     supplier_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierResponse:
     """Soft-delete a supplier.
@@ -238,7 +239,7 @@ async def get_supplier_balance(
     supplier_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierBalanceResponse:
     """Get the current outstanding balance for a supplier.
@@ -282,7 +283,7 @@ async def get_supplier_aging(
     supplier_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_suppliers")
     ),
 ) -> SupplierBalanceResponse:
     """Get aging analysis for a supplier's outstanding balance.

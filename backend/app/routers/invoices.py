@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.schemas.invoice import InvoiceGenerateRequest, InvoiceResponse
 from app.services.invoice_service import (
@@ -60,7 +61,7 @@ async def generate_invoice(
     request: InvoiceGenerateRequest,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("generate_invoices")
     ),
 ) -> InvoiceResponse:
     """Generate a PDF invoice for a confirmed sale.
@@ -114,7 +115,7 @@ async def get_invoice_by_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("generate_invoices")
     ),
     format: str = Query(default="A4", description="Invoice format: A4 or THERMAL"),
 ) -> InvoiceResponse:
@@ -148,7 +149,7 @@ async def download_invoice_pdf(
     invoice_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("generate_invoices")
     ),
 ) -> Response:
     """Download invoice PDF by invoice ID.
@@ -194,7 +195,7 @@ async def generate_credit_note(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("generate_invoices")
     ),
 ) -> Response:
     """Generate a credit note PDF for a returned sale.

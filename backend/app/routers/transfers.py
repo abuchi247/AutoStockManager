@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.transfer import Transfer, TransferStatus
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -156,7 +157,7 @@ async def create_transfer(
     request: TransferCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_transfers")
     ),
 ) -> TransferResponse:
     """Create a new transfer request.
@@ -248,7 +249,7 @@ async def approve_transfer(
     transfer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("approve_transfers")
     ),
 ) -> TransferResponse:
     """Approve a pending transfer and deduct stock from source.
@@ -301,7 +302,7 @@ async def receive_transfer(
     transfer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_transfers")
     ),
 ) -> TransferResponse:
     """Receive a transfer at the destination location.
@@ -350,7 +351,7 @@ async def cancel_transfer(
     request: TransferCancel,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("approve_transfers")
     ),
 ) -> TransferResponse:
     """Cancel a transfer that has not yet been received.

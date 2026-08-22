@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.audit_session import AuditType, AuditStatus
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -58,7 +59,7 @@ router = APIRouter(prefix="/api/v1/audits", tags=["Audits"])
 async def list_audits(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -117,7 +118,7 @@ async def create_audit(
     request: AuditSessionCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
 ) -> AuditSessionResponse:
     """Initiate a new audit session.
@@ -161,7 +162,7 @@ async def get_audit(
     session_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
 ) -> AuditSessionResponse:
     """Get a single audit session by its ID.
@@ -198,7 +199,7 @@ async def submit_count(
     request: AuditCountSubmit,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
 ) -> AuditCountResponse:
     """Submit a physical count for a spare part.
@@ -251,7 +252,7 @@ async def approve_audit(
     session_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("approve_audits")
     ),
 ) -> AuditSessionResponse:
     """Complete/approve an audit session.
@@ -295,7 +296,7 @@ async def get_reconciliation(
     session_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
 ) -> ReconciliationResponse:
     """Get the reconciliation view showing post-snapshot movements.
@@ -344,7 +345,7 @@ async def get_recount_flags(
     session_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("start_audits")
     ),
 ) -> RecountFlagsResponse:
     """Get parts flagged as needing re-count.

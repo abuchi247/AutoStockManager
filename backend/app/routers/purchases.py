@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 
 from app.dependencies import DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -64,7 +65,7 @@ def _get_purchase_service(db: AsyncSession, user_id: UUID) -> PurchaseService:
 async def list_purchase_orders(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_purchases")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -123,7 +124,7 @@ async def create_purchase_order(
     request: PurchaseOrderCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_purchases")
     ),
 ) -> PurchaseOrderResponse:
     """Create a new purchase order in DRAFT status.
@@ -167,7 +168,7 @@ async def get_purchase_order(
     po_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_purchases")
     ),
 ) -> PurchaseOrderResponse:
     """Get a single purchase order by its ID.
@@ -213,7 +214,7 @@ async def approve_purchase_order(
     po_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_purchases")
     ),
 ) -> PurchaseOrderResponse:
     """Approve a purchase order (DRAFT → APPROVED).
@@ -331,7 +332,7 @@ async def cancel_purchase_order(
     request: PurchaseOrderCancel,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_purchases")
     ),
 ) -> PurchaseOrderResponse:
     """Cancel a purchase order.

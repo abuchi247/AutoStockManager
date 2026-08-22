@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.customer import Customer
 from app.models.customer_credit_ledger import CreditTransactionType
 from app.models.user import User, UserRole
@@ -70,7 +71,7 @@ async def record_payment(
     request: PaymentCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.SALESPERSON, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("record_payments")
     ),
 ) -> PaymentResponse:
     """Record a customer payment.
@@ -127,7 +128,7 @@ async def record_adjustment(
     request: AdjustmentCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("credit_adjustments")
     ),
 ) -> AdjustmentResponse:
     """Record a manual credit adjustment.

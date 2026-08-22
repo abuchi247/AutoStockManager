@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.category import Category
 from app.models.spare_part import SparePart
 from app.models.user import User, UserRole
@@ -146,7 +147,7 @@ async def create_category(
     request: CategoryCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_categories")
     ),
 ) -> CategoryResponse:
     """Create a new category.
@@ -248,7 +249,7 @@ async def update_category(
     request: CategoryUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_categories")
     ),
 ) -> CategoryResponse:
     """Update a category's attributes (partial update)."""

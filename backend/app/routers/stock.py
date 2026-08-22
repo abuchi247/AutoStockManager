@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.models.inventory_movement_ledger import InventoryMovementLedger, MovementType, ReferenceType
 from app.models.cost_layer import CostLayer
@@ -70,7 +71,7 @@ class StockAdjustmentResponse(BaseModel):
 async def adjust_stock(
     request: StockAdjustmentRequest,
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.STOREKEEPER, UserRole.MANAGER)),
+    current_user: User = Depends(require_permission("adjust_stock")),
 ) -> StockAdjustmentResponse:
     """Make a manual stock adjustment.
 
