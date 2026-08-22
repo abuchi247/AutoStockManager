@@ -322,8 +322,9 @@ export default function InventoryDetailPage() {
     );
   }
 
-  const stockLevel = part.total_stock ?? 0;
-  const stockStatus = stockLevel <= 0 ? 'out_of_stock' : stockLevel <= part.min_stock_level ? 'low' : 'in_stock';
+  const stockLevel = Number(part.total_stock ?? 0);
+  const minLevel = Number(part.min_stock_level ?? 0);
+  const stockStatus = stockLevel <= 0 ? 'out_of_stock' : stockLevel <= minLevel ? 'low' : 'in_stock';
 
   return (
     <div className="space-y-6">

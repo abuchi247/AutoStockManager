@@ -32,14 +32,15 @@ import { sparePartCreateSchema } from '@/lib/validation/schemas';
 type StockLevel = 'in_stock' | 'low' | 'out_of_stock';
 
 function getStockBadge(part: SparePart & { total_stock?: number }): React.ReactNode {
-  const stock = part.total_stock ?? 0;
+  const stock = Number(part.total_stock ?? 0);
+  const minLevel = Number(part.min_stock_level ?? 0);
   let variant: 'success' | 'warning' | 'danger';
   let label: string;
 
   if (stock <= 0) {
     variant = 'danger';
     label = 'Out of Stock';
-  } else if (stock <= part.min_stock_level) {
+  } else if (stock <= minLevel) {
     variant = 'warning';
     label = 'Low Stock';
   } else {
