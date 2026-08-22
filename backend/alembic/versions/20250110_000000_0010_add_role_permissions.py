@@ -153,14 +153,15 @@ def upgrade() -> None:
     # Seed default permissions
     now = datetime.now(timezone.utc)
     for role, perms in DEFAULT_PERMISSIONS.items():
+        import json
         op.execute(
             sa.text(
                 "INSERT INTO role_permissions (id, role, permissions, updated_at) "
-                "VALUES (:id, :role, :permissions, :updated_at)"
+                "VALUES (:id::uuid, :role, :permissions::jsonb, :updated_at)"
             ).bindparams(
                 id=str(uuid.uuid4()),
                 role=role,
-                permissions=sa.type_coerce(perms, JSONB),
+                permissions=json.dumps(perms),
                 updated_at=now,
             )
         )
