@@ -96,7 +96,7 @@ export default function EditSalePage() {
         setLocations(locationsRes.data);
 
         // Redirect if not draft
-        if (sale.status.toLowerCase() !== 'draft') {
+        if (sale.status !== 'DRAFT') {
           router.replace(`/sales/${saleId}`);
           return;
         }

@@ -86,7 +86,7 @@ export default function SalesPage() {
     queryKeys.sales.list(paramsFor(page)),
     `/sales?${toQueryString(paramsFor(page))}`,
   );
-  const sales = normalizeList(salesQuery.data).data.map((s) => ({ ...s, status: s.status?.toLowerCase() as SaleStatus }));
+  const sales = normalizeList(salesQuery.data).data;
   const isLoading = salesQuery.isLoading;
   const error = salesQuery.error?.message ?? null;
   const totalPages = normalizeList(salesQuery.data).totalPages;
