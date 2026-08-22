@@ -481,10 +481,30 @@ export default function SaleDetailPage() {
                   <span>Paid at Checkout:</span>
                   <span>{formatCurrency(sale.amount_paid || 0)}</span>
                 </div>
-                <div className="flex justify-between text-sm font-semibold text-red-600">
-                  <span>Balance Due:</span>
-                  <span>{formatCurrency(Number(sale.total_amount) - Number(sale.amount_paid || 0))}</span>
-                </div>
+                {(() => {
+                  const totalReturned = sale.items?.reduce((sum, item) => {
+                    const returned = Number(item.returned_quantity || 0);
+                    return sum + returned * Number(item.unit_price);
+                  }, 0) ?? 0;
+                  const netOwed = Number(sale.total_amount) - Number(sale.amount_paid || 0) - totalReturned;
+                  return (
+                    <>
+                      {totalReturned > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Returned:</span>
+                          <span>-{formatCurrency(totalReturned)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm font-semibold text-red-600">
+                        <span>Balance on this sale:</span>
+                        <span>{formatCurrency(Math.max(0, netOwed))}</span>
+                      </div>
+                    </>
+                  );
+                })()}
+                <p className="text-xs text-gray-400 mt-1">
+                  See the customer&apos;s Credit Ledger for their total account balance.
+                </p>
               </>
             )}
           </div>
