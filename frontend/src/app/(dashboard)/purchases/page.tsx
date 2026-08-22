@@ -60,7 +60,7 @@ const PO_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function PurchasesPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
 
   const router = useRouter();
 

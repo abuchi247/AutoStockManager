@@ -36,7 +36,7 @@ interface ReceiveItem {
 }
 
 export default function PurchaseOrderDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
 
   const params = useParams();
   const router = useRouter();
