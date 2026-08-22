@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.dependencies import DbSession
+from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
 from app.services.permission_service import require_permission
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus
@@ -64,9 +64,7 @@ def _get_purchase_service(db: AsyncSession, user_id: UUID) -> PurchaseService:
 )
 async def list_purchase_orders(
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_purchases")
-    ),
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     supplier_id: Optional[UUID] = Query(
@@ -167,9 +165,7 @@ async def create_purchase_order(
 async def get_purchase_order(
     po_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_purchases")
-    ),
+    current_user: CurrentUser,
 ) -> PurchaseOrderResponse:
     """Get a single purchase order by its ID.
 

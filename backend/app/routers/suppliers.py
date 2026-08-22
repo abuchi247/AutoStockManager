@@ -56,9 +56,7 @@ def _get_supplier_service(db) -> SupplierService:
 )
 async def list_suppliers(
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_suppliers")
-    ),
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     search: Optional[str] = Query(
@@ -126,9 +124,7 @@ async def create_supplier(
 async def get_supplier(
     supplier_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_suppliers")
-    ),
+    current_user: CurrentUser,
 ) -> SupplierResponse:
     """Get a single supplier by ID.
 
@@ -238,9 +234,7 @@ async def delete_supplier(
 async def get_supplier_balance(
     supplier_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_suppliers")
-    ),
+    current_user: CurrentUser,
 ) -> SupplierBalanceResponse:
     """Get the current outstanding balance for a supplier.
 
@@ -282,9 +276,7 @@ async def get_supplier_balance(
 async def get_supplier_aging(
     supplier_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_suppliers")
-    ),
+    current_user: CurrentUser,
 ) -> SupplierBalanceResponse:
     """Get aging analysis for a supplier's outstanding balance.
 

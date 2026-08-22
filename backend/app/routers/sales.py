@@ -62,9 +62,7 @@ def _get_sales_service(db: AsyncSession, user_id: UUID) -> SalesService:
 )
 async def list_sales(
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("create_sales")
-    ),
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     status_filter: Optional[str] = Query(

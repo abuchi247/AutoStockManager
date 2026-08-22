@@ -17,7 +17,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.dependencies import DbSession
+from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
 from app.services.permission_service import require_permission
 from app.models.audit_session import AuditType, AuditStatus
@@ -58,9 +58,7 @@ router = APIRouter(prefix="/api/v1/audits", tags=["Audits"])
 )
 async def list_audits(
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("start_audits")
-    ),
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     location_id: Optional[UUID] = Query(
@@ -161,9 +159,7 @@ async def create_audit(
 async def get_audit(
     session_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("start_audits")
-    ),
+    current_user: CurrentUser,
 ) -> AuditSessionResponse:
     """Get a single audit session by its ID.
 
@@ -295,9 +291,7 @@ async def approve_audit(
 async def get_reconciliation(
     session_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("start_audits")
-    ),
+    current_user: CurrentUser,
 ) -> ReconciliationResponse:
     """Get the reconciliation view showing post-snapshot movements.
 
@@ -344,9 +338,7 @@ async def get_reconciliation(
 async def get_recount_flags(
     session_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("start_audits")
-    ),
+    current_user: CurrentUser,
 ) -> RecountFlagsResponse:
     """Get parts flagged as needing re-count.
 

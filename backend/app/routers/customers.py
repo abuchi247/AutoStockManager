@@ -66,9 +66,7 @@ def _get_customer_service(db) -> CustomerService:
 )
 async def list_customers(
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("manage_customers")
-    ),
+    current_user: CurrentUser,
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
     search: Optional[str] = Query(

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import DbSession
+from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
 from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
@@ -114,9 +114,7 @@ async def generate_invoice(
 async def get_invoice_by_sale(
     sale_id: UUID,
     db: DbSession,
-    current_user: User = Depends(
-        require_permission("generate_invoices")
-    ),
+    current_user: CurrentUser,
     format: str = Query(default="A4", description="Invoice format: A4 or THERMAL"),
 ) -> InvoiceResponse:
     """Get invoice metadata by sale ID.
