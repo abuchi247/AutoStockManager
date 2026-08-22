@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.stock_status_cache import StockStatusCache
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
@@ -258,7 +259,7 @@ async def create_spare_part(
     request: SparePartCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_inventory")
     ),
 ) -> SparePartResponse:
     """Create a new spare part.
@@ -415,7 +416,7 @@ async def update_spare_part(
     request: SparePartUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_inventory")
     ),
 ) -> SparePartResponse:
     """Update a spare part's attributes (partial update).
@@ -471,7 +472,7 @@ async def delete_spare_part(
     spare_part_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_inventory")
     ),
 ) -> SparePartResponse:
     """Soft-delete a spare part.

@@ -262,7 +262,7 @@ async def receive_goods(
     request: GoodsReceiveRequest,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.STOREKEEPER, UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("receive_goods")
     ),
 ) -> GRNResponse:
     """Receive goods against a purchase order, creating a GRN.

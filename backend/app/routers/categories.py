@@ -317,7 +317,7 @@ async def delete_category(
     category_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.ADMIN)
+        require_permission("manage_categories")
     ),
 ) -> CategoryResponse:
     """Soft-delete a category.

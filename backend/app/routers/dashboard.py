@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, status
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import get_current_user, require_roles
 from app.models.user import User, UserRole
+from app.services.permission_service import require_permission
 from app.schemas.report import DashboardKPIResponse, TopSellingProductSchema
 from app.services.dashboard_service import DashboardService
 
@@ -288,7 +289,7 @@ def _period_label(period: str) -> str:
 async def get_profit_summary(
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("view_profit")
     ),
     period: str = "1m",
 ) -> dict:

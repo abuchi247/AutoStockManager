@@ -241,7 +241,7 @@ async def delete_customer(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
 ) -> CustomerResponse:
     """Soft-delete a customer.
@@ -340,7 +340,7 @@ async def get_customer_ledger(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -405,7 +405,7 @@ async def get_customer_aging(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.MANAGER, UserRole.ADMIN)
+        require_permission("manage_customers")
     ),
 ) -> AgingAnalysisResponse:
     """Get aging analysis for a customer.

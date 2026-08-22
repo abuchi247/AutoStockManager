@@ -371,7 +371,7 @@ async def confirm_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("cancel_sales")
+        require_permission("confirm_sales")
     ),
 ) -> SaleResponse:
     """Confirm a sale, deducting stock and calculating COGS.
@@ -432,8 +432,8 @@ async def confirm_sale(
 async def return_sale(
     sale_id: UUID,
     db: DbSession,
+    current_user: CurrentUser,
     request: Optional[SaleReturnRequest] = None,
-    current_user: CurrentUser = None,
 ) -> SaleResponse:
     """Process a sales return.
 

@@ -215,7 +215,7 @@ async def delete_location(
     location_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_roles(UserRole.ADMIN)
+        require_permission("manage_locations")
     ),
 ) -> LocationResponse:
     """Soft-delete a location.
