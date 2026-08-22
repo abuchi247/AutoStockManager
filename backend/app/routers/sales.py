@@ -128,7 +128,7 @@ async def create_sale(
     request: SaleCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("create_sales")
+        require_permission("sales")
     ),
 ) -> SaleResponse:
     """Create a new sale in DRAFT status.
@@ -188,7 +188,7 @@ async def get_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("confirm_sales")
+        require_permission("sales")
     ),
 ) -> SaleResponse:
     """Get a single sale by its ID.
@@ -267,7 +267,7 @@ async def update_sale(
     request: SaleCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("create_sales")
+        require_permission("sales")
     ),
 ) -> SaleResponse:
     """Update a draft sale's customer, payment type, and line items.
@@ -371,7 +371,7 @@ async def confirm_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("confirm_sales")
+        require_permission("sales")
     ),
 ) -> SaleResponse:
     """Confirm a sale, deducting stock and calculating COGS.
@@ -445,7 +445,7 @@ async def return_sale(
     """
     # Dynamic permission check — uses configurable role_permissions table
     from app.services.permission_service import check_permission
-    if not await check_permission(db, current_user.role, "process_returns"):
+    if not await check_permission(db, current_user.role, "sales_returns"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to process returns. Contact your Admin to enable this.",
@@ -500,7 +500,7 @@ async def cancel_sale(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("cancel_sales")
+        require_permission("sales")
     ),
 ) -> SaleResponse:
     """Cancel a draft sale.

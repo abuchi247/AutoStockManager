@@ -147,7 +147,7 @@ async def create_category(
     request: CategoryCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_categories")
+        require_permission("categories")
     ),
 ) -> CategoryResponse:
     """Create a new category.
@@ -249,7 +249,7 @@ async def update_category(
     request: CategoryUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_categories")
+        require_permission("categories")
     ),
 ) -> CategoryResponse:
     """Update a category's attributes (partial update)."""
@@ -317,7 +317,7 @@ async def delete_category(
     category_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_categories")
+        require_permission("categories")
     ),
 ) -> CategoryResponse:
     """Soft-delete a category.

@@ -62,7 +62,7 @@ def _get_report_service(db: AsyncSession) -> ReportService:
 )
 async def get_sales_report(
     db: DbSession,
-    current_user: User = Depends(require_permission("view_reports")),
+    current_user: User = Depends(require_permission("reports")),
     start_date: date = Query(
         default=None,
         description="Start date for the report (defaults to 30 days ago)",
@@ -165,7 +165,7 @@ async def get_sales_report(
 )
 async def get_inventory_report(
     db: DbSession,
-    current_user: User = Depends(require_permission("view_reports")),
+    current_user: User = Depends(require_permission("reports")),
     location_id: Optional[UUID] = Query(default=None, description="Filter by location"),
     category_id: Optional[UUID] = Query(default=None, description="Filter by category"),
     format: str = Query(default="json", description="Export format: json, csv, or pdf"),
@@ -237,7 +237,7 @@ async def get_inventory_report(
 )
 async def get_customer_report(
     db: DbSession,
-    current_user: User = Depends(require_permission("view_reports")),
+    current_user: User = Depends(require_permission("reports")),
     start_date: date = Query(
         default=None,
         description="Start date for the report (defaults to 30 days ago)",
@@ -328,7 +328,7 @@ async def get_customer_report(
 )
 async def get_supplier_report(
     db: DbSession,
-    current_user: User = Depends(require_permission("view_reports")),
+    current_user: User = Depends(require_permission("reports")),
     start_date: date = Query(
         default=None,
         description="Start date for the report (defaults to 30 days ago)",
@@ -419,7 +419,7 @@ async def get_supplier_report(
 )
 async def get_financial_summary(
     db: DbSession,
-    current_user: User = Depends(require_permission("view_reports")),
+    current_user: User = Depends(require_permission("reports")),
     start_date: date = Query(
         default=None,
         description="Start date for the report (defaults to 30 days ago)",

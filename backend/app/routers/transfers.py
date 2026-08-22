@@ -157,7 +157,7 @@ async def create_transfer(
     request: TransferCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_transfers")
+        require_permission("transfers")
     ),
 ) -> TransferResponse:
     """Create a new transfer request.
@@ -249,7 +249,7 @@ async def approve_transfer(
     transfer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("approve_transfers")
+        require_permission("transfer_approval")
     ),
 ) -> TransferResponse:
     """Approve a pending transfer and deduct stock from source.
@@ -302,7 +302,7 @@ async def receive_transfer(
     transfer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_transfers")
+        require_permission("transfers")
     ),
 ) -> TransferResponse:
     """Receive a transfer at the destination location.
@@ -351,7 +351,7 @@ async def cancel_transfer(
     request: TransferCancel,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("approve_transfers")
+        require_permission("transfer_approval")
     ),
 ) -> TransferResponse:
     """Cancel a transfer that has not yet been received.

@@ -93,7 +93,7 @@ async def create_supplier(
     request: SupplierCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_suppliers")
+        require_permission("purchasing")
     ),
 ) -> SupplierResponse:
     """Create a new supplier.
@@ -158,7 +158,7 @@ async def update_supplier(
     request: SupplierUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_suppliers")
+        require_permission("purchasing")
     ),
 ) -> SupplierResponse:
     """Update a supplier's attributes (partial update).
@@ -198,7 +198,7 @@ async def delete_supplier(
     supplier_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_suppliers")
+        require_permission("purchasing")
     ),
 ) -> SupplierResponse:
     """Soft-delete a supplier.

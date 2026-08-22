@@ -283,7 +283,10 @@ export default function CreateSalePage() {
   );
 
   const locationOptions = useMemo(
-    () => locations.map((l: { id: string; name: string }) => ({ value: l.id, label: l.name })),
+    () => [
+      { value: '', label: 'Select location...' },
+      ...locations.map((l: { id: string; name: string }) => ({ value: l.id, label: l.name })),
+    ],
     [locations]
   );
 

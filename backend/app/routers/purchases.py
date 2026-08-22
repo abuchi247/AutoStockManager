@@ -122,7 +122,7 @@ async def create_purchase_order(
     request: PurchaseOrderCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_purchases")
+        require_permission("purchasing")
     ),
 ) -> PurchaseOrderResponse:
     """Create a new purchase order in DRAFT status.
@@ -210,7 +210,7 @@ async def approve_purchase_order(
     po_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_purchases")
+        require_permission("purchasing")
     ),
 ) -> PurchaseOrderResponse:
     """Approve a purchase order (DRAFT → APPROVED).
@@ -262,7 +262,7 @@ async def receive_goods(
     request: GoodsReceiveRequest,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("receive_goods")
+        require_permission("receiving")
     ),
 ) -> GRNResponse:
     """Receive goods against a purchase order, creating a GRN.
@@ -328,7 +328,7 @@ async def cancel_purchase_order(
     request: PurchaseOrderCancel,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_purchases")
+        require_permission("purchasing")
     ),
 ) -> PurchaseOrderResponse:
     """Cancel a purchase order.

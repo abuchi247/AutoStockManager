@@ -71,7 +71,7 @@ class StockAdjustmentResponse(BaseModel):
 async def adjust_stock(
     request: StockAdjustmentRequest,
     db: DbSession,
-    current_user: User = Depends(require_permission("adjust_stock")),
+    current_user: User = Depends(require_permission("inventory")),
 ) -> StockAdjustmentResponse:
     """Make a manual stock adjustment.
 

@@ -100,7 +100,7 @@ async def create_location(
     request: LocationCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_locations")
+        require_permission("locations")
     ),
 ) -> LocationResponse:
     """Create a new location.
@@ -172,7 +172,7 @@ async def update_location(
     request: LocationUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_locations")
+        require_permission("locations")
     ),
 ) -> LocationResponse:
     """Update a location's attributes (partial update)."""
@@ -215,7 +215,7 @@ async def delete_location(
     location_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_locations")
+        require_permission("locations")
     ),
 ) -> LocationResponse:
     """Soft-delete a location.

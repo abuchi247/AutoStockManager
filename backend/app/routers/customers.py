@@ -128,7 +128,7 @@ async def create_customer(
     request: CustomerCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_customers")
+        require_permission("customers")
     ),
 ) -> CustomerResponse:
     """Create a new customer.
@@ -204,7 +204,7 @@ async def update_customer(
     request: CustomerUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_customers")
+        require_permission("customers")
     ),
 ) -> CustomerResponse:
     """Update a customer's attributes (partial update)."""
@@ -241,7 +241,7 @@ async def delete_customer(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_customers")
+        require_permission("customers")
     ),
 ) -> CustomerResponse:
     """Soft-delete a customer.
@@ -340,7 +340,7 @@ async def get_customer_ledger(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_customers")
+        require_permission("customers")
     ),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -405,7 +405,7 @@ async def get_customer_aging(
     customer_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_customers")
+        require_permission("customers")
     ),
 ) -> AgingAnalysisResponse:
     """Get aging analysis for a customer.

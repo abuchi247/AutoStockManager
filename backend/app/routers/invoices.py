@@ -61,7 +61,7 @@ async def generate_invoice(
     request: InvoiceGenerateRequest,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("generate_invoices")
+        require_permission("invoices")
     ),
 ) -> InvoiceResponse:
     """Generate a PDF invoice for a confirmed sale.
@@ -147,7 +147,7 @@ async def download_invoice_pdf(
     invoice_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("generate_invoices")
+        require_permission("invoices")
     ),
 ) -> Response:
     """Download invoice PDF by invoice ID.
@@ -193,7 +193,7 @@ async def generate_credit_note(
     sale_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("generate_invoices")
+        require_permission("invoices")
     ),
 ) -> Response:
     """Generate a credit note PDF for a returned sale.

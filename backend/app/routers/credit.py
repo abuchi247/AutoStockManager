@@ -71,7 +71,7 @@ async def record_payment(
     request: PaymentCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("record_payments")
+        require_permission("customers")
     ),
 ) -> PaymentResponse:
     """Record a customer payment.
@@ -128,7 +128,7 @@ async def record_adjustment(
     request: AdjustmentCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("credit_adjustments")
+        require_permission("credit_management")
     ),
 ) -> AdjustmentResponse:
     """Record a manual credit adjustment.

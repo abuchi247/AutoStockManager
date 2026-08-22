@@ -259,7 +259,7 @@ async def create_spare_part(
     request: SparePartCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_inventory")
+        require_permission("inventory")
     ),
 ) -> SparePartResponse:
     """Create a new spare part.
@@ -416,7 +416,7 @@ async def update_spare_part(
     request: SparePartUpdate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_inventory")
+        require_permission("inventory")
     ),
 ) -> SparePartResponse:
     """Update a spare part's attributes (partial update).
@@ -472,7 +472,7 @@ async def delete_spare_part(
     spare_part_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("manage_inventory")
+        require_permission("inventory")
     ),
 ) -> SparePartResponse:
     """Soft-delete a spare part.

@@ -116,7 +116,7 @@ async def create_audit(
     request: AuditSessionCreate,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("start_audits")
+        require_permission("audits")
     ),
 ) -> AuditSessionResponse:
     """Initiate a new audit session.
@@ -195,7 +195,7 @@ async def submit_count(
     request: AuditCountSubmit,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("start_audits")
+        require_permission("audits")
     ),
 ) -> AuditCountResponse:
     """Submit a physical count for a spare part.
@@ -248,7 +248,7 @@ async def approve_audit(
     session_id: UUID,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("approve_audits")
+        require_permission("audit_approval")
     ),
 ) -> AuditSessionResponse:
     """Complete/approve an audit session.

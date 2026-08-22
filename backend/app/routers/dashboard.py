@@ -289,7 +289,7 @@ def _period_label(period: str) -> str:
 async def get_profit_summary(
     db: DbSession,
     current_user: User = Depends(
-        require_permission("view_profit")
+        require_permission("reports")
     ),
     period: str = "1m",
 ) -> dict:
