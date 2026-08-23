@@ -4,105 +4,46 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
-import type { UserRole } from '@/lib/types';
 
 interface NavItem {
   label: string;
   href: string;
   icon: string;
-  roles: UserRole[];
+  /** Permission key(s) required — if any one is true, the link shows. Null = always visible. */
+  permission: string | string[] | null;
 }
 
 const navItems: NavItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/dashboard',
-    roles: ['admin', 'manager', 'salesperson', 'storekeeper'],
-    icon: '📊',
-  },
-  {
-    label: 'Inventory',
-    href: '/inventory',
-    roles: ['admin', 'manager', 'salesperson', 'storekeeper'],
-    icon: '📦',
-  },
-  {
-    label: 'Categories',
-    href: '/categories',
-    roles: ['admin', 'manager'],
-    icon: '🏷️',
-  },
-  {
-    label: 'Sales',
-    href: '/sales',
-    roles: ['admin', 'manager', 'salesperson'],
-    icon: '🛒',
-  },
-  {
-    label: 'Customers',
-    href: '/customers',
-    roles: ['admin', 'manager', 'salesperson'],
-    icon: '👥',
-  },
-  {
-    label: 'Suppliers',
-    href: '/suppliers',
-    roles: ['admin', 'manager'],
-    icon: '🏭',
-  },
-  {
-    label: 'Purchases',
-    href: '/purchases',
-    roles: ['admin', 'manager', 'storekeeper'],
-    icon: '📋',
-  },
-  {
-    label: 'Transfers',
-    href: '/transfers',
-    roles: ['admin', 'manager', 'storekeeper'],
-    icon: '🔄',
-  },
-  {
-    label: 'Audits',
-    href: '/audits',
-    roles: ['admin', 'manager', 'storekeeper'],
-    icon: '✅',
-  },
-  {
-    label: 'Reports',
-    href: '/reports',
-    roles: ['admin', 'manager'],
-    icon: '📈',
-  },
-  {
-    label: 'Locations',
-    href: '/locations',
-    roles: ['admin', 'manager', 'storekeeper'],
-    icon: '🏢',
-  },
-  {
-    label: 'Settings',
-    href: '/settings',
-    roles: ['admin'],
-    icon: '⚙️',
-  },
-  {
-    label: 'User Guide',
-    href: '/guide',
-    roles: ['admin', 'manager', 'salesperson', 'storekeeper'],
-    icon: '📖',
-  },
+  { label: 'Dashboard', href: '/dashboard', icon: '📊', permission: null },
+  { label: 'Inventory', href: '/inventory', icon: '📦', permission: null },
+  { label: 'Categories', href: '/categories', icon: '🏷️', permission: 'categories' },
+  { label: 'Sales', href: '/sales', icon: '🛒', permission: 'sales' },
+  { label: 'Customers', href: '/customers', icon: '👥', permission: 'customers' },
+  { label: 'Suppliers', href: '/suppliers', icon: '🏭', permission: 'purchasing' },
+  { label: 'Purchases', href: '/purchases', icon: '📋', permission: ['purchasing', 'receiving'] },
+  { label: 'Transfers', href: '/transfers', icon: '🔄', permission: 'transfers' },
+  { label: 'Audits', href: '/audits', icon: '✅', permission: 'audits' },
+  { label: 'Reports', href: '/reports', icon: '📈', permission: 'reports' },
+  { label: 'Locations', href: '/locations', icon: '🏢', permission: 'locations' },
+  { label: 'Settings', href: '/settings', icon: '⚙️', permission: ['user_management', 'system_settings'] },
+  { label: 'User Guide', href: '/guide', icon: '📖', permission: null },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout } = useAuth();
+  const { can } = usePermissions();
 
-  const filteredNavItems = navItems.filter((item) =>
-    hasRole(item.roles)
-  );
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.permission === null) return true; // Always visible
+    if (Array.isArray(item.permission)) {
+      return item.permission.some((p) => can(p)); // Any one permission grants access
+    }
+    return can(item.permission);
+  });
 
   const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
 
