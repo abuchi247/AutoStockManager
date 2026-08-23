@@ -49,14 +49,33 @@ router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 async def get_current_user_profile(
     current_user: CurrentUser,
 ) -> UserResponse:
-    """Return the profile of the currently authenticated user.
-
-    Used by the frontend to populate the sidebar display name, avatar
-    initials, and the profile page after a session refresh — the JWT
-    only carries the user ID and role, so the username and email are
-    fetched here.
-    """
+    """Return the profile of the currently authenticated user."""
     return UserResponse.model_validate(current_user)
+
+
+@router.get(
+    "/me/permissions",
+    status_code=status.HTTP_200_OK,
+    summary="Get current user's effective permissions",
+    description="Return the configurable permissions for the current user's role.",
+)
+async def get_current_user_permissions(
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Return the effective permissions for the authenticated user's role.
+
+    Admin always gets all=true. Other roles get their configured permissions
+    from the role_permissions table.
+    """
+    from app.services.permission_service import _load_role_permissions
+    from app.initial_data import ALL_PERMISSIONS
+
+    if current_user.role == "Admin":
+        return {"permissions": {p: True for p in ALL_PERMISSIONS}}
+
+    perms = await _load_role_permissions(db, current_user.role)
+    return {"permissions": perms}
 
 
 @router.put(

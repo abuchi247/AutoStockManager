@@ -27,6 +27,7 @@ import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 
 function getStatusBadge(status: SaleStatus): React.ReactNode {
   const map: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
@@ -61,6 +62,7 @@ interface ReturnItem {
 export default function SaleDetailPage() {
   const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
   const { hasRole } = useAuth();
+  const { can } = usePermissions();
 
   const router = useRouter();
   const params = useParams();
@@ -342,7 +344,7 @@ export default function SaleDetailPage() {
               Cancel Sale
             </Button>
           )}
-          {sale.status === 'CONFIRMED' && hasRole(['admin', 'manager']) && (
+          {sale.status === 'CONFIRMED' && can('sales_returns') && (
             <Button
               variant="danger"
               onClick={openReturnModal}
