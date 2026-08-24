@@ -465,13 +465,30 @@ class SalesService:
                 refund_amount += return_quantity * sale_item.unit_price
 
             if refund_amount > Decimal("0.00"):
+                # Build reason summary from return items
+                reasons = []
+                for sale_item, return_quantity in items_to_return:
+                    # Find the reason from the return_items dict list
+                    item_reason = None
+                    if return_items:
+                        for ri in return_items:
+                            if ri.get("sale_item_id") == sale_item.id:
+                                item_reason = ri.get("reason")
+                                break
+                    if item_reason:
+                        reasons.append(item_reason)
+
+                notes = f"Return on {sale.invoice_number}"
+                if reasons:
+                    notes += f" — {'; '.join(reasons)}"
+
                 credit_entry = CustomerCreditLedger(
                     customer_id=sale.customer_id,
                     transaction_type=CreditTransactionType.RETURN.value,
-                    amount=-refund_amount,  # Negative = credit (reduces balance)
+                    amount=-refund_amount,
                     reference_type="sale",
                     reference_id=sale.id,
-                    notes=f"Return on {sale.invoice_number}",
+                    notes=notes,
                     created_by=returned_by,
                 )
                 self.db.add(credit_entry)

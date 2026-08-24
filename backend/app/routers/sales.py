@@ -460,6 +460,7 @@ async def return_sale(
             {
                 "sale_item_id": item.sale_item_id,
                 "quantity": item.quantity,
+                "reason": item.reason,
             }
             for item in request.items
         ]
@@ -470,6 +471,25 @@ async def return_sale(
             returned_by=current_user.id,
             return_items=return_items,
         )
+
+        # Record return reasons in the audit trail for accountability
+        if return_items:
+            from app.models.audit_trail import AuditTrail, ActionType
+            reasons_summary = "; ".join(
+                f"{item['quantity']}x item {str(item['sale_item_id'])[:8]}: {item['reason']}"
+                for item in return_items
+                if item.get("reason")
+            )
+            if reasons_summary:
+                audit = AuditTrail(
+                    action_type=ActionType.UPDATE.value if hasattr(ActionType.UPDATE, 'value') else "UPDATE",
+                    entity_type="sale_return",
+                    entity_id=sale_id,
+                    details={"reasons": reasons_summary, "sale_id": str(sale_id)},
+                    performed_by=str(current_user.id),
+                )
+                db.add(audit)
+
         await db.commit()
         await db.refresh(sale)
         return SaleResponse.model_validate(sale)

@@ -117,6 +117,12 @@ class ReturnItemSpec(BaseModel):
         description="Quantity to return",
         examples=["1.00"],
     )
+    reason: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="Reason for the return (e.g. 'Wrong part', 'Defective')",
+        examples=["Customer received wrong part"],
+    )
 
     @field_validator("quantity")
     @classmethod
