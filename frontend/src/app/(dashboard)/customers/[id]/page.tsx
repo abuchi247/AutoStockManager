@@ -25,6 +25,7 @@ import type {
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { usePermissions } from '@/hooks/usePermissions';
 
 type TabKey = 'purchases' | 'ledger' | 'aging';
 
@@ -63,6 +64,7 @@ function getTransactionBadge(type: string): React.ReactNode {
 
 export default function CustomerDetailPage() {
   const { allowed } = useRequirePermission('customers');
+  const { can } = usePermissions();
 
   const params = useParams();
   const router = useRouter();
@@ -335,12 +337,12 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {customer.account_status === 'active' && (
+          {customer.account_status === 'active' && can('credit_management') && (
             <Button variant="danger" onClick={handleSuspend}>
               Suspend
             </Button>
           )}
-          {customer.account_status === 'suspended' && (
+          {customer.account_status === 'suspended' && can('credit_management') && (
             <>
               <Button variant="secondary" onClick={handleActivate}>
                 Activate
