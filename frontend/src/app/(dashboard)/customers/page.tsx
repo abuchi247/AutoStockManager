@@ -25,7 +25,7 @@ import { formatCurrency } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { customerCreateSchema } from '@/lib/validation/schemas';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -51,7 +51,7 @@ const CUSTOMER_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function CustomersPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('customers');
 
   const router = useRouter();
 

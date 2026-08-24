@@ -23,7 +23,7 @@ import type {
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { supplierCreateSchema } from '@/lib/validation/schemas';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 function getStatusBadge(status: AccountStatus): React.ReactNode {
   const variants: Record<AccountStatus, 'success' | 'warning' | 'danger'> = {
@@ -47,7 +47,7 @@ const SUPPLIER_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function SuppliersPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequirePermission('purchasing');
 
   const router = useRouter();
 

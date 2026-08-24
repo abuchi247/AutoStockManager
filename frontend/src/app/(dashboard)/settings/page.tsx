@@ -23,7 +23,7 @@ import type {
   PaginatedResponse,
 } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { getCurrency, setCurrency, CURRENCY_OPTIONS } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
@@ -68,7 +68,7 @@ const USER_STATUS_OPTIONS: SelectOption[] = [
 export default function SettingsPage() {
   const router = useRouter();
   const { hasRole, user: currentUser, isLoading: authLoading } = useAuth();
-  const { allowed } = useRequireRole('admin');
+  const { allowed } = useRequirePermission(['user_management', 'system_settings']);
 
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);

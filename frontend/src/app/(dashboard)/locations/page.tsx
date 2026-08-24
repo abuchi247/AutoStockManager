@@ -21,7 +21,7 @@ import {
 import type { Column, SelectOption } from '@/components';
 import type { Location, LocationType, PaginatedResponse } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 function getTypeBadge(type: LocationType): React.ReactNode {
   const variants: Record<LocationType, 'info' | 'success' | 'warning'> = {
@@ -46,7 +46,7 @@ function getStatusBadge(isActive: boolean): React.ReactNode {
 }
 
 export default function LocationsPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+  const { allowed } = useRequirePermission('locations');
 
   const router = useRouter();
   const [locations, setLocations] = useState<Location[]>([]);

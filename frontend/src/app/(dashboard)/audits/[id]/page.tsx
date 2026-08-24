@@ -21,7 +21,7 @@ import {
   LoadingSpinner,
 } from '@/components';
 import type { BadgeVariant } from '@/components';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import type {
   AuditSession,
   AuditStatus,
@@ -65,7 +65,7 @@ interface ReconciliationItem {
 }
 
 export default function AuditDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+  const { allowed } = useRequirePermission('audits');
 
   const router = useRouter();
   const params = useParams();

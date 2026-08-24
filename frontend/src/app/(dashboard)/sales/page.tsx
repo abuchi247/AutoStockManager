@@ -26,7 +26,7 @@ import {
 import type { Column, SelectOption, BadgeVariant } from '@/components';
 import type { Sale, PaginatedResponse, SaleStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: 'All Statuses' },
@@ -56,7 +56,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function SalesPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('sales');
 
   const router = useRouter();
 

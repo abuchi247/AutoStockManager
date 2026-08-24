@@ -26,7 +26,7 @@ import {
 import type { SelectOption } from '@/components';
 import type { ReportType } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 const ReportResultsTable = dynamic(
   () => import('@/components/reports/ReportResultsTable').then((mod) => mod.ReportResultsTable),
@@ -73,7 +73,7 @@ function getDefaultEndDate(): string {
 }
 
 export default function ReportsPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequirePermission('reports');
 
   const searchParams = useSearchParams();
 

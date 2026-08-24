@@ -19,7 +19,7 @@ import {
   Alert,
 } from '@/components';
 import type { SelectOption } from '@/components';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface CategoryItem {
   id: string;
@@ -40,7 +40,7 @@ interface CategoryListResponse {
 }
 
 export default function CategoriesPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequirePermission('categories');
 
   const pageSize = 5;
 

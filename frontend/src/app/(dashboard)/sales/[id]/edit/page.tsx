@@ -31,7 +31,7 @@ import type {
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface LineItem {
   id: string;
@@ -51,7 +51,7 @@ const SALE_PAYMENT_OPTIONS = [
 ];
 
 export default function EditSalePage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('sales');
 
   const router = useRouter();
   const params = useParams();

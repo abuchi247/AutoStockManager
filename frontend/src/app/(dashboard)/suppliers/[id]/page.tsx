@@ -22,7 +22,7 @@ import type {
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface SupplierBalance {
   supplier_id: string;
@@ -68,7 +68,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function SupplierDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager']);
+  const { allowed } = useRequirePermission('purchasing');
 
   const params = useParams();
   const router = useRouter();

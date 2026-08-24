@@ -24,7 +24,7 @@ import type {
 } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 type TabKey = 'purchases' | 'ledger' | 'aging';
 
@@ -62,7 +62,7 @@ function getTransactionBadge(type: string): React.ReactNode {
 }
 
 export default function CustomerDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('customers');
 
   const params = useParams();
   const router = useRouter();

@@ -25,7 +25,7 @@ import type { BadgeVariant, SelectOption } from '@/components';
 import type { Sale, SaleItem, SaleStatus, SaleReturnRequest } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -60,7 +60,7 @@ interface ReturnItem {
 }
 
 export default function SaleDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('sales');
   const { hasRole } = useAuth();
   const { can } = usePermissions();
 

@@ -27,7 +27,7 @@ import { formatCurrency } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { purchaseOrderCreateSchema } from '@/lib/validation/schemas';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -60,7 +60,7 @@ const PO_STATUS_OPTIONS: SelectOption[] = [
 ];
 
 export default function PurchasesPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+  const { allowed } = useRequirePermission(['purchasing', 'receiving']);
 
   const router = useRouter();
 

@@ -8,7 +8,7 @@ import type { BadgeVariant, SelectOption } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -36,7 +36,7 @@ interface ReceiveItem {
 }
 
 export default function PurchaseOrderDetailPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+  const { allowed } = useRequirePermission(['purchasing', 'receiving']);
 
   const params = useParams();
   const router = useRouter();

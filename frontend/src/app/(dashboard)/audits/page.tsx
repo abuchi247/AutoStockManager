@@ -24,7 +24,7 @@ import {
   LoadingSpinner,
 } from '@/components';
 import type { Column, SelectOption, BadgeVariant } from '@/components';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import type {
   AuditSession,
   AuditType,
@@ -78,7 +78,7 @@ interface StartAuditForm {
 }
 
 export default function AuditsPage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'storekeeper']);
+  const { allowed } = useRequirePermission('audits');
 
   const router = useRouter();
 

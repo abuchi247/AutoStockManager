@@ -34,7 +34,7 @@ import { formatCurrency } from '@/lib/currency';
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { saleCreateSchema } from '@/lib/validation/schemas';
 import { extractApiError } from '@/lib/validation/errors';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface LineItem {
   id: string;
@@ -55,7 +55,7 @@ const SALE_PAYMENT_OPTIONS = [
 ];
 
 export default function CreateSalePage() {
-  const { allowed } = useRequireRole(['admin', 'manager', 'salesperson']);
+  const { allowed } = useRequirePermission('sales');
 
   const router = useRouter();
 
