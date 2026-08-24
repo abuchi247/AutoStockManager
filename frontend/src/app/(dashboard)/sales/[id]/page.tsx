@@ -563,6 +563,10 @@ export default function SaleDetailPage() {
                 const cashRefund = Math.min(amountPaid, goodsReturnedValue);
                 // Credit reversed = goods returned value - cash refund
                 const creditReversed = goodsReturnedValue - cashRefund;
+                // Net value of goods kept
+                const netSaleValue = totalAmount - goodsReturnedValue;
+                // Outstanding balance = what customer still owes (only for credit)
+                const outstandingBalance = Math.max(0, netSaleValue - amountPaid);
 
                 return (
                   <>
@@ -570,7 +574,7 @@ export default function SaleDetailPage() {
                       <span>Goods Returned Value:</span>
                       <span>{formatCurrency(goodsReturnedValue)}</span>
                     </div>
-                    {amountPaid > 0 && (
+                    {cashRefund > 0 && (
                       <div className="flex justify-between text-sm text-green-700 font-medium">
                         <span>Cash Refund to Customer:</span>
                         <span>{formatCurrency(cashRefund)}</span>
@@ -583,11 +587,21 @@ export default function SaleDetailPage() {
                       </div>
                     )}
                     <div className="flex justify-between border-t border-amber-200 pt-2 text-base font-semibold text-gray-900">
-                      <span>Net Amount Owed:</span>
-                      <span>
-                        {formatCurrency(Math.max(0, totalAmount - goodsReturnedValue))}
-                      </span>
+                      <span>Net Sale Value:</span>
+                      <span>{formatCurrency(Math.max(0, netSaleValue))}</span>
                     </div>
+                    {outstandingBalance > 0 && (
+                      <div className="flex justify-between text-sm text-red-700 font-medium mt-1">
+                        <span>Outstanding Balance:</span>
+                        <span>{formatCurrency(outstandingBalance)}</span>
+                      </div>
+                    )}
+                    {amountPaid >= netSaleValue && netSaleValue > 0 && (
+                      <div className="flex justify-between text-sm text-green-700 mt-1">
+                        <span>Status:</span>
+                        <span>Fully Paid</span>
+                      </div>
+                    )}
                   </>
                 );
               })()}
