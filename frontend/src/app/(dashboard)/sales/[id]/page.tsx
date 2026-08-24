@@ -270,11 +270,7 @@ export default function SaleDetailPage() {
       setSuccess('Return processed successfully. Stock has been restored.');
       fetchSale();
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to process return.')
-          : 'Failed to process return.';
+      const message = extractApiError(err, 'Failed to process return.');
       setReturnError(message);
     } finally {
       setIsReturning(false);

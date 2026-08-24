@@ -485,8 +485,8 @@ async def return_sale(
                     action_type=ActionType.UPDATE.value if hasattr(ActionType.UPDATE, 'value') else "UPDATE",
                     entity_type="sale_return",
                     entity_id=sale_id,
-                    details={"reasons": reasons_summary, "sale_id": str(sale_id)},
-                    performed_by=str(current_user.id),
+                    user_id=str(current_user.id),
+                    new_values={"reasons": reasons_summary, "sale_id": str(sale_id)},
                 )
                 db.add(audit)
 
