@@ -35,11 +35,15 @@ class NotificationResponse(BaseModel):
     created_at: Optional[datetime] = Field(
         default=None, description="When the notification was created"
     )
+    resolved_status: Optional[str] = Field(
+        default=None,
+        description="Current status of the referenced entity (e.g. 'approved', 'cancelled', 'received')",
+    )
 
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_notification(cls, notification) -> "NotificationResponse":
+    def from_notification(cls, notification, resolved_status: Optional[str] = None) -> "NotificationResponse":
         """Create a response from a Notification model instance.
 
         Handles the extra_data -> metadata field mapping.
@@ -54,6 +58,7 @@ class NotificationResponse(BaseModel):
             is_read=notification.is_read,
             read_at=notification.read_at,
             created_at=notification.created_at,
+            resolved_status=resolved_status,
         )
 
 

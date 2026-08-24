@@ -7,16 +7,30 @@ import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { Notification, PaginatedResponse } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
 
-type NotificationTypeVariant = 'warning' | 'danger' | 'info';
+type NotificationTypeVariant = 'warning' | 'danger' | 'info' | 'success' | 'default';
 
 const NOTIFICATION_TYPE_CONFIG: Record<
-  Notification['notification_type'],
+  string,
   { variant: NotificationTypeVariant; label: string; icon: string }
 > = {
   low_stock: { variant: 'warning', label: 'Low Stock', icon: '⚠️' },
   credit_limit_exceeded: { variant: 'danger', label: 'Credit Exceeded', icon: '🚨' },
   overdue_customer: { variant: 'danger', label: 'Overdue', icon: '⏰' },
   pending_approval: { variant: 'info', label: 'Pending', icon: 'ℹ️' },
+};
+
+const RESOLVED_STATUS_CONFIG: Record<
+  string,
+  { variant: NotificationTypeVariant; label: string }
+> = {
+  pending: { variant: 'info', label: 'Pending' },
+  approved: { variant: 'success', label: 'Approved' },
+  in_transit: { variant: 'info', label: 'In Transit' },
+  received: { variant: 'success', label: 'Received' },
+  cancelled: { variant: 'danger', label: 'Cancelled' },
+  draft: { variant: 'warning', label: 'Draft' },
+  ordered: { variant: 'info', label: 'Ordered' },
+  partially_received: { variant: 'warning', label: 'Partial' },
 };
 
 function formatRelativeTime(dateString: string): string {
@@ -262,7 +276,16 @@ export default function NotificationsPage() {
                                 Mark Unread
                               </button>
                             )}
-                            <Badge variant={config.variant}>{config.label}</Badge>
+                            {(() => {
+                              // Show resolved entity status if available, otherwise notification type
+                              const resolved = notification.resolved_status
+                                ? RESOLVED_STATUS_CONFIG[notification.resolved_status]
+                                : null;
+                              if (resolved) {
+                                return <Badge variant={resolved.variant}>{resolved.label}</Badge>;
+                              }
+                              return <Badge variant={config.variant}>{config.label}</Badge>;
+                            })()}
                           </div>
                         </div>
 

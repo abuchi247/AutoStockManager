@@ -571,6 +571,7 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
   read_at?: string;
+  resolved_status?: string;
 }
 
 // --- Dashboard ---

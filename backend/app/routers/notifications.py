@@ -27,6 +27,63 @@ from app.services.notification_service import (
     NotificationService,
 )
 
+
+async def _resolve_entity_statuses(db, notifications) -> dict[str, str]:
+    """Look up the current status of referenced entities (transfers, POs).
+
+    Returns a dict of notification_id → current_status_string.
+    Only resolves pending_approval notifications that reference an entity.
+    """
+    from sqlalchemy import select
+    from app.models.transfer import Transfer
+    from app.models.purchase_order import PurchaseOrder
+
+    result: dict[str, str] = {}
+
+    transfer_ids = []
+    po_ids = []
+    notification_entity_map: dict[str, tuple[str, str]] = {}  # notification_id → (entity_type, entity_id)
+
+    for n in notifications:
+        if n.notification_type != "pending_approval":
+            continue
+        meta = n.extra_data if isinstance(n.extra_data, dict) else {}
+        entity_type = meta.get("entity_type")
+        entity_id = meta.get("entity_id")
+        if not entity_type or not entity_id:
+            continue
+        notification_entity_map[str(n.id)] = (entity_type, entity_id)
+        if entity_type == "transfer":
+            transfer_ids.append(entity_id)
+        elif entity_type == "purchase_order":
+            po_ids.append(entity_id)
+
+    # Batch fetch transfer statuses
+    if transfer_ids:
+        from uuid import UUID as UUIDType
+        stmt = select(Transfer.id, Transfer.status).filter(
+            Transfer.id.in_([UUIDType(tid) for tid in transfer_ids])
+        )
+        rows = await db.execute(stmt)
+        status_map = {str(r.id): r.status.value if hasattr(r.status, 'value') else str(r.status) for r in rows}
+        for nid, (etype, eid) in notification_entity_map.items():
+            if etype == "transfer" and eid in status_map:
+                result[nid] = status_map[eid].lower()
+
+    # Batch fetch PO statuses
+    if po_ids:
+        from uuid import UUID as UUIDType
+        stmt = select(PurchaseOrder.id, PurchaseOrder.status).filter(
+            PurchaseOrder.id.in_([UUIDType(pid) for pid in po_ids])
+        )
+        rows = await db.execute(stmt)
+        status_map = {str(r.id): r.status.value if hasattr(r.status, 'value') else str(r.status) for r in rows}
+        for nid, (etype, eid) in notification_entity_map.items():
+            if etype == "purchase_order" and eid in status_map:
+                result[nid] = status_map[eid].lower()
+
+    return result
+
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
 
 
@@ -64,9 +121,13 @@ async def list_notifications(
         page_size=page_size,
     )
 
+    # Resolve current status for pending_approval notifications
+    resolved_statuses = await _resolve_entity_statuses(db, notifications)
+
     return NotificationListResponse(
         data=[
-            NotificationResponse.from_notification(n) for n in notifications
+            NotificationResponse.from_notification(n, resolved_status=resolved_statuses.get(str(n.id)))
+            for n in notifications
         ],
         meta={"page": page, "total": total, "page_size": page_size},
     )
