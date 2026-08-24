@@ -84,6 +84,8 @@ export default function SaleDetailPage() {
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [isReturning, setIsReturning] = useState(false);
   const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnLocationId, setReturnLocationId] = useState('');
+  const [returnLocations, setReturnLocations] = useState<Array<{ id: string; name: string }>>([]);
 
   // Invoice state
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
@@ -93,6 +95,24 @@ export default function SaleDetailPage() {
   const closeReturnModal = useCallback(() => {
     setShowReturnModal(false);
   }, []);
+
+  // Fetch locations for return-to picker when modal opens
+  useEffect(() => {
+    if (!showReturnModal) return;
+    async function fetchLocations() {
+      try {
+        const res = await get<{ data: Array<{ id: string; name: string }> }>('/locations');
+        setReturnLocations(res.data);
+        // Default to the sale's original location
+        if (sale?.location_id) {
+          setReturnLocationId(sale.location_id);
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+    fetchLocations();
+  }, [showReturnModal, sale?.location_id]);
 
   const fetchSale = useCallback(async () => {
     setIsLoading(true);
@@ -264,6 +284,9 @@ export default function SaleDetailPage() {
           quantity: item.quantity || 1,
           reason: item.reason || undefined,
         })),
+        return_location_id: returnLocationId && returnLocationId !== sale?.location_id
+          ? returnLocationId
+          : undefined,
       };
       await post<Sale>(`/sales/${saleId}/return`, payload);
       setShowReturnModal(false);
@@ -702,6 +725,19 @@ export default function SaleDetailPage() {
           <p className="text-sm text-gray-600">
             Select items to return and specify the quantity for each.
           </p>
+          {returnLocations.length > 1 && (
+            <Select
+              label="Return to Location"
+              options={[
+                ...returnLocations.map((loc) => ({
+                  value: loc.id,
+                  label: loc.id === sale?.location_id ? `${loc.name} (original)` : loc.name,
+                })),
+              ]}
+              value={returnLocationId}
+              onChange={(e) => setReturnLocationId(e.target.value)}
+            />
+          )}
           <div className="max-h-80 overflow-y-auto space-y-3">
             {returnItems.map((item, index) => (
               <div

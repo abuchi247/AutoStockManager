@@ -333,6 +333,7 @@ class SalesService:
         sale_id: uuid.UUID,
         returned_by: uuid.UUID,
         return_items: Optional[list[dict]] = None,
+        return_location_id: Optional[uuid.UUID] = None,
     ) -> Sale:
         """Process a sales return, creating new cost layers and ledger entries.
 
@@ -362,6 +363,8 @@ class SalesService:
                 - sale_item_id: UUID of the sale item
                 - quantity: Decimal quantity to return
                 If None, all items in the sale are returned in full.
+            return_location_id: Optional UUID of the location to return items to.
+                Defaults to the original sale location if not specified.
 
         Returns:
             The updated Sale record with RETURNED status.
@@ -409,6 +412,9 @@ class SalesService:
             )
 
         # Process each return item
+        # Resolve the return location: use provided return_location_id or default to sale's location
+        effective_return_location = return_location_id or sale.location_id
+
         for sale_item, return_quantity in items_to_return:
             # Determine the unit cost for the new cost layer.
             # Use the COGS-derived unit cost if available (COGS / quantity gives
@@ -423,7 +429,7 @@ class SalesService:
             # created_at will be set by BaseModel default to NOW() (Req 5.13)
             new_layer = CostLayer(
                 spare_part_id=sale_item.spare_part_id,
-                location_id=sale.location_id,
+                location_id=effective_return_location,
                 unit_cost=unit_cost,
                 original_quantity=return_quantity,
                 remaining_quantity=return_quantity,
@@ -437,7 +443,7 @@ class SalesService:
             await record_inventory_movement(
                 db=self.db,
                 spare_part_id=sale_item.spare_part_id,
-                location_id=sale.location_id,
+                location_id=effective_return_location,
                 quantity_change=return_quantity,
                 movement_type=MovementType.RETURN.value,
                 reference_type="sale",

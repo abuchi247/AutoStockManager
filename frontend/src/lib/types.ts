@@ -391,6 +391,7 @@ export interface SaleReturnRequest {
     quantity: number;
     reason?: string;
   }>;
+  return_location_id?: string;
 }
 
 // --- Purchase Orders ---

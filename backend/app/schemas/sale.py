@@ -144,6 +144,11 @@ class SaleReturnRequest(BaseModel):
         description="Specific items to return. If not provided, all items are returned in full.",
     )
 
+    return_location_id: Optional[UUID] = Field(
+        default=None,
+        description="Location to return items to. Defaults to the original sale location if not specified.",
+    )
+
 
 # =============================================================================
 # Response Schemas

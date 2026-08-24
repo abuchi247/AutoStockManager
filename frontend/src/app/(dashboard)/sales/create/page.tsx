@@ -91,7 +91,18 @@ export default function CreateSalePage() {
           get<{ data: Location[]; meta: { page: number; total: number; page_size: number } }>('/locations'),
         ]);
         setCustomers(customersRes.data.filter((c: Customer) => c.account_status !== 'closed'));
-        setLocations(locationsRes.data);
+        const locs = locationsRes.data;
+        setLocations(locs);
+
+        // Auto-select location: single location → auto-pick; otherwise restore last-used
+        if (locs.length === 1) {
+          setLocationId(locs[0].id);
+        } else if (locs.length > 1) {
+          const lastUsed = localStorage.getItem('lastSaleLocationId');
+          if (lastUsed && locs.some((l: Location) => l.id === lastUsed)) {
+            setLocationId(lastUsed);
+          }
+        }
       } catch {
         // Non-critical; dropdowns will be empty
       }
@@ -335,7 +346,12 @@ export default function CreateSalePage() {
             label="Location"
             options={locationOptions}
             value={locationId}
-            onChange={(e) => setLocationId(e.target.value)}
+            onChange={(e) => {
+              setLocationId(e.target.value);
+              if (e.target.value) {
+                localStorage.setItem('lastSaleLocationId', e.target.value);
+              }
+            }}
             required
           />
           <Select

@@ -470,6 +470,7 @@ async def return_sale(
             sale_id=sale_id,
             returned_by=current_user.id,
             return_items=return_items,
+            return_location_id=request.return_location_id if request else None,
         )
 
         # Record return reasons in the audit trail for accountability
