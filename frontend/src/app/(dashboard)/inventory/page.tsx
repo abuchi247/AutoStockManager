@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
 import { usePaginatedQuery, useResourceQuery, usePrefetchNextPage, queryKeys, toQueryString, normalizeList, useCreateMutation, invalidateQueryKeys } from '@/lib/queries';
@@ -52,6 +53,8 @@ function getStockBadge(part: SparePart & { total_stock?: number }): React.ReactN
 }
 
 export default function InventoryPage() {
+  const { allowed } = useRequirePermission('inventory');
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -278,6 +281,8 @@ export default function InventoryPage() {
       render: (item) => getStockBadge(item),
     },
   ];
+
+  if (!allowed) return null;
 
   return (
     <div className="space-y-6">

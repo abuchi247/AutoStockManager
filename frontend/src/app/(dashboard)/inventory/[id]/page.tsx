@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useRouter, useParams } from 'next/navigation';
 import { get, put, post, del } from '@/lib/api';
 import {
@@ -18,6 +19,8 @@ import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 
 export default function InventoryDetailPage() {
+  const { allowed } = useRequirePermission('inventory');
+
   const router = useRouter();
   const params = useParams();
   const partId = params.id as string;
@@ -302,6 +305,8 @@ export default function InventoryDetailPage() {
     { value: '', label: 'No category' },
     ...categories.map((c) => ({ value: c.id, label: c.name })),
   ];
+
+  if (!allowed) return null;
 
   if (isLoading) {
     return (

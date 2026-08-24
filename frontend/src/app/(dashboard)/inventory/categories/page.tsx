@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { get, post, put, del } from '@/lib/api';
 import {
   Button,
@@ -13,6 +14,8 @@ import type { Category } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
 
 export default function CategoriesPage() {
+  const { allowed } = useRequirePermission('categories');
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +131,8 @@ export default function CategoriesPage() {
   const topLevelCategories = categories.filter((c) => !c.parent_id);
   const getChildren = (parentId: string) =>
     categories.filter((c) => c.parent_id === parentId);
+
+  if (!allowed) return null;
 
   if (isLoading) {
     return (
