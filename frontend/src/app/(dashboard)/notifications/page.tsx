@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { Notification, PaginatedResponse } from '@/lib/types';
@@ -39,7 +40,26 @@ function formatRelativeTime(dateString: string): string {
   });
 }
 
+function getNotificationLink(notification: Notification): string | null {
+  const meta = notification.metadata;
+  if (!meta) return null;
+
+  const entityType = meta.entity_type as string | undefined;
+  const entityId = meta.entity_id as string | undefined;
+  const sparePartId = meta.spare_part_id as string | undefined;
+  const customerId = meta.customer_id as string | undefined;
+
+  if (entityType === 'transfer' && entityId) return `/transfers/${entityId}`;
+  if (entityType === 'purchase_order' && entityId) return `/purchases/${entityId}`;
+  if (notification.notification_type === 'low_stock' && sparePartId) return `/inventory/${sparePartId}`;
+  if (notification.notification_type === 'credit_limit_exceeded' && customerId) return `/customers/${customerId}`;
+  if (notification.notification_type === 'overdue_customer' && customerId) return `/customers/${customerId}`;
+
+  return null;
+}
+
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,21 +116,29 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: string) => {
     if (markingId) return;
     const notification = notifications.find((n) => n.id === id);
-    if (notification?.is_read) return;
+    if (!notification) return;
 
-    setMarkingId(id);
-    try {
-      await post<Notification>(`/notifications/${id}/mark-read`);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
-        )
-      );
-    } catch (err: unknown) {
-      const message = extractApiError(err, 'Failed to mark notification as read');
-      setError(message);
-    } finally {
-      setMarkingId(null);
+    // Mark as read (even if already read, we still navigate)
+    if (!notification.is_read) {
+      setMarkingId(id);
+      try {
+        await post<Notification>(`/notifications/${id}/mark-read`);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+          )
+        );
+      } catch {
+        // Don't block navigation if mark-read fails
+      } finally {
+        setMarkingId(null);
+      }
+    }
+
+    // Navigate to the relevant entity
+    const link = getNotificationLink(notification);
+    if (link) {
+      router.push(link);
     }
   };
 
@@ -219,6 +247,11 @@ export default function NotificationsPage() {
                               className="inline-block h-2 w-2 rounded-full bg-blue-500"
                               aria-label="Unread"
                             />
+                          )}
+                          {getNotificationLink(notification) && (
+                            <span className="text-xs text-blue-500 font-medium">
+                              View →
+                            </span>
                           )}
                         </div>
                       </div>
