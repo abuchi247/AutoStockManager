@@ -323,6 +323,12 @@ export default function CreateSalePage() {
     [locations, locationId]
   );
 
+  // Format stock quantity: strip trailing zeros (43.0000 → 43, 2.5000 → 2.5)
+  const formatStock = (val: number) => {
+    const num = Number(val);
+    return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+  };
+
   if (!allowed) return null;
 
   return (
@@ -393,8 +399,23 @@ export default function CreateSalePage() {
         </div>
       </div>
 
+      {/* Mobile cart summary bar (fixed at bottom on small screens) */}
+      {lineItems.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-200 bg-white px-4 py-3 shadow-lg lg:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{formatCurrency(totalAmount)}</p>
+              <p className="text-xs text-gray-500">{lineItems.length} item{lineItems.length > 1 ? 's' : ''} in cart</p>
+            </div>
+            <a href="#cart-section" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              View Cart
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Two-panel layout: Product catalog + Cart */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 pb-20 lg:pb-0">
         {/* LEFT: Product catalog (2/3 width on desktop) */}
         <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
           {/* Search bar */}
@@ -506,7 +527,7 @@ export default function CreateSalePage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
                   {catalogProducts.map((product) => {
                     const stock = product.total_stock ?? 0;
                     const isOutOfStock = stock <= 0;
@@ -540,19 +561,19 @@ export default function CreateSalePage() {
                           {isOutOfStock
                             ? 'Out of stock'
                             : locationId
-                            ? `${stock} here`
-                            : `${stock} total`}
+                            ? `${formatStock(stock)} here`
+                            : `${formatStock(stock)} total`}
                         </span>
 
-                        {/* In-cart badge */}
+                        {/* In-cart indicator */}
                         {isInCart && (
-                          <span className="absolute top-2 left-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            In cart
+                          <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            ✓ Added
                           </span>
                         )}
 
                         {/* Product info */}
-                        <p className="text-sm font-medium text-gray-900 pr-16 truncate">
+                        <p className="text-sm font-medium text-gray-900 pr-20 leading-tight">
                           {product.name}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">{product.part_number}</p>
@@ -604,7 +625,7 @@ export default function CreateSalePage() {
         </div>
 
         {/* RIGHT: Cart (1/3 width on desktop) */}
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm flex flex-col">
+        <div id="cart-section" className="rounded-lg border border-gray-200 bg-white shadow-sm flex flex-col lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-120px)]">
           <div className="border-b border-gray-200 px-4 py-3">
             <h2 className="text-base font-semibold text-gray-900">
               Cart
@@ -616,7 +637,7 @@ export default function CreateSalePage() {
             </h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-2 max-h-[500px]">
+          <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
             {lineItems.length === 0 ? (
               <div className="py-12 text-center">
                 <p className="text-sm text-gray-500">
@@ -638,7 +659,7 @@ export default function CreateSalePage() {
                           <p className="text-xs text-gray-500">{item.part_number}</p>
                           {item.available_stock !== undefined && (
                             <p className={`text-xs mt-0.5 ${item.available_stock <= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              Stock: {item.available_stock}
+                              Stock: {formatStock(item.available_stock)}
                             </p>
                           )}
                         </div>
