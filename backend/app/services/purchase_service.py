@@ -385,6 +385,14 @@ class PurchaseService:
                 created_by=received_by,
             )
 
+            # Update spare part's cost_price to the latest purchase price
+            from app.models.spare_part import SparePart
+            part_stmt = select(SparePart).filter(SparePart.id == po_item.spare_part_id)
+            part_result = await self.db.execute(part_stmt)
+            spare_part = part_result.scalar_one_or_none()
+            if spare_part:
+                spare_part.cost_price = unit_cost
+
             total_grn_amount += quantity_received * unit_cost
 
         # Update PO status based on whether all items are fully received

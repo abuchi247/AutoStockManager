@@ -90,6 +90,26 @@ export default function InventoryDetailPage() {
   const [costLayersPage, setCostLayersPage] = useState(1);
   const [costLayersTotalPages, setCostLayersTotalPages] = useState(1);
 
+  // Purchase history state
+  interface PurchaseHistoryItem {
+    id: string;
+    date: string;
+    supplier_name: string | null;
+    quantity: number;
+    unit_cost: number;
+    total_cost: number;
+    location_name: string | null;
+  }
+  interface PurchaseHistoryData {
+    spare_part_id: string;
+    data: PurchaseHistoryItem[];
+    average_cost: number;
+    latest_cost: number;
+    total_purchased: number;
+  }
+  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryData | null>(null);
+  const [purchaseHistoryLoading, setPurchaseHistoryLoading] = useState(false);
+
   const fetchPart = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -175,6 +195,22 @@ export default function InventoryDetailPage() {
   useEffect(() => {
     fetchCostLayers();
   }, [fetchCostLayers]);
+
+  // Fetch purchase history
+  useEffect(() => {
+    async function fetchPurchaseHistory() {
+      setPurchaseHistoryLoading(true);
+      try {
+        const data = await get<PurchaseHistoryData>(`/stock/purchase-history/${partId}`);
+        setPurchaseHistory(data);
+      } catch {
+        setPurchaseHistory(null);
+      } finally {
+        setPurchaseHistoryLoading(false);
+      }
+    }
+    fetchPurchaseHistory();
+  }, [partId]);
 
   const handleEdit = () => {
     if (!part) return;
@@ -460,6 +496,76 @@ export default function InventoryDetailPage() {
             </dd>
           </div>
         </dl>
+      </div>
+
+      {/* Purchase History */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Purchase History</h2>
+        {purchaseHistoryLoading ? (
+          <div className="flex justify-center py-4">
+            <LoadingSpinner size="md" />
+          </div>
+        ) : !purchaseHistory || purchaseHistory.data.length === 0 ? (
+          <p className="text-sm text-gray-500">No purchase records yet. Records will appear after goods are received via GRN.</p>
+        ) : (
+          <>
+            {/* Summary stats */}
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-md bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">Latest Cost</p>
+                <p className="text-lg font-semibold text-gray-900">{formatCurrency(purchaseHistory.latest_cost)}</p>
+              </div>
+              <div className="rounded-md bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">Average Cost</p>
+                <p className="text-lg font-semibold text-gray-900">{formatCurrency(purchaseHistory.average_cost)}</p>
+              </div>
+              <div className="rounded-md bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">Total Purchased</p>
+                <p className="text-lg font-semibold text-gray-900">{purchaseHistory.total_purchased} units</p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Supplier</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Qty</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Unit Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Location</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {purchaseHistory.data.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {entry.date ? new Date(entry.date).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
+                        {entry.supplier_name || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {entry.quantity}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {formatCurrency(entry.unit_cost)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right font-medium text-gray-900">
+                        {formatCurrency(entry.total_cost)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                        {entry.location_name || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Movement History */}

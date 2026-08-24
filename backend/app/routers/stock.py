@@ -496,3 +496,124 @@ async def get_cost_layers(
             "total": total,
         },
     )
+
+
+# =============================================================================
+# Purchase History Endpoint
+# =============================================================================
+
+
+class PurchaseHistoryItem(BaseModel):
+    """A single purchase receipt record for a spare part."""
+    id: UUID
+    date: str
+    supplier_name: Optional[str] = None
+    quantity: float
+    unit_cost: float
+    total_cost: float
+    location_name: Optional[str] = None
+    po_id: Optional[str] = None
+    grn_id: Optional[str] = None
+
+
+class PurchaseHistoryResponse(BaseModel):
+    """Purchase history for a spare part."""
+    spare_part_id: UUID
+    data: list[PurchaseHistoryItem]
+    average_cost: float
+    latest_cost: float
+    total_purchased: float
+
+
+@router.get(
+    "/purchase-history/{spare_part_id}",
+    response_model=PurchaseHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get purchase history for a spare part",
+    description="Returns all purchase receipts (GRNs) for a spare part with supplier, cost, and quantity details.",
+)
+async def get_purchase_history(
+    spare_part_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> PurchaseHistoryResponse:
+    """Get purchase history showing every time this item was purchased.
+
+    Shows date, supplier, quantity, unit cost, and location for each receipt.
+    Also returns average cost and latest cost for quick reference.
+    """
+    from app.models.grn_items import GRNItem
+    from app.models.goods_receipt_note import GoodsReceiptNote
+    from app.models.purchase_order import PurchaseOrder
+    from app.models.supplier import Supplier
+
+    # Validate spare part exists
+    part_result = await db.execute(
+        select(SparePart).filter_by(id=spare_part_id, deleted_at=None)
+    )
+    part = part_result.scalar_one_or_none()
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spare part not found",
+        )
+
+    # Get all GRN items for this spare part, joined with GRN → PO → Supplier
+    stmt = (
+        select(
+            GRNItem.id,
+            GRNItem.quantity_received,
+            GRNItem.unit_cost,
+            GRNItem.created_at,
+            GoodsReceiptNote.id.label("grn_id"),
+            GoodsReceiptNote.location_id,
+            PurchaseOrder.id.label("po_id"),
+            Supplier.name.label("supplier_name"),
+            Location.name.label("location_name"),
+        )
+        .join(GoodsReceiptNote, GRNItem.grn_id == GoodsReceiptNote.id)
+        .join(PurchaseOrder, GoodsReceiptNote.purchase_order_id == PurchaseOrder.id)
+        .join(Supplier, PurchaseOrder.supplier_id == Supplier.id)
+        .outerjoin(Location, GoodsReceiptNote.location_id == Location.id)
+        .filter(GRNItem.spare_part_id == spare_part_id)
+        .order_by(GRNItem.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items = []
+    total_qty = Decimal("0")
+    total_cost_sum = Decimal("0")
+    latest_cost = Decimal("0")
+
+    for row in rows:
+        qty = Decimal(str(row.quantity_received))
+        cost = Decimal(str(row.unit_cost))
+        total = qty * cost
+        total_qty += qty
+        total_cost_sum += total
+
+        if not items:  # First row is the latest (ordered DESC)
+            latest_cost = cost
+
+        items.append(PurchaseHistoryItem(
+            id=row.id,
+            date=row.created_at.isoformat() if row.created_at else "",
+            supplier_name=row.supplier_name,
+            quantity=float(qty),
+            unit_cost=float(cost),
+            total_cost=float(total),
+            location_name=row.location_name,
+            po_id=str(row.po_id) if row.po_id else None,
+            grn_id=str(row.grn_id) if row.grn_id else None,
+        ))
+
+    average_cost = float(total_cost_sum / total_qty) if total_qty > 0 else 0.0
+
+    return PurchaseHistoryResponse(
+        spare_part_id=spare_part_id,
+        data=items,
+        average_cost=average_cost,
+        latest_cost=float(latest_cost),
+        total_purchased=float(total_qty),
+    )
