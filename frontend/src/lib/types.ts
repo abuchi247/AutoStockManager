@@ -494,8 +494,10 @@ export interface Transfer {
   approved_at?: string;
   received_at?: string;
   cancellation_reason?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
+  updated_by?: string;
   spare_part?: SparePart;
   spare_part_name?: string;
   spare_part_number?: string;

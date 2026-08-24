@@ -25,6 +25,7 @@ interface TimelineEvent {
   actor: string | null;
   isActive: boolean;
   isCurrent: boolean;
+  note?: string | null;
 }
 
 function getStatusBadge(status: TransferStatus): React.ReactNode {
@@ -90,9 +91,10 @@ function buildTimeline(transfer: Transfer): TimelineEvent[] {
     events.push({
       label: 'Cancelled',
       date: transfer.updated_at,
-      actor: null,
+      actor: transfer.updated_by ?? null,
       isActive: true,
       isCurrent: true,
+      note: transfer.cancellation_reason || null,
     });
   }
 
@@ -284,6 +286,22 @@ export default function TransferDetailPage() {
               <dd className="text-sm text-gray-900">{formatDateTime(transfer.created_at)}</dd>
             </div>
           </dl>
+
+          {/* Cancellation reason callout */}
+          {transfer.status === 'cancelled' && transfer.cancellation_reason && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Cancellation Reason</p>
+              <p className="text-sm text-red-800">{transfer.cancellation_reason}</p>
+            </div>
+          )}
+
+          {/* Transfer notes */}
+          {transfer.notes && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+              <p className="text-sm text-gray-700">{transfer.notes}</p>
+            </div>
+          )}
         </div>
 
         {/* Actions card */}
@@ -384,6 +402,11 @@ export default function TransferDetailPage() {
                 {event.actor && (
                   <p className="mt-0.5 text-xs text-gray-500">
                     By: {event.actor.slice(0, 8)}...
+                  </p>
+                )}
+                {event.note && (
+                  <p className="mt-1 text-xs text-gray-600 bg-gray-50 rounded px-2 py-1 border border-gray-200 italic">
+                    Reason: {event.note}
                   </p>
                 )}
               </div>
