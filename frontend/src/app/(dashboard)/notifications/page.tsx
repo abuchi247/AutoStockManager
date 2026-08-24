@@ -142,6 +142,25 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleMarkUnread = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Don't trigger navigation
+    if (markingId) return;
+    setMarkingId(id);
+    try {
+      await post<Notification>(`/notifications/${id}/mark-unread`);
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === id ? { ...n, is_read: false, read_at: undefined } : n
+        )
+      );
+    } catch (err: unknown) {
+      const message = extractApiError(err, 'Failed to mark as unread');
+      setError(message);
+    } finally {
+      setMarkingId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -233,6 +252,16 @@ export default function NotificationsPage() {
                             </p>
                           </div>
                           <div className="flex flex-shrink-0 items-center gap-2">
+                            {notification.is_read && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleMarkUnread(e, notification.id)}
+                                className="text-xs text-gray-400 hover:text-blue-600 font-medium transition-colors"
+                                aria-label="Mark as unread"
+                              >
+                                Mark Unread
+                              </button>
+                            )}
                             <Badge variant={config.variant}>{config.label}</Badge>
                           </div>
                         </div>

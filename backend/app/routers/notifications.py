@@ -136,3 +136,46 @@ async def mark_notification_read(
     await service.mark_read(notification_id)
     await db.commit()
     return NotificationResponse.from_notification(notification)
+
+
+@router.post(
+    "/{notification_id}/mark-unread",
+    response_model=NotificationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Mark notification as unread",
+    description="Mark a single notification as unread. Only the owning user can do this.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Notification not found"},
+        403: {"model": ErrorResponse, "description": "Not your notification"},
+    },
+)
+async def mark_notification_unread(
+    notification_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> NotificationResponse:
+    """Mark a single notification as unread.
+
+    Allows users to flag a notification they've already read as unread
+    so it stays visible as a reminder to take action.
+    """
+    service = NotificationService(db=db)
+
+    try:
+        notification = await service.get_notification(notification_id)
+    except NotificationNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found",
+        )
+
+    if notification.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only modify your own notifications",
+        )
+
+    notification.is_read = False
+    notification.read_at = None
+    await db.commit()
+    return NotificationResponse.from_notification(notification)
