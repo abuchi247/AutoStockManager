@@ -30,6 +30,7 @@ class NotificationType(str, enum.Enum):
     LOW_STOCK = "low_stock"
     CREDIT_LIMIT_EXCEEDED = "credit_limit_exceeded"
     OVERDUE_CUSTOMER = "overdue_customer"
+    OVERDUE_SUPPLIER = "overdue_supplier"
     PENDING_APPROVAL = "pending_approval"
     SYSTEM = "system"
 

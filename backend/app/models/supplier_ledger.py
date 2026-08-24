@@ -150,6 +150,12 @@ class SupplierLedger(Base):
         comment="Timestamp when this ledger entry was created (immutable)",
     )
 
+    payment_due_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Payment due date calculated from supplier payment terms (PURCHASE entries only)",
+    )
+
     def __repr__(self) -> str:
         return (
             f"<SupplierLedger(id={self.id}, supplier_id={self.supplier_id}, "

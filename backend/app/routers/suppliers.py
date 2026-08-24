@@ -304,3 +304,113 @@ async def get_supplier_aging(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Supplier not found",
         )
+
+
+@router.get(
+    "/{supplier_id}/payment-schedule",
+    status_code=status.HTTP_200_OK,
+    summary="Get supplier payment schedule",
+    description="Returns upcoming and overdue payment entries for a supplier.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Supplier not found"},
+    },
+)
+async def get_supplier_payment_schedule(
+    supplier_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Get payment schedule for a supplier — upcoming and overdue payments.
+
+    Returns PURCHASE ledger entries that have a payment_due_date set,
+    grouped into overdue (past due) and upcoming (future due), with
+    payment status derived from the running balance.
+    """
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from sqlalchemy import select, and_
+    from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
+
+    service = _get_supplier_service(db)
+    try:
+        supplier = await service.get_supplier(supplier_id)
+    except SupplierNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Supplier not found",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    # Get all PURCHASE entries with a due date for this supplier
+    stmt = (
+        select(SupplierLedger)
+        .filter(
+            SupplierLedger.supplier_id == supplier_id,
+            SupplierLedger.payment_due_date.isnot(None),
+            SupplierLedger.amount > Decimal("0"),
+        )
+        .order_by(SupplierLedger.payment_due_date.asc())
+    )
+    result = await db.execute(stmt)
+    entries = result.scalars().all()
+
+    # Get total payments made (credits)
+    payments_stmt = (
+        select(
+            SupplierLedger.amount,
+        )
+        .filter(
+            SupplierLedger.supplier_id == supplier_id,
+            SupplierLedger.amount < Decimal("0"),
+        )
+        .order_by(SupplierLedger.created_at.asc())
+    )
+    payments_result = await db.execute(payments_stmt)
+    total_paid = abs(sum((row[0] for row in payments_result.all()), Decimal("0")))
+
+    # Apply payments to entries in FIFO order to determine which are still outstanding
+    overdue = []
+    upcoming = []
+    remaining_credits = total_paid
+
+    for entry in entries:
+        outstanding = entry.amount
+        if remaining_credits > Decimal("0"):
+            apply = min(outstanding, remaining_credits)
+            outstanding -= apply
+            remaining_credits -= apply
+
+        if outstanding <= Decimal("0"):
+            continue  # Fully paid
+
+        due_date = entry.payment_due_date
+        if due_date.tzinfo is None:
+            due_date = due_date.replace(tzinfo=timezone.utc)
+
+        item = {
+            "id": str(entry.id),
+            "amount": float(entry.amount),
+            "outstanding": float(outstanding),
+            "due_date": entry.payment_due_date.isoformat(),
+            "created_at": entry.created_at.isoformat(),
+            "notes": entry.notes,
+            "days_overdue": max(0, (now - due_date).days) if due_date < now else 0,
+            "days_until_due": max(0, (due_date - now).days) if due_date >= now else 0,
+            "status": "overdue" if due_date < now else "upcoming",
+        }
+
+        if due_date < now:
+            overdue.append(item)
+        else:
+            upcoming.append(item)
+
+    return {
+        "supplier_id": str(supplier_id),
+        "supplier_name": supplier.name,
+        "payment_terms": supplier.payment_terms,
+        "overdue": overdue,
+        "upcoming": upcoming,
+        "total_overdue": sum(item["outstanding"] for item in overdue),
+        "total_upcoming": sum(item["outstanding"] for item in upcoming),
+    }

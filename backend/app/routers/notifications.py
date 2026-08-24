@@ -240,3 +240,32 @@ async def mark_notification_unread(
     notification.read_at = None
     await db.commit()
     return NotificationResponse.from_notification(notification)
+
+
+@router.post(
+    "/check-overdue-suppliers",
+    status_code=status.HTTP_200_OK,
+    summary="Check for overdue supplier payments",
+    description="Scans supplier ledger for overdue payments and creates notifications. Manager/Admin only.",
+)
+async def check_overdue_suppliers(
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Trigger check for overdue supplier payments.
+
+    Creates notifications for managers/admins about suppliers with
+    payments past their due date. Deduplicates (once per supplier per day).
+    Can be called on dashboard load or via cron.
+    """
+    from app.models.user import UserRole
+    if current_user.role not in (UserRole.MANAGER.value, UserRole.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only managers and admins can trigger overdue checks",
+        )
+
+    service = NotificationService(db=db)
+    count = await service.check_overdue_supplier_payments()
+    await db.commit()
+    return {"notified_suppliers": count}

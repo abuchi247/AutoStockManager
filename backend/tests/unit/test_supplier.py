@@ -444,19 +444,23 @@ class TestSupplierService:
         entry_current = MagicMock()
         entry_current.amount = Decimal("1000.00")
         entry_current.created_at = now  # Current (0 days)
+        entry_current.payment_due_date = None
 
         entry_30_days = MagicMock()
         entry_30_days.amount = Decimal("2000.00")
         entry_30_days.created_at = now - timedelta(days=15)  # 1-30 days
+        entry_30_days.payment_due_date = None
 
         entry_60_days = MagicMock()
         entry_60_days.amount = Decimal("1500.00")
         entry_60_days.created_at = now - timedelta(days=45)  # 31-60 days
+        entry_60_days.payment_due_date = None
 
         # A payment of 500
         entry_payment = MagicMock()
         entry_payment.amount = Decimal("-500.00")
         entry_payment.created_at = now - timedelta(days=5)
+        entry_payment.payment_due_date = None
 
         # First call: get_supplier
         mock_supplier_result = MagicMock()

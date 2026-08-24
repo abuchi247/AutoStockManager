@@ -83,6 +83,30 @@ export default function SupplierDetailPage() {
   const [balance, setBalance] = useState<SupplierBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
 
+  // Payment schedule state
+  interface PaymentEntry {
+    id: string;
+    amount: number;
+    outstanding: number;
+    due_date: string;
+    created_at: string;
+    notes: string | null;
+    days_overdue: number;
+    days_until_due: number;
+    status: 'overdue' | 'upcoming';
+  }
+  interface PaymentSchedule {
+    supplier_id: string;
+    supplier_name: string;
+    payment_terms: string | null;
+    overdue: PaymentEntry[];
+    upcoming: PaymentEntry[];
+    total_overdue: number;
+    total_upcoming: number;
+  }
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentSchedule | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+
   // Purchase orders state
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [posLoading, setPosLoading] = useState(true);
@@ -139,11 +163,24 @@ export default function SupplierDetailPage() {
     }
   }, [id]);
 
+  const fetchPaymentSchedule = useCallback(async () => {
+    setScheduleLoading(true);
+    try {
+      const data = await get<PaymentSchedule>(`/suppliers/${id}/payment-schedule`);
+      setPaymentSchedule(data);
+    } catch {
+      setPaymentSchedule(null);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchSupplier();
     fetchBalance();
     fetchPurchaseOrders();
-  }, [fetchSupplier, fetchBalance, fetchPurchaseOrders]);
+    fetchPaymentSchedule();
+  }, [fetchSupplier, fetchBalance, fetchPurchaseOrders, fetchPaymentSchedule]);
 
   const openEditModal = () => {
     if (!supplier) return;
@@ -298,6 +335,76 @@ export default function SupplierDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Payment Schedule */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Schedule</h2>
+        {scheduleLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : !paymentSchedule || (paymentSchedule.overdue.length === 0 && paymentSchedule.upcoming.length === 0) ? (
+          <p className="text-sm text-gray-500 text-center py-8">
+            No scheduled payments. Payments will appear here after goods are received.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {paymentSchedule.total_overdue > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-medium text-red-800">Overdue</p>
+                  <p className="text-xl font-bold text-red-700">{formatCurrency(paymentSchedule.total_overdue)}</p>
+                  <p className="text-xs text-red-600">{paymentSchedule.overdue.length} payment{paymentSchedule.overdue.length > 1 ? 's' : ''}</p>
+                </div>
+              )}
+              {paymentSchedule.total_upcoming > 0 && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-sm font-medium text-blue-800">Upcoming</p>
+                  <p className="text-xl font-bold text-blue-700">{formatCurrency(paymentSchedule.total_upcoming)}</p>
+                  <p className="text-xs text-blue-600">{paymentSchedule.upcoming.length} payment{paymentSchedule.upcoming.length > 1 ? 's' : ''}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Overdue entries */}
+            {paymentSchedule.overdue.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-red-700 mb-2">Overdue Payments</h3>
+                <div className="space-y-2">
+                  {paymentSchedule.overdue.map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(entry.outstanding)}</p>
+                        <p className="text-xs text-gray-500">Due: {formatDate(entry.due_date)}</p>
+                      </div>
+                      <Badge variant="danger">{entry.days_overdue}d overdue</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming entries */}
+            {paymentSchedule.upcoming.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-blue-700 mb-2">Upcoming Payments</h3>
+                <div className="space-y-2">
+                  {paymentSchedule.upcoming.map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(entry.outstanding)}</p>
+                        <p className="text-xs text-gray-500">Due: {formatDate(entry.due_date)}</p>
+                      </div>
+                      <Badge variant="info">In {entry.days_until_due}d</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Purchase Orders */}

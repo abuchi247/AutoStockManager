@@ -408,3 +408,125 @@ class NotificationService:
             notifications.append(notification)
 
         return notifications
+
+    async def trigger_overdue_supplier_payment(
+        self,
+        supplier_id: UUID,
+        supplier_name: str,
+        amount: "Decimal",
+        days_overdue: int,
+    ) -> list[Notification]:
+        """Trigger overdue supplier payment notifications for Manager and Admin roles.
+
+        Notifies managers when a supplier payment is past its due date,
+        enabling timely follow-up to maintain supplier relationships.
+
+        Args:
+            supplier_id: UUID of the supplier with overdue payment.
+            supplier_name: Name of the supplier (for display).
+            amount: Outstanding amount that is overdue.
+            days_overdue: Number of days past the payment due date.
+
+        Returns:
+            List of created Notification instances.
+        """
+        from decimal import Decimal as Dec
+
+        target_roles = [UserRole.MANAGER.value, UserRole.ADMIN.value]
+        users = await self._get_users_by_roles(target_roles)
+
+        notifications = []
+        for user in users:
+            notification = await self.create_notification(
+                user_id=user.id,
+                notification_type=NotificationType.OVERDUE_SUPPLIER.value,
+                title="Overdue Supplier Payment",
+                message=(
+                    f"Payment to {supplier_name} is {days_overdue} days overdue. "
+                    f"Outstanding amount: {amount}. Please arrange payment."
+                ),
+                metadata={
+                    "supplier_id": str(supplier_id),
+                    "supplier_name": supplier_name,
+                    "amount": str(amount),
+                    "days_overdue": days_overdue,
+                },
+            )
+            notifications.append(notification)
+
+        return notifications
+
+    async def check_overdue_supplier_payments(self) -> int:
+        """Check all supplier ledger entries for overdue payments and send notifications.
+
+        Scans PURCHASE entries with payment_due_date in the past that still have
+        outstanding balance (not fully paid). Sends one notification per supplier
+        per day (deduplicates by checking recent notifications).
+
+        Returns:
+            Number of overdue suppliers notified.
+        """
+        from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
+        from app.models.supplier import Supplier
+        from decimal import Decimal
+
+        now = datetime.now(timezone.utc)
+
+        # Find suppliers with overdue PURCHASE entries (due date in the past)
+        overdue_stmt = (
+            select(
+                SupplierLedger.supplier_id,
+                func.sum(SupplierLedger.amount).label("total_outstanding"),
+                func.min(SupplierLedger.payment_due_date).label("earliest_due"),
+            )
+            .filter(
+                SupplierLedger.payment_due_date < now,
+                SupplierLedger.payment_due_date.isnot(None),
+            )
+            .group_by(SupplierLedger.supplier_id)
+            .having(func.sum(SupplierLedger.amount) > Decimal("0"))
+        )
+        result = await self.db.execute(overdue_stmt)
+        overdue_suppliers = result.all()
+
+        notified_count = 0
+        for row in overdue_suppliers:
+            supplier_id = row.supplier_id
+            outstanding = row.total_outstanding
+            earliest_due = row.earliest_due
+
+            if earliest_due.tzinfo is None:
+                earliest_due = earliest_due.replace(tzinfo=timezone.utc)
+            days_overdue = (now - earliest_due).days
+
+            if days_overdue <= 0:
+                continue
+
+            # Check if we already notified about this supplier today (dedup)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            existing_stmt = (
+                select(func.count(Notification.id))
+                .filter(
+                    Notification.notification_type == NotificationType.OVERDUE_SUPPLIER.value,
+                    Notification.created_at >= today_start,
+                    Notification.metadata["supplier_id"].astext == str(supplier_id),
+                )
+            )
+            existing_result = await self.db.execute(existing_stmt)
+            if (existing_result.scalar() or 0) > 0:
+                continue
+
+            # Get supplier name
+            supplier_stmt = select(Supplier.name).filter(Supplier.id == supplier_id)
+            supplier_result = await self.db.execute(supplier_stmt)
+            supplier_name = supplier_result.scalar_one_or_none() or "Unknown"
+
+            await self.trigger_overdue_supplier_payment(
+                supplier_id=supplier_id,
+                supplier_name=supplier_name,
+                amount=outstanding,
+                days_overdue=days_overdue,
+            )
+            notified_count += 1
+
+        return notified_count

@@ -26,6 +26,59 @@ from app.schemas.supplier import SupplierCreate, SupplierUpdate
 
 
 # =============================================================================
+# Payment Terms Utility
+# =============================================================================
+
+
+def parse_payment_terms_days(payment_terms: Optional[str]) -> Optional[int]:
+    """Parse a payment_terms string into the number of days until payment is due.
+
+    Supports: 'Net 7', 'Net 14', 'Net 30', 'Net 60', 'Net 90', 'COD', 'Prepaid'.
+
+    Returns:
+        Number of days, or None if terms are immediate/unparseable.
+        COD and Prepaid return 0 (due immediately).
+    """
+    if not payment_terms:
+        return None
+
+    terms = payment_terms.strip().lower()
+
+    if terms in ("cod", "prepaid", "cash on delivery"):
+        return 0
+
+    # Handle "Net X" patterns
+    import re
+    match = re.match(r"net\s*(\d+)", terms)
+    if match:
+        return int(match.group(1))
+
+    return None
+
+
+def calculate_payment_due_date(
+    payment_terms: Optional[str],
+    from_date: Optional[datetime] = None,
+) -> Optional[datetime]:
+    """Calculate payment due date from payment terms.
+
+    Args:
+        payment_terms: The supplier's payment terms string (e.g., "Net 30").
+        from_date: The starting date (GRN/receipt date). Defaults to now.
+
+    Returns:
+        The due date as a timezone-aware datetime, or None if terms are unparseable.
+    """
+    days = parse_payment_terms_days(payment_terms)
+    if days is None:
+        return None
+
+    from datetime import timedelta
+    base = from_date or datetime.now(timezone.utc)
+    return base + timedelta(days=days)
+
+
+# =============================================================================
 # Custom Exceptions
 # =============================================================================
 
@@ -345,11 +398,13 @@ class SupplierService:
         reference_id: UUID,
         created_by: UUID,
         notes: Optional[str] = None,
+        payment_due_date: Optional[datetime] = None,
     ) -> SupplierLedger:
         """Record a purchase debit entry in the supplier ledger.
 
         When goods are received from a supplier, the amount owed increases.
         This creates a positive (debit) entry in the supplier ledger.
+        Auto-calculates payment_due_date from supplier's payment_terms if not provided.
 
         Args:
             supplier_id: UUID of the supplier.
@@ -357,6 +412,7 @@ class SupplierService:
             reference_id: UUID of the originating purchase order or GRN.
             created_by: UUID of the user recording this entry.
             notes: Optional notes for the entry.
+            payment_due_date: Explicit due date. If None, auto-calculated from supplier terms.
 
         Returns:
             The created SupplierLedger entry.
@@ -368,8 +424,12 @@ class SupplierService:
         if amount <= Decimal("0"):
             raise ValueError("Purchase debit amount must be positive")
 
-        # Verify supplier exists
-        await self.get_supplier(supplier_id)
+        # Verify supplier exists and get payment terms
+        supplier = await self.get_supplier(supplier_id)
+
+        # Auto-calculate due date from supplier's payment terms if not provided
+        if payment_due_date is None:
+            payment_due_date = calculate_payment_due_date(supplier.payment_terms)
 
         entry = SupplierLedger(
             supplier_id=supplier_id,
@@ -379,6 +439,7 @@ class SupplierService:
             reference_id=reference_id,
             notes=notes,
             created_by=created_by,
+            payment_due_date=payment_due_date,
         )
         self.db.add(entry)
         await self.db.flush()
@@ -500,6 +561,7 @@ class SupplierService:
                     "amount": entry.amount,
                     "remaining": entry.amount,
                     "created_at": entry.created_at,
+                    "payment_due_date": entry.payment_due_date,
                 })
             else:
                 # Credit entry — accumulate for FIFO application
@@ -514,33 +576,42 @@ class SupplierService:
             debit["remaining"] -= apply
             remaining_credits -= apply
 
-        # Categorize remaining outstanding debits by age
+        # Categorize remaining outstanding debits by overdue status
+        # Uses payment_due_date if available, otherwise falls back to created_at
+        # Buckets represent days PAST DUE (not days since creation)
         buckets = {
-            "current": Decimal("0.00"),
-            "days_1_30": Decimal("0.00"),
-            "days_31_60": Decimal("0.00"),
-            "days_61_90": Decimal("0.00"),
-            "days_over_90": Decimal("0.00"),
+            "current": Decimal("0.00"),       # Not yet due or due today
+            "days_1_30": Decimal("0.00"),     # 1-30 days past due
+            "days_31_60": Decimal("0.00"),    # 31-60 days past due
+            "days_61_90": Decimal("0.00"),    # 61-90 days past due
+            "days_over_90": Decimal("0.00"),  # Over 90 days past due
         }
 
         for debit in debits:
             if debit["remaining"] <= Decimal("0"):
                 continue
 
-            # Calculate age in days
-            created_at = debit["created_at"]
-            if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=timezone.utc)
+            # Use payment_due_date for overdue calculation if available
+            due_date = debit["payment_due_date"]
+            if due_date:
+                if due_date.tzinfo is None:
+                    due_date = due_date.replace(tzinfo=timezone.utc)
+                # Overdue days = how many days past the due date
+                overdue_days = (as_of_date - due_date).days
+            else:
+                # Fallback: use created_at (legacy entries without due dates)
+                created_at = debit["created_at"]
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                overdue_days = (as_of_date - created_at).days
 
-            age_days = (as_of_date - created_at).days
-
-            if age_days <= 0:
+            if overdue_days <= 0:
                 buckets["current"] += debit["remaining"]
-            elif age_days <= 30:
+            elif overdue_days <= 30:
                 buckets["days_1_30"] += debit["remaining"]
-            elif age_days <= 60:
+            elif overdue_days <= 60:
                 buckets["days_31_60"] += debit["remaining"]
-            elif age_days <= 90:
+            elif overdue_days <= 90:
                 buckets["days_61_90"] += debit["remaining"]
             else:
                 buckets["days_over_90"] += debit["remaining"]

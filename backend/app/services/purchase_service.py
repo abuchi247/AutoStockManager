@@ -54,6 +54,7 @@ from app.models.purchase_order import (
     PurchaseOrderStatus,
 )
 from app.models.supplier_ledger import SupplierLedger, SupplierTransactionType
+from app.services.supplier_service import calculate_payment_due_date
 from app.utils.ledger import record_inventory_movement
 
 
@@ -391,6 +392,12 @@ class PurchaseService:
 
         # Record purchase debit in SupplierLedger for the total GRN amount
         if total_grn_amount > Decimal("0"):
+            # Fetch supplier's payment terms to calculate due date
+            from app.models.supplier import Supplier
+            supplier_stmt = select(Supplier.payment_terms).filter(Supplier.id == po.supplier_id)
+            supplier_result = await self.db.execute(supplier_stmt)
+            supplier_payment_terms = supplier_result.scalar_one_or_none()
+
             supplier_entry = SupplierLedger(
                 supplier_id=po.supplier_id,
                 transaction_type=SupplierTransactionType.PURCHASE.value,
@@ -399,6 +406,7 @@ class PurchaseService:
                 reference_id=grn.id,
                 notes=f"GRN for PO {po.id}",
                 created_by=received_by,
+                payment_due_date=calculate_payment_due_date(supplier_payment_terms),
             )
             self.db.add(supplier_entry)
 
