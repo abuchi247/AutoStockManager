@@ -126,22 +126,17 @@ class DashboardService:
         return kpi_data
 
     async def _get_total_sales_today(self) -> Decimal:
-        """Get the sum of confirmed sale total_amount for today.
+        """Get NET sales for today (gross sales - returns value).
 
-        Uses an aggregate SUM query filtered by status=CONFIRMED and
-        created_at within today's range (index-friendly).
-
-        Returns:
-            Total sales amount for today, or 0.00 if no sales.
+        Net = SUM(confirmed totals) - ABS(SUM(credit ledger RETURN amounts today))
         """
         today = date.today()
         today_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
-        tomorrow_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
-        # Calculate tomorrow
         from datetime import timedelta
         tomorrow_start = today_start + timedelta(days=1)
 
-        stmt = select(
+        # Gross sales
+        gross_stmt = select(
             func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
         ).where(
             and_(
@@ -150,28 +145,39 @@ class DashboardService:
                 Sale.created_at < tomorrow_start,
             )
         )
-        result = await self.db.execute(stmt)
-        return result.scalar() or Decimal("0.00")
+        gross_result = await self.db.execute(gross_stmt)
+        gross = gross_result.scalar() or Decimal("0.00")
+
+        # Returns value from credit ledger (RETURN entries are negative amounts)
+        returns_stmt = select(
+            func.coalesce(func.sum(CustomerCreditLedger.amount), Decimal("0.00"))
+        ).where(
+            and_(
+                CustomerCreditLedger.transaction_type == "RETURN",
+                CustomerCreditLedger.created_at >= today_start,
+                CustomerCreditLedger.created_at < tomorrow_start,
+            )
+        )
+        returns_result = await self.db.execute(returns_stmt)
+        returns_value = abs(returns_result.scalar() or Decimal("0.00"))
+
+        return gross - returns_value
 
     async def _get_total_sales_month(self) -> Decimal:
-        """Get the sum of confirmed sale total_amount for the current month.
+        """Get NET sales for the current month (gross sales - returns value).
 
-        Uses an aggregate SUM query filtered by status=CONFIRMED and
-        created_at within the current calendar month (index-friendly range).
-
-        Returns:
-            Total sales amount for this month, or 0.00 if no sales.
+        Net = SUM(confirmed totals) - ABS(SUM(credit ledger RETURN amounts this month))
         """
         today = date.today()
         first_of_month = datetime(today.year, today.month, 1, tzinfo=timezone.utc)
-        # Next month start
         from datetime import timedelta
         if today.month == 12:
             next_month_start = datetime(today.year + 1, 1, 1, tzinfo=timezone.utc)
         else:
             next_month_start = datetime(today.year, today.month + 1, 1, tzinfo=timezone.utc)
 
-        stmt = select(
+        # Gross sales
+        gross_stmt = select(
             func.coalesce(func.sum(Sale.total_amount), Decimal("0.00"))
         ).where(
             and_(
@@ -180,8 +186,23 @@ class DashboardService:
                 Sale.created_at < next_month_start,
             )
         )
-        result = await self.db.execute(stmt)
-        return result.scalar() or Decimal("0.00")
+        gross_result = await self.db.execute(gross_stmt)
+        gross = gross_result.scalar() or Decimal("0.00")
+
+        # Returns value from credit ledger
+        returns_stmt = select(
+            func.coalesce(func.sum(CustomerCreditLedger.amount), Decimal("0.00"))
+        ).where(
+            and_(
+                CustomerCreditLedger.transaction_type == "RETURN",
+                CustomerCreditLedger.created_at >= first_of_month,
+                CustomerCreditLedger.created_at < next_month_start,
+            )
+        )
+        returns_result = await self.db.execute(returns_stmt)
+        returns_value = abs(returns_result.scalar() or Decimal("0.00"))
+
+        return gross - returns_value
 
     async def _get_outstanding_receivables(self) -> Decimal:
         """Get the total outstanding customer receivables.

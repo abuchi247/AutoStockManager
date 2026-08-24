@@ -116,10 +116,17 @@ class TestRoleBasedVisibility:
     @pytest.mark.asyncio
     async def test_salesperson_sees_only_sales_kpis(self, service, mock_db):
         """Salesperson gets only total_sales_today and total_sales_month."""
-        # Mock all query results
-        mock_result = MagicMock()
-        mock_result.scalar.return_value = Decimal("1000.00")
-        mock_db.execute.return_value = mock_result
+        mock_result_sales = MagicMock()
+        mock_result_sales.scalar.return_value = Decimal("1000.00")
+        mock_result_returns = MagicMock()
+        mock_result_returns.scalar.return_value = Decimal("0.00")
+
+        mock_db.execute.side_effect = [
+            mock_result_sales,    # _get_total_sales_today gross
+            mock_result_returns,  # _get_total_sales_today returns
+            mock_result_sales,    # _get_total_sales_month gross
+            mock_result_returns,  # _get_total_sales_month returns
+        ]
 
         kpi = await service.get_kpis(UserRole.SALESPERSON.value)
 
@@ -134,9 +141,11 @@ class TestRoleBasedVisibility:
     @pytest.mark.asyncio
     async def test_manager_sees_all_kpis(self, service, mock_db):
         """Manager gets all KPI data."""
-        # Mock scalar results for different queries
         mock_result_sales = MagicMock()
         mock_result_sales.scalar.return_value = Decimal("5000.00")
+
+        mock_result_returns = MagicMock()
+        mock_result_returns.scalar.return_value = Decimal("0.00")
 
         mock_result_receivables = MagicMock()
         mock_result_receivables.scalar.return_value = Decimal("25000.00")
@@ -151,8 +160,10 @@ class TestRoleBasedVisibility:
         mock_result_top_products.all.return_value = []
 
         mock_db.execute.side_effect = [
-            mock_result_sales,       # total_sales_today
-            mock_result_sales,       # total_sales_month
+            mock_result_sales,       # _get_total_sales_today gross
+            mock_result_returns,     # _get_total_sales_today returns
+            mock_result_sales,       # _get_total_sales_month gross
+            mock_result_returns,     # _get_total_sales_month returns
             mock_result_receivables, # outstanding_receivables
             mock_result_low_stock,   # low_stock_count
             mock_result_pending_po,  # pending_po_count
@@ -174,6 +185,9 @@ class TestRoleBasedVisibility:
         mock_result_sales = MagicMock()
         mock_result_sales.scalar.return_value = Decimal("10000.00")
 
+        mock_result_returns = MagicMock()
+        mock_result_returns.scalar.return_value = Decimal("0.00")
+
         mock_result_receivables = MagicMock()
         mock_result_receivables.scalar.return_value = Decimal("50000.00")
 
@@ -187,8 +201,10 @@ class TestRoleBasedVisibility:
         mock_result_top_products.all.return_value = []
 
         mock_db.execute.side_effect = [
-            mock_result_sales,       # total_sales_today
-            mock_result_sales,       # total_sales_month
+            mock_result_sales,       # _get_total_sales_today gross
+            mock_result_returns,     # _get_total_sales_today returns
+            mock_result_sales,       # _get_total_sales_month gross
+            mock_result_returns,     # _get_total_sales_month returns
             mock_result_receivables, # outstanding_receivables
             mock_result_low_stock,   # low_stock_count
             mock_result_pending_po,  # pending_po_count
@@ -209,6 +225,9 @@ class TestRoleBasedVisibility:
         mock_result_sales = MagicMock()
         mock_result_sales.scalar.return_value = Decimal("2000.00")
 
+        mock_result_returns = MagicMock()
+        mock_result_returns.scalar.return_value = Decimal("0.00")
+
         mock_result_low_stock = MagicMock()
         mock_result_low_stock.scalar.return_value = 4
 
@@ -216,8 +235,10 @@ class TestRoleBasedVisibility:
         mock_result_pending_po.scalar.return_value = 2
 
         mock_db.execute.side_effect = [
-            mock_result_sales,      # total_sales_today
-            mock_result_sales,      # total_sales_month
+            mock_result_sales,      # _get_total_sales_today gross
+            mock_result_returns,    # _get_total_sales_today returns
+            mock_result_sales,      # _get_total_sales_month gross
+            mock_result_returns,    # _get_total_sales_month returns
             mock_result_low_stock,  # low_stock_count
             mock_result_pending_po, # pending_po_count
         ]
@@ -242,10 +263,12 @@ class TestSalesKPIs:
 
     @pytest.mark.asyncio
     async def test_total_sales_today_returns_sum(self, service, mock_db):
-        """_get_total_sales_today returns the aggregated sum."""
-        mock_result = MagicMock()
-        mock_result.scalar.return_value = Decimal("7500.50")
-        mock_db.execute.return_value = mock_result
+        """_get_total_sales_today returns the aggregated sum (net of returns)."""
+        mock_gross = MagicMock()
+        mock_gross.scalar.return_value = Decimal("7500.50")
+        mock_returns = MagicMock()
+        mock_returns.scalar.return_value = Decimal("0.00")
+        mock_db.execute.side_effect = [mock_gross, mock_returns]
 
         result = await service._get_total_sales_today()
         assert result == Decimal("7500.50")
@@ -253,19 +276,23 @@ class TestSalesKPIs:
     @pytest.mark.asyncio
     async def test_total_sales_today_returns_zero_when_no_sales(self, service, mock_db):
         """_get_total_sales_today returns 0.00 when there are no sales."""
-        mock_result = MagicMock()
-        mock_result.scalar.return_value = None
-        mock_db.execute.return_value = mock_result
+        mock_gross = MagicMock()
+        mock_gross.scalar.return_value = None
+        mock_returns = MagicMock()
+        mock_returns.scalar.return_value = None
+        mock_db.execute.side_effect = [mock_gross, mock_returns]
 
         result = await service._get_total_sales_today()
         assert result == Decimal("0.00")
 
     @pytest.mark.asyncio
     async def test_total_sales_month_returns_sum(self, service, mock_db):
-        """_get_total_sales_month returns the aggregated sum."""
-        mock_result = MagicMock()
-        mock_result.scalar.return_value = Decimal("125000.00")
-        mock_db.execute.return_value = mock_result
+        """_get_total_sales_month returns the aggregated sum (net of returns)."""
+        mock_gross = MagicMock()
+        mock_gross.scalar.return_value = Decimal("125000.00")
+        mock_returns = MagicMock()
+        mock_returns.scalar.return_value = Decimal("0.00")
+        mock_db.execute.side_effect = [mock_gross, mock_returns]
 
         result = await service._get_total_sales_month()
         assert result == Decimal("125000.00")
@@ -273,9 +300,11 @@ class TestSalesKPIs:
     @pytest.mark.asyncio
     async def test_total_sales_month_returns_zero_when_no_sales(self, service, mock_db):
         """_get_total_sales_month returns 0.00 when there are no sales."""
-        mock_result = MagicMock()
-        mock_result.scalar.return_value = None
-        mock_db.execute.return_value = mock_result
+        mock_gross = MagicMock()
+        mock_gross.scalar.return_value = None
+        mock_returns = MagicMock()
+        mock_returns.scalar.return_value = None
+        mock_db.execute.side_effect = [mock_gross, mock_returns]
 
         result = await service._get_total_sales_month()
         assert result == Decimal("0.00")

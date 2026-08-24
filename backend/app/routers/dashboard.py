@@ -322,8 +322,22 @@ async def get_profit_summary(
     ).where(and_(*revenue_conditions))
     rev_result = await db.execute(rev_stmt)
     rev_row = rev_result.one()
-    total_revenue = rev_row[0] or Decimal("0.00")
+    gross_revenue = rev_row[0] or Decimal("0.00")
     sale_count = int(rev_row[1])
+
+    # ── Returns (subtract from revenue) ───────────────────────────────────────
+    from app.models.customer_credit_ledger import CustomerCreditLedger
+    returns_conditions = [CustomerCreditLedger.transaction_type == "RETURN"]
+    if start_dt:
+        returns_conditions.append(CustomerCreditLedger.created_at >= start_dt)
+
+    returns_stmt = select(
+        func.coalesce(func.sum(CustomerCreditLedger.amount), Decimal("0"))
+    ).where(and_(*returns_conditions))
+    returns_result = await db.execute(returns_stmt)
+    returns_value = abs(returns_result.scalar() or Decimal("0.00"))
+
+    total_revenue = gross_revenue - returns_value
 
     # ── COGS ──────────────────────────────────────────────────────────────────
     cogs_conditions = [Sale.status == SaleStatus.CONFIRMED]
