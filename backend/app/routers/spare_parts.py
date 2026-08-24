@@ -66,6 +66,7 @@ async def list_spare_parts(
     search: Optional[str] = Query(default=None, description="Search by name, part number, or barcode"),
     brand: Optional[str] = Query(default=None, description="Filter by brand"),
     category_id: Optional[str] = Query(default=None, description="Filter by category ID"),
+    include_zero_stock: bool = Query(default=False, description="When true with location_id, show all parts (not just those with stock)"),
 ) -> SparePartListResponse:
     """List all active spare parts with pagination and filters.
 
@@ -96,36 +97,54 @@ async def list_spare_parts(
         base_filter.append(SP.category_id == cat_uuid)
 
     if location_id:
-        # Join with stock cache to filter by location
+        # Join with stock cache to get stock at this location
         loc_uuid = UUIDType(location_id)
 
-        count_stmt = (
-            select(func.count(SP.id.distinct()))
-            .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
-            .filter(
-                *base_filter,
-                StockStatusCache.location_id == loc_uuid,
-                StockStatusCache.current_quantity > 0,
+        if not include_zero_stock:
+            # Original behavior: only show parts with stock > 0 at location
+            count_stmt = (
+                select(func.count(SP.id.distinct()))
+                .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
+                .filter(
+                    *base_filter,
+                    StockStatusCache.location_id == loc_uuid,
+                    StockStatusCache.current_quantity > 0,
+                )
             )
-        )
-        total_result = await db.execute(count_stmt)
-        total = total_result.scalar() or 0
+            total_result = await db.execute(count_stmt)
+            total = total_result.scalar() or 0
 
-        offset = (page - 1) * page_size
-        stmt = (
-            select(SP)
-            .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
-            .filter(
-                *base_filter,
-                StockStatusCache.location_id == loc_uuid,
-                StockStatusCache.current_quantity > 0,
+            offset = (page - 1) * page_size
+            stmt = (
+                select(SP)
+                .join(StockStatusCache, StockStatusCache.spare_part_id == SP.id)
+                .filter(
+                    *base_filter,
+                    StockStatusCache.location_id == loc_uuid,
+                    StockStatusCache.current_quantity > 0,
+                )
+                .order_by(SP.name.asc())
+                .offset(offset)
+                .limit(page_size)
             )
-            .order_by(SP.name.asc())
-            .offset(offset)
-            .limit(page_size)
-        )
-        result = await db.execute(stmt)
-        spare_parts = list(result.scalars().all())
+            result = await db.execute(stmt)
+            spare_parts = list(result.scalars().all())
+        else:
+            # Show ALL parts matching filters, regardless of stock at location
+            count_stmt = select(func.count(SP.id)).filter(*base_filter)
+            total_result = await db.execute(count_stmt)
+            total = total_result.scalar() or 0
+
+            offset = (page - 1) * page_size
+            stmt = (
+                select(SP)
+                .filter(*base_filter)
+                .order_by(SP.name.asc())
+                .offset(offset)
+                .limit(page_size)
+            )
+            result = await db.execute(stmt)
+            spare_parts = list(result.scalars().all())
 
         # Get stock at this specific location
         stock_map = {}
