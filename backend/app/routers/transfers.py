@@ -351,7 +351,7 @@ async def cancel_transfer(
     request: TransferCancel,
     db: DbSession,
     current_user: User = Depends(
-        require_permission("transfer_approval")
+        require_permission("transfers")
     ),
 ) -> TransferResponse:
     """Cancel a transfer that has not yet been received.
