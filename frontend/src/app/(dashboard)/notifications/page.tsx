@@ -82,9 +82,8 @@ export default function NotificationsPage() {
   const [total, setTotal] = useState(0);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [markingId, setMarkingId] = useState<string | null>(null);
-  const pageSize = 20;
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('unread');
+  const pageSize = 10;
 
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -93,11 +92,16 @@ export default function NotificationsPage() {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('page_size', String(pageSize));
+      if (filter === 'unread') params.set('unread_only', 'true');
 
       const response = await get<PaginatedResponse<Notification>>(
         `/notifications?${params.toString()}`
       );
-      setNotifications(response.data);
+      // Client-side filter for 'read' tab (backend only has unread_only filter)
+      const filtered = filter === 'read'
+        ? response.data.filter((n) => n.is_read)
+        : response.data;
+      setNotifications(filtered);
       setTotal(response.meta.total);
       setTotalPages(Math.ceil((response.meta.total || 0) / pageSize));
     } catch (err: unknown) {
@@ -106,7 +110,7 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page]);
+  }, [page, filter]);
 
   useEffect(() => {
     fetchNotifications();
@@ -189,11 +193,8 @@ export default function NotificationsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Notifications</h1>
-          {unreadCount > 0 && (
-            <Badge variant="danger">{unreadCount} unread</Badge>
-          )}
         </div>
-        {notifications.length > 0 && unreadCount > 0 && (
+        {notifications.length > 0 && filter === 'unread' && (
           <Button
             variant="secondary"
             size="sm"
@@ -203,6 +204,24 @@ export default function NotificationsPage() {
             Mark All Read
           </Button>
         )}
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
+        {(['unread', 'all', 'read'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => { setFilter(tab); setPage(1); }}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              filter === tab
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab === 'unread' ? 'Unread' : tab === 'read' ? 'Read' : 'All'}
+          </button>
+        ))}
       </div>
 
       {/* Error display */}
