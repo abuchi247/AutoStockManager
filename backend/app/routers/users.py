@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import DbSession, AppSettings, CurrentUser
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
 from app.schemas.user import (
@@ -141,7 +142,7 @@ async def change_own_password(
 )
 async def list_users(
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("user_management")),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
 ) -> UserListResponse:
@@ -190,7 +191,7 @@ async def create_user(
     request: UserCreate,
     db: DbSession,
     settings: AppSettings,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("user_management")),
 ) -> UserResponse:
     """Create a new user account.
 
@@ -258,7 +259,7 @@ async def create_user(
 async def get_user(
     user_id: UUID,
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("user_management")),
 ) -> UserResponse:
     """Get a single user by ID.
 
@@ -295,7 +296,7 @@ async def update_user(
     user_id: UUID,
     request: UserUpdate,
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("user_management")),
 ) -> UserResponse:
     """Update a user's profile.
 

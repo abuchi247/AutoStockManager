@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.business_settings import BusinessSettings
 from app.models.user import User, UserRole
 from app.schemas.business_settings import (
@@ -111,7 +112,7 @@ async def get_business_settings(
 async def update_business_settings(
     request: BusinessSettingsUpdate,
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("system_settings")),
 ) -> BusinessSettingsResponse:
     """Update business settings. Admin only."""
     settings = await _get_or_create_settings(db)

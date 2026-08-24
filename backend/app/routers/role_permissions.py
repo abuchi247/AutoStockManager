@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies import CurrentUser, DbSession
 from app.middleware.auth import require_roles
+from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.initial_data import ALL_PERMISSIONS
 from app.schemas.role_permission import (
@@ -37,7 +38,7 @@ router = APIRouter(prefix="/api/v1/role-permissions", tags=["Role Permissions"])
 )
 async def get_permissions(
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("system_settings")),
 ) -> RolePermissionsResponse:
     """Return all roles with their current permission assignments."""
     roles_data = await get_all_role_permissions(db)
@@ -70,7 +71,7 @@ async def update_permissions(
     role: str,
     request: UpdateRolePermissionsRequest,
     db: DbSession,
-    current_user: User = Depends(require_roles(UserRole.ADMIN)),
+    current_user: User = Depends(require_permission("system_settings")),
 ) -> UpdateRolePermissionsResponse:
     """Update permissions for a role.
 
