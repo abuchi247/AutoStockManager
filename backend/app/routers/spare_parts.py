@@ -94,7 +94,16 @@ async def list_spare_parts(
 
     if category_id:
         cat_uuid = UUIDType(category_id)
-        base_filter.append(SP.category_id == cat_uuid)
+        # Include items in this category AND its child categories (hierarchical filter)
+        from app.models.category import Category
+        child_stmt = select(Category.id).filter(
+            Category.parent_id == cat_uuid,
+            Category.deleted_at.is_(None),
+        )
+        child_result = await db.execute(child_stmt)
+        child_ids = [row[0] for row in child_result.all()]
+        all_cat_ids = [cat_uuid] + child_ids
+        base_filter.append(SP.category_id.in_(all_cat_ids))
 
     if location_id:
         # Join with stock cache to get stock at this location
