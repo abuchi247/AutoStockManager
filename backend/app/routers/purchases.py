@@ -149,6 +149,20 @@ async def create_purchase_order(
     )
     await db.commit()
     await db.refresh(po)
+
+    # Notify managers/admins that a new PO needs approval
+    from app.services.notification_service import NotificationService
+    from app.models.supplier import Supplier
+    supplier_result = await db.execute(select(Supplier.name).filter(Supplier.id == request.supplier_id))
+    supplier_name = supplier_result.scalar_one_or_none() or "Unknown"
+    notification_service = NotificationService(db=db)
+    await notification_service.trigger_pending_approval(
+        entity_type="purchase_order",
+        entity_id=po.id,
+        hours_pending=0,
+    )
+    await db.commit()
+
     return PurchaseOrderResponse.model_validate(po)
 
 
@@ -291,6 +305,78 @@ async def receive_goods(
             items=items,
             notes=request.notes,
         )
+
+        # Check for quantity discrepancies and notify managers
+        from app.services.notification_service import NotificationService
+        from app.models.notification import NotificationType
+        from app.models.supplier import Supplier
+        from decimal import Decimal
+
+        notification_service = NotificationService(db=db)
+
+        # Get PO with items for discrepancy check
+        po_stmt = (
+            select(PurchaseOrder)
+            .options(selectinload(PurchaseOrder.items))
+            .filter(PurchaseOrder.id == po_id)
+        )
+        po_result = await db.execute(po_stmt)
+        po = po_result.scalar_one_or_none()
+
+        # Get supplier name for notification message
+        supplier_name = "Unknown"
+        if po:
+            sup_result = await db.execute(select(Supplier.name).filter(Supplier.id == po.supplier_id))
+            supplier_name = sup_result.scalar_one_or_none() or "Unknown"
+
+        # Notify managers that goods were received
+        from app.models.user import UserRole as UR
+        target_users = await notification_service._get_users_by_roles([UR.MANAGER.value, UR.ADMIN.value])
+        total_received = sum(item.quantity_received for item in request.items)
+        for user in target_users:
+            await notification_service.create_notification(
+                user_id=user.id,
+                notification_type=NotificationType.SYSTEM.value,
+                title="Goods Received",
+                message=f"GRN processed for PO from {supplier_name}. {len(request.items)} item(s), {total_received} units received.",
+                metadata={
+                    "entity_type": "grn",
+                    "entity_id": str(grn.id),
+                    "po_id": str(po_id),
+                    "supplier_name": supplier_name,
+                },
+            )
+
+        # Discrepancy alert: if any item received significantly less than ordered
+        if po and po.items:
+            po_items_map = {str(pi.id): pi for pi in po.items}
+            discrepancies = []
+            for req_item in request.items:
+                po_item = po_items_map.get(str(req_item.po_item_id))
+                if po_item:
+                    ordered = float(po_item.quantity_ordered)
+                    already_received = float(po_item.quantity_received)
+                    remaining = ordered - already_received
+                    received_now = float(req_item.quantity_received)
+                    # Flag if received is less than 80% of remaining expected
+                    if remaining > 0 and received_now < remaining * 0.8 and (remaining - received_now) > 1:
+                        discrepancies.append(f"{po_item.spare_part_id}: received {received_now}/{remaining} expected")
+
+            if discrepancies:
+                for user in target_users:
+                    await notification_service.create_notification(
+                        user_id=user.id,
+                        notification_type=NotificationType.SYSTEM.value,
+                        title="GRN Quantity Discrepancy",
+                        message=f"Goods from {supplier_name} received with quantity discrepancies. {len(discrepancies)} item(s) received significantly less than ordered.",
+                        metadata={
+                            "entity_type": "grn_discrepancy",
+                            "entity_id": str(grn.id),
+                            "po_id": str(po_id),
+                            "discrepancies": discrepancies[:5],
+                        },
+                    )
+
         await db.commit()
         await db.refresh(grn)
         return GRNResponse.model_validate(grn)
