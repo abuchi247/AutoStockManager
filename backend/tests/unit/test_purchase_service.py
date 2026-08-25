@@ -288,7 +288,7 @@ class TestReceiveGoods:
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
 
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         grn_items = [
             {
@@ -337,7 +337,7 @@ class TestReceiveGoods:
         mock_result_po.scalar_one_or_none.return_value = po
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         grn_items = [{"po_item_id": po_item_id, "quantity_received": Decimal("5")}]
 
@@ -379,7 +379,7 @@ class TestReceiveGoods:
         mock_result_po.scalar_one_or_none.return_value = po
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         # Receive only 5 of 10 ordered
         grn_items = [{"po_item_id": po_item_id, "quantity_received": Decimal("5")}]
@@ -420,7 +420,7 @@ class TestReceiveGoods:
         mock_result_po.scalar_one_or_none.return_value = po
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         # Receive all 10 of 10 ordered
         grn_items = [{"po_item_id": po_item_id, "quantity_received": Decimal("10")}]
@@ -527,7 +527,7 @@ class TestReceiveGoods:
         mock_result_po.scalar_one_or_none.return_value = po
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         grn_items = [{"po_item_id": po_item_id, "quantity_received": Decimal("10")}]
 
@@ -579,7 +579,7 @@ class TestReceiveGoods:
         mock_result_po.scalar_one_or_none.return_value = po
         mock_cache_result = MagicMock()
         mock_cache_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00")))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
+        mock_db.execute.side_effect = [mock_result_po, mock_cache_result, MagicMock(scalar_one_or_none=MagicMock(return_value=MagicMock(cost_price=Decimal("50.00"), selling_price=100.0, price_review_needed=False))), MagicMock(scalar_one_or_none=MagicMock(return_value="Net 30"))]
 
         grn_items = [{"po_item_id": po_item_id, "quantity_received": Decimal("10")}]
 

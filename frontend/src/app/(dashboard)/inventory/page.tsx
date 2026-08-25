@@ -236,13 +236,20 @@ export default function InventoryPage() {
       header: 'Name',
       sortable: true,
       render: (item) => (
-        <button
-          type="button"
-          className="text-left text-blue-600 hover:text-blue-800 hover:underline"
-          onClick={() => router.push(`/inventory/${item.id}`)}
-        >
-          {item.name}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="text-left text-blue-600 hover:text-blue-800 hover:underline"
+            onClick={() => router.push(`/inventory/${item.id}`)}
+          >
+            {item.name}
+          </button>
+          {item.price_review_needed && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700" title="Selling price needs review — margin eroded">
+              ⚠ Price
+            </span>
+          )}
+        </div>
       ),
     },
     {

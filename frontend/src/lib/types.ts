@@ -148,6 +148,7 @@ export interface SparePart {
   min_stock_level: number;
   max_stock_level: number;
   reorder_quantity: number;
+  price_review_needed?: boolean;
   total_stock?: number;
   created_at: string;
   updated_at: string;

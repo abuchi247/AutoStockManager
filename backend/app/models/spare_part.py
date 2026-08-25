@@ -164,6 +164,13 @@ class SparePart(BaseModel, SoftDeleteMixin):
         comment="Default quantity to reorder when stock is low",
     )
 
+    price_review_needed: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment="Flag indicating selling price needs review due to cost increase eroding margin",
+    )
+
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------

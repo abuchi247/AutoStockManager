@@ -392,6 +392,14 @@ class PurchaseService:
             spare_part = part_result.scalar_one_or_none()
             if spare_part:
                 spare_part.cost_price = unit_cost
+                # Check if margin has eroded below threshold (15%)
+                # Margin = (selling - cost) / selling * 100
+                if spare_part.selling_price and spare_part.selling_price > 0:
+                    margin_pct = ((spare_part.selling_price - float(unit_cost)) / spare_part.selling_price) * 100
+                    if margin_pct < 15:
+                        spare_part.price_review_needed = True
+                    else:
+                        spare_part.price_review_needed = False
 
             total_grn_amount += quantity_received * unit_cost
 

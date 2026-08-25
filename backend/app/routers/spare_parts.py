@@ -522,3 +522,103 @@ async def delete_spare_part(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Spare part not found",
         )
+
+
+
+@router.get(
+    "/price-review",
+    response_model=SparePartListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List items needing price review",
+    description="Returns spare parts flagged for price review due to margin erosion from cost increases.",
+)
+async def list_price_review_items(
+    db: DbSession,
+    current_user: CurrentUser,
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> SparePartListResponse:
+    """List all spare parts where price_review_needed is True.
+
+    These are items where a recent cost increase has eroded the selling
+    margin below the acceptable threshold (15%). The owner should review
+    and update selling prices for these items.
+    """
+    from app.models.spare_part import SparePart as SP
+
+    base_filter = [SP.deleted_at.is_(None), SP.price_review_needed.is_(True)]
+
+    count_stmt = select(func.count(SP.id)).filter(*base_filter)
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+
+    offset = (page - 1) * page_size
+    stmt = (
+        select(SP)
+        .filter(*base_filter)
+        .order_by(SP.name.asc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    result = await db.execute(stmt)
+    spare_parts = list(result.scalars().all())
+
+    # Get total stock for each part
+    part_ids = [sp.id for sp in spare_parts]
+    stock_map: dict = {}
+    if part_ids:
+        stock_stmt = (
+            select(
+                StockStatusCache.spare_part_id,
+                func.sum(StockStatusCache.current_quantity).label("total_stock"),
+            )
+            .filter(StockStatusCache.spare_part_id.in_(part_ids))
+            .group_by(StockStatusCache.spare_part_id)
+        )
+        stock_result = await db.execute(stock_stmt)
+        stock_map = {row.spare_part_id: row.total_stock for row in stock_result}
+
+    data = []
+    for sp in spare_parts:
+        resp = SparePartResponse.model_validate(sp)
+        resp.total_stock = stock_map.get(sp.id)
+        data.append(resp)
+
+    return SparePartListResponse(
+        data=data,
+        meta={"page": page, "total": total, "page_size": page_size},
+    )
+
+
+@router.post(
+    "/{spare_part_id}/dismiss-price-review",
+    status_code=status.HTTP_200_OK,
+    summary="Dismiss price review flag",
+    description="Clear the price_review_needed flag after reviewing/updating the selling price.",
+)
+async def dismiss_price_review(
+    spare_part_id: UUID,
+    db: DbSession,
+    current_user: User = Depends(require_permission("inventory")),
+) -> dict:
+    """Clear the price review flag for a spare part.
+
+    Called after the owner reviews the margin and either updates the
+    selling price or consciously accepts the lower margin.
+    """
+    from app.models.spare_part import SparePart as SP
+
+    stmt = select(SP).filter(SP.id == spare_part_id, SP.deleted_at.is_(None))
+    result = await db.execute(stmt)
+    part = result.scalar_one_or_none()
+
+    if not part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spare part not found",
+        )
+
+    part.price_review_needed = False
+    await db.commit()
+
+    return {"message": "Price review dismissed", "spare_part_id": str(spare_part_id)}

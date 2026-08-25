@@ -429,6 +429,42 @@ export default function InventoryDetailPage() {
         {/* Pricing & Stock */}
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">Pricing & Stock</h2>
+          {part.price_review_needed && (
+            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-600 text-lg">⚠</span>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Price Review Needed</p>
+                    <p className="text-xs text-amber-600">
+                      Cost increased — margin is below 15%. Consider updating the selling price.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await post(`/spare-parts/${partId}/dismiss-price-review`);
+                        fetchPart();
+                      } catch { /* ignore */ }
+                    }}
+                    className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEdit}
+                    className="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                  >
+                    Update Price
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <dl className="space-y-3">
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Cost Price</dt>
