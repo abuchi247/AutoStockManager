@@ -100,7 +100,9 @@ export default function ReportsPage() {
       params.set('start_date', startDate);
       params.set('end_date', endDate);
       params.set('format', format);
-      if (locationFilter) params.set('location_id', locationFilter);
+      if (locationFilter && (reportType === 'sales' || reportType === 'inventory')) {
+        params.set('location_id', locationFilter);
+      }
       if (reportType === 'customer' && customerFilter) {
         params.set('customer_id', customerFilter);
       }
@@ -241,14 +243,16 @@ export default function ReportsPage() {
             />
           </div>
 
-          {/* Location Filter (always available) */}
-          <Input
-            label="Location ID"
-            placeholder="Filter by location (optional)"
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            aria-label="Filter by location"
-          />
+          {/* Location Filter (only sales and inventory reports use it) */}
+          {(reportType === 'sales' || reportType === 'inventory') && (
+            <Input
+              label="Location ID"
+              placeholder="Filter by location (optional)"
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              aria-label="Filter by location"
+            />
+          )}
 
           {/* Customer Filter (for customer reports) */}
           {reportType === 'customer' && (
