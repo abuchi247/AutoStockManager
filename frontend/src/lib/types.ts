@@ -561,7 +561,9 @@ export type NotificationType =
   | 'low_stock'
   | 'credit_limit_exceeded'
   | 'overdue_customer'
-  | 'pending_approval';
+  | 'overdue_supplier'
+  | 'pending_approval'
+  | 'system';
 
 export interface Notification {
   id: string;

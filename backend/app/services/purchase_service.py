@@ -493,9 +493,13 @@ class PurchaseService:
 
         po.status = PurchaseOrderStatus.CANCELLED
 
-        # Store reason in notes (append if existing notes)
+        # Store reason in notes with username (append if existing notes)
         if reason:
-            cancel_note = f"[CANCELLED by {cancelled_by}]: {reason}"
+            from app.models.user import User
+            user_stmt = select(User.username).filter(User.id == cancelled_by)
+            user_result = await self.db.execute(user_stmt)
+            username = user_result.scalar_one_or_none() or str(cancelled_by)
+            cancel_note = f"[CANCELLED by {username}]: {reason}"
             if po.notes:
                 po.notes = f"{po.notes}\n{cancel_note}"
             else:
