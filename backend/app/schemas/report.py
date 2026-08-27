@@ -27,6 +27,8 @@ class SalesReportRowSchema(BaseModel):
     sale_date: datetime
     customer_name: Optional[str] = None
     location_id: UUID
+    location_name: Optional[str] = None
+    salesperson_name: Optional[str] = None
     total_amount: Decimal
     discount_total: Decimal
     tax_amount: Decimal
@@ -64,7 +66,9 @@ class InventoryReportRowSchema(BaseModel):
     name: str
     brand: Optional[str] = None
     category_id: Optional[UUID] = None
+    category_name: Optional[str] = None
     location_id: Optional[UUID] = None
+    location_name: Optional[str] = None
     current_quantity: Decimal
     unit_cost: Decimal
     stock_value: Decimal

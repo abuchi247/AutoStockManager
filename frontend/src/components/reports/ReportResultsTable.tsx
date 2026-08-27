@@ -27,13 +27,28 @@ export function toColumnHeader(key: string): string {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+// Raw UUID / internal columns hidden from report display — we show the
+// human-readable name columns instead (location_name, category_name, etc.)
+const HIDDEN_COLUMNS = new Set([
+  'sale_id',
+  'location_id',
+  'customer_id',
+  'supplier_id',
+  'category_id',
+  'subcategory_id',
+  'spare_part_id',
+  'salesperson_id',
+]);
+
 export function buildReportColumns(rows: ReportRow[]): Column<ReportRow>[] {
   if (rows.length === 0) return [];
-  return Object.keys(rows[0]).map((key) => ({
-    key,
-    header: toColumnHeader(key),
-    render: (item: ReportRow) => <span>{formatReportCell(item[key])}</span>,
-  }));
+  return Object.keys(rows[0])
+    .filter((key) => !HIDDEN_COLUMNS.has(key))
+    .map((key) => ({
+      key,
+      header: toColumnHeader(key),
+      render: (item: ReportRow) => <span>{formatReportCell(item[key])}</span>,
+    }));
 }
 
 interface ReportResultsTableProps {

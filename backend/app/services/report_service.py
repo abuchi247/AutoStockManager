@@ -88,6 +88,8 @@ class SalesReportRow:
     tax_amount: Decimal
     cost_of_goods_sold: Decimal
     gross_margin: Decimal
+    location_name: Optional[str] = None
+    salesperson_name: Optional[str] = None
 
 
 @dataclass
@@ -119,6 +121,8 @@ class InventoryReportRow:
     min_stock_level: Decimal
     is_below_reorder: bool
     last_movement_date: Optional[datetime] = None
+    location_name: Optional[str] = None
+    category_name: Optional[str] = None
 
 
 @dataclass
@@ -290,12 +294,45 @@ class ReportService:
             cust_result = await self.db.execute(cust_stmt)
             customer_name_map = {row.id: row.name for row in cust_result.all()}
 
+        # Batch-fetch location names
+        from app.models.location import Location
+        location_ids = {s.location_id for s in sales if s.location_id}
+        location_name_map: dict = {}
+        if location_ids:
+            loc_stmt = select(Location.id, Location.name).where(
+                Location.id.in_(location_ids)
+            )
+            loc_result = await self.db.execute(loc_stmt)
+            location_name_map = {row.id: row.name for row in loc_result.all()}
+
+        # Batch-fetch salesperson (creator) names
+        from app.models.user import User
+        creator_ids = set()
+        for s in sales:
+            if s.created_by:
+                try:
+                    creator_ids.add(uuid.UUID(str(s.created_by)))
+                except (ValueError, TypeError):
+                    pass
+        salesperson_name_map: dict = {}
+        if creator_ids:
+            user_stmt = select(User.id, User.username).where(User.id.in_(creator_ids))
+            user_result = await self.db.execute(user_stmt)
+            salesperson_name_map = {row.id: row.username for row in user_result.all()}
+
         for sale in sales:
             cogs = sum(
                 (item.cost_of_goods_sold or Decimal("0.00"))
                 for item in sale.items
             )
             customer_name = customer_name_map.get(sale.customer_id)
+            location_name = location_name_map.get(sale.location_id)
+            salesperson_name = None
+            if sale.created_by:
+                try:
+                    salesperson_name = salesperson_name_map.get(uuid.UUID(str(sale.created_by)))
+                except (ValueError, TypeError):
+                    pass
 
             gross_margin = sale.total_amount - cogs
             row = SalesReportRow(
@@ -304,6 +341,8 @@ class ReportService:
                 sale_date=sale.created_at,
                 customer_name=customer_name,
                 location_id=sale.location_id,
+                location_name=location_name,
+                salesperson_name=salesperson_name,
                 total_amount=sale.total_amount,
                 discount_total=sale.discount_total,
                 tax_amount=sale.tax_amount,
@@ -372,6 +411,24 @@ class ReportService:
         )
         parts_result = await self.db.execute(parts_stmt)
         parts_map = {p.id: p for p in parts_result.scalars().all()}
+
+        # Batch-load location names
+        from app.models.location import Location
+        loc_ids = list({c.location_id for c in cache_entries if c.location_id})
+        location_name_map: dict = {}
+        if loc_ids:
+            loc_stmt = select(Location.id, Location.name).where(Location.id.in_(loc_ids))
+            loc_result = await self.db.execute(loc_stmt)
+            location_name_map = {row.id: row.name for row in loc_result.all()}
+
+        # Batch-load category names
+        from app.models.category import Category
+        cat_ids = list({p.category_id for p in parts_map.values() if p.category_id})
+        category_name_map: dict = {}
+        if cat_ids:
+            cat_stmt = select(Category.id, Category.name).where(Category.id.in_(cat_ids))
+            cat_result = await self.db.execute(cat_stmt)
+            category_name_map = {row.id: row.name for row in cat_result.all()}
 
         # Batch-load stock valuations from cost layers
         valuation_stmt = select(
@@ -443,7 +500,9 @@ class ReportService:
                 name=part.name,
                 brand=part.brand,
                 category_id=part.category_id,
+                category_name=category_name_map.get(part.category_id),
                 location_id=cache_entry.location_id,
+                location_name=location_name_map.get(cache_entry.location_id),
                 current_quantity=cache_entry.current_quantity,
                 unit_cost=unit_cost,
                 stock_value=stock_value,
@@ -822,17 +881,17 @@ class ReportService:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
-            "Sale ID", "Invoice Number", "Sale Date", "Customer",
-            "Location ID", "Total Amount", "Discount", "Tax",
+            "Invoice Number", "Sale Date", "Customer", "Salesperson",
+            "Location", "Total Amount", "Discount", "Tax",
             "COGS", "Gross Margin",
         ])
         for row in report.rows:
             writer.writerow([
-                str(row.sale_id),
                 row.invoice_number or "",
                 row.sale_date.strftime("%Y-%m-%d %H:%M:%S"),
                 row.customer_name or "Walk-in",
-                str(row.location_id),
+                row.salesperson_name or "",
+                row.location_name or str(row.location_id),
                 str(row.total_amount),
                 str(row.discount_total),
                 str(row.tax_amount),
@@ -857,8 +916,8 @@ class ReportService:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
-            "Part Number", "Name", "Brand", "Category ID",
-            "Location ID", "Current Qty", "Unit Cost",
+            "Part Number", "Name", "Brand", "Category",
+            "Location", "Current Qty", "Unit Cost",
             "Stock Value", "Min Stock Level", "Below Reorder",
             "Last Movement Date",
         ])
@@ -867,8 +926,8 @@ class ReportService:
                 row.part_number,
                 row.name,
                 row.brand or "",
-                str(row.category_id),
-                str(row.location_id),
+                row.category_name or (str(row.category_id) if row.category_id else ""),
+                row.location_name or (str(row.location_id) if row.location_id else ""),
                 str(row.current_quantity),
                 str(row.unit_cost),
                 str(row.stock_value),

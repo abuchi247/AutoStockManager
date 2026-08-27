@@ -15,10 +15,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
+import { get } from '@/lib/api';
 import { useResourceQuery, queryKeys } from '@/lib/queries';
 import {
   Button,
-  Input,
   Select,
   Alert,
   LoadingSpinner,
@@ -27,6 +27,15 @@ import type { SelectOption } from '@/components';
 import type { ReportType } from '@/lib/types';
 import { extractApiError } from '@/lib/validation/errors';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+
+interface NamedEntity {
+  id: string;
+  name: string;
+}
+interface UserEntity {
+  id: string;
+  username: string;
+}
 
 const ReportResultsTable = dynamic(
   () => import('@/components/reports/ReportResultsTable').then((mod) => mod.ReportResultsTable),
@@ -85,11 +94,51 @@ export default function ReportsPage() {
   const [customerFilter, setCustomerFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [salespersonFilter, setSalespersonFilter] = useState('');
+
+  // Reference data for dropdown filters
+  const [locations, setLocations] = useState<NamedEntity[]>([]);
+  const [customers, setCustomers] = useState<NamedEntity[]>([]);
+  const [suppliers, setSuppliers] = useState<NamedEntity[]>([]);
+  const [categories, setCategories] = useState<NamedEntity[]>([]);
+  const [salespeople, setSalespeople] = useState<UserEntity[]>([]);
 
   const [reportData, setReportData] = useState<Record<string, unknown>[] | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Fetch reference data for dropdowns once on mount
+  useEffect(() => {
+    async function fetchRefData() {
+      try {
+        const [locRes, custRes, supRes, catRes, userRes] = await Promise.all([
+          get<{ data: NamedEntity[] }>('/locations?page_size=200').catch(() => ({ data: [] })),
+          get<{ data: NamedEntity[] }>('/customers?page_size=500').catch(() => ({ data: [] })),
+          get<{ data: NamedEntity[] }>('/suppliers?page_size=500').catch(() => ({ data: [] })),
+          get<{ data: Array<NamedEntity & { children?: NamedEntity[] }> }>('/categories?page_size=500').catch(() => ({ data: [] })),
+          get<{ data: UserEntity[] }>('/users?page_size=200').catch(() => ({ data: [] })),
+        ]);
+        setLocations(locRes.data || []);
+        setCustomers(custRes.data || []);
+        setSuppliers(supRes.data || []);
+        // Flatten category tree
+        const flatCats: NamedEntity[] = [];
+        const flatten = (items: Array<NamedEntity & { children?: NamedEntity[] }>) => {
+          for (const c of items) {
+            flatCats.push({ id: c.id, name: c.name });
+            if (c.children?.length) flatten(c.children as Array<NamedEntity & { children?: NamedEntity[] }>);
+          }
+        };
+        flatten(catRes.data || []);
+        setCategories(flatCats);
+        setSalespeople(userRes.data || []);
+      } catch {
+        // Non-critical; dropdowns will be empty
+      }
+    }
+    fetchRefData();
+  }, []);
 
   /**
    * Build query params for the report API call.
@@ -112,9 +161,12 @@ export default function ReportsPage() {
       if ((reportType === 'inventory' || reportType === 'sales') && categoryFilter) {
         params.set('category_id', categoryFilter);
       }
+      if (reportType === 'sales' && salespersonFilter) {
+        params.set('salesperson_id', salespersonFilter);
+      }
       return params.toString();
     },
-    [startDate, endDate, locationFilter, customerFilter, supplierFilter, categoryFilter, reportType]
+    [startDate, endDate, locationFilter, customerFilter, supplierFilter, categoryFilter, salespersonFilter, reportType]
   );
 
   const reportParams = buildParams('json');
@@ -245,45 +297,71 @@ export default function ReportsPage() {
 
           {/* Location Filter (only sales and inventory reports use it) */}
           {(reportType === 'sales' || reportType === 'inventory') && (
-            <Input
-              label="Location ID"
-              placeholder="Filter by location (optional)"
+            <Select
+              label="Location"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               aria-label="Filter by location"
+              options={[
+                { value: '', label: 'All Locations' },
+                ...locations.map((l) => ({ value: l.id, label: l.name })),
+              ]}
             />
           )}
 
           {/* Customer Filter (for customer reports) */}
           {reportType === 'customer' && (
-            <Input
-              label="Customer ID"
-              placeholder="Filter by customer (optional)"
+            <Select
+              label="Customer"
               value={customerFilter}
               onChange={(e) => setCustomerFilter(e.target.value)}
               aria-label="Filter by customer"
+              options={[
+                { value: '', label: 'All Customers' },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+              ]}
             />
           )}
 
           {/* Supplier Filter (for supplier reports) */}
           {reportType === 'supplier' && (
-            <Input
-              label="Supplier ID"
-              placeholder="Filter by supplier (optional)"
+            <Select
+              label="Supplier"
               value={supplierFilter}
               onChange={(e) => setSupplierFilter(e.target.value)}
               aria-label="Filter by supplier"
+              options={[
+                { value: '', label: 'All Suppliers' },
+                ...suppliers.map((s) => ({ value: s.id, label: s.name })),
+              ]}
             />
           )}
 
           {/* Category Filter (for inventory and sales reports) */}
           {(reportType === 'inventory' || reportType === 'sales') && (
-            <Input
-              label="Category ID"
-              placeholder="Filter by category (optional)"
+            <Select
+              label="Category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               aria-label="Filter by category"
+              options={[
+                { value: '', label: 'All Categories' },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
+          )}
+
+          {/* Salesperson Filter (for sales reports) */}
+          {reportType === 'sales' && (
+            <Select
+              label="Salesperson"
+              value={salespersonFilter}
+              onChange={(e) => setSalespersonFilter(e.target.value)}
+              aria-label="Filter by salesperson"
+              options={[
+                { value: '', label: 'All Salespeople' },
+                ...salespeople.map((u) => ({ value: u.id, label: u.username })),
+              ]}
             />
           )}
         </div>

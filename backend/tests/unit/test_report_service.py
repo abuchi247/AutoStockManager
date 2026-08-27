@@ -131,8 +131,9 @@ class TestCSVExport:
         report = SalesReportResult(filters=sales_filters)
         csv_content = report_service.export_sales_report_csv(report)
         first_line = csv_content.split("\n")[0]
-        assert "Sale ID" in first_line
         assert "Invoice Number" in first_line
+        assert "Salesperson" in first_line
+        assert "Location" in first_line
         assert "Total Amount" in first_line
         assert "COGS" in first_line
         assert "Gross Margin" in first_line
