@@ -11,7 +11,8 @@ import { extractApiError } from '@/lib/validation/errors';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { usePermissions } from '@/hooks/usePermissions';
 
-function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
+function getStatusBadge(status: PurchaseOrderStatus | string): React.ReactNode {
+  const normalized = status.toLowerCase() as PurchaseOrderStatus;
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
     draft: 'default',
     approved: 'info',
@@ -28,7 +29,7 @@ function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
     received: 'Received',
     cancelled: 'Cancelled',
   };
-  return <Badge variant={variants[status]}>{labels[status]}</Badge>;
+  return <Badge variant={variants[normalized] || 'default'}>{labels[normalized] || status}</Badge>;
 }
 
 interface ReceiveItem {
@@ -213,9 +214,9 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const canApprove = order.status === 'draft' && can('purchasing');
-  const canReceive = (order.status === 'approved' || order.status === 'ordered' || order.status === 'partially_received') && can('receiving');
-  const canCancel = (order.status === 'draft' || order.status === 'approved') && can('purchasing');
+  const canApprove = order.status.toLowerCase() === 'draft' && can('purchasing');
+  const canReceive = (['approved', 'ordered', 'partially_received'].includes(order.status.toLowerCase())) && can('receiving');
+  const canCancel = (['draft', 'approved'].includes(order.status.toLowerCase())) && can('purchasing');
 
   if (!allowed) return null;
 
