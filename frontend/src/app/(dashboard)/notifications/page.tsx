@@ -65,9 +65,12 @@ function getNotificationLink(notification: Notification): string | null {
 
   if (entityType === 'transfer' && entityId) return `/transfers/${entityId}`;
   if (entityType === 'purchase_order' && entityId) return `/purchases/${entityId}`;
+  if (entityType === 'grn' && meta.po_id) return `/purchases/${meta.po_id as string}`;
+  if (entityType === 'grn_discrepancy' && meta.po_id) return `/purchases/${meta.po_id as string}`;
   if (notification.notification_type === 'low_stock' && sparePartId) return `/inventory/${sparePartId}`;
   if (notification.notification_type === 'credit_limit_exceeded' && customerId) return `/customers/${customerId}`;
   if (notification.notification_type === 'overdue_customer' && customerId) return `/customers/${customerId}`;
+  if (notification.notification_type === 'overdue_supplier' && meta.supplier_id) return `/suppliers/${meta.supplier_id as string}`;
 
   return null;
 }
