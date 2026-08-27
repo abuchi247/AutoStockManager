@@ -16,7 +16,6 @@ import React, { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { get } from '@/lib/api';
-import { useResourceQuery, queryKeys } from '@/lib/queries';
 import {
   Button,
   Select,
@@ -169,18 +168,18 @@ export default function ReportsPage() {
     [startDate, endDate, locationFilter, customerFilter, supplierFilter, categoryFilter, salespersonFilter, reportType]
   );
 
-  const reportParams = buildParams('json');
-  const reportQuery = useResourceQuery<Record<string, unknown>>(
-    queryKeys.reports.report({ reportType, reportParams }),
-    `/reports/${REPORT_API_PATH[reportType]}?${reportParams}`,
-    { enabled: false },
-  );
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleGenerate = useCallback(async () => {
     setError(null); setSuccessMessage(null); setReportData(null);
+    setIsLoading(true);
     try {
-      const result = await reportQuery.refetch();
-      const responseData = result.data ?? {};
+      // Build params fresh at call time so the latest filter values are used,
+      // and fetch directly (avoids React Query stale-key/refetch timing issues).
+      const params = buildParams('json');
+      const responseData = await get<Record<string, unknown>>(
+        `/reports/${REPORT_API_PATH[reportType]}?${params}`
+      );
       let data: Record<string, unknown>[];
       if ('rows' in responseData && Array.isArray(responseData.rows)) data = responseData.rows as Record<string, unknown>[];
       else if (reportType === 'financial') { const { start_date: _s, end_date: _e, ...metrics } = responseData; data = [metrics]; }
@@ -188,11 +187,10 @@ export default function ReportsPage() {
       setReportData(data);
     } catch (err: unknown) {
       setError(extractApiError(err, 'Failed to generate report'));
+    } finally {
+      setIsLoading(false);
     }
-  }, [reportType, reportQuery]);
-
-
-  const isLoading = reportQuery.isFetching;
+  }, [reportType, buildParams]);
 
   useEffect(() => {
     if (searchParams.get('type') && searchParams.get('start_date')) void handleGenerate();
