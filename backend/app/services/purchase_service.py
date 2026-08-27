@@ -394,8 +394,10 @@ class PurchaseService:
                 spare_part.cost_price = unit_cost
                 # Check if margin has eroded below threshold (15%)
                 # Margin = (selling - cost) / selling * 100
-                if spare_part.selling_price and spare_part.selling_price > 0:
-                    margin_pct = ((spare_part.selling_price - float(unit_cost)) / spare_part.selling_price) * 100
+                selling = float(spare_part.selling_price or 0)
+                cost = float(unit_cost)
+                if selling > 0:
+                    margin_pct = ((selling - cost) / selling) * 100
                     if margin_pct < 15:
                         spare_part.price_review_needed = True
                     else:
