@@ -437,7 +437,7 @@ export default function InventoryDetailPage() {
                   <div>
                     <p className="text-sm font-medium text-amber-800">Price Review Needed</p>
                     <p className="text-xs text-amber-600">
-                      Cost increased — margin is below 15%. Consider updating the selling price.
+                      Cost increased and profit margin is thin. Consider updating the selling price, then save to clear this alert.
                     </p>
                   </div>
                 </div>

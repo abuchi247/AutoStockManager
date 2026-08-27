@@ -254,6 +254,16 @@ class InventoryService:
         for field, value in update_data.items():
             setattr(spare_part, field, value)
 
+        # Recalculate price review flag when cost or selling price changes.
+        # If margin is now healthy (>= 15%), clear the review flag.
+        selling = float(spare_part.selling_price or 0)
+        cost = float(spare_part.cost_price or 0)
+        if selling > 0:
+            margin_pct = ((selling - cost) / selling) * 100
+            spare_part.price_review_needed = margin_pct < 15
+        else:
+            spare_part.price_review_needed = False
+
         if updated_by:
             spare_part.updated_by = updated_by
 
