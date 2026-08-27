@@ -9,6 +9,7 @@ import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { usePermissions } from '@/hooks/usePermissions';
 
 function getStatusBadge(status: PurchaseOrderStatus): React.ReactNode {
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
@@ -37,6 +38,7 @@ interface ReceiveItem {
 
 export default function PurchaseOrderDetailPage() {
   const { allowed } = useRequirePermission(['purchasing', 'receiving']);
+  const { can } = usePermissions();
 
   const params = useParams();
   const router = useRouter();
@@ -211,9 +213,9 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const canApprove = order.status === 'draft';
-  const canReceive = order.status === 'approved' || order.status === 'ordered' || order.status === 'partially_received';
-  const canCancel = order.status === 'draft' || order.status === 'approved';
+  const canApprove = order.status === 'draft' && can('purchasing');
+  const canReceive = (order.status === 'approved' || order.status === 'ordered' || order.status === 'partially_received') && can('receiving');
+  const canCancel = (order.status === 'draft' || order.status === 'approved') && can('purchasing');
 
   if (!allowed) return null;
 
