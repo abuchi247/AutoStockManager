@@ -16,7 +16,9 @@ const NOTIFICATION_TYPE_CONFIG: Record<
   low_stock: { variant: 'warning', label: 'Low Stock', icon: '⚠️' },
   credit_limit_exceeded: { variant: 'danger', label: 'Credit Exceeded', icon: '🚨' },
   overdue_customer: { variant: 'danger', label: 'Overdue', icon: '⏰' },
+  overdue_supplier: { variant: 'danger', label: 'Overdue Payment', icon: '💰' },
   pending_approval: { variant: 'info', label: 'Pending', icon: 'ℹ️' },
+  system: { variant: 'default', label: 'System', icon: '📋' },
 };
 
 const RESOLVED_STATUS_CONFIG: Record<
@@ -252,7 +254,7 @@ export default function NotificationsPage() {
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <ul className="divide-y divide-gray-100" role="list">
             {notifications.map((notification) => {
-              const config = NOTIFICATION_TYPE_CONFIG[notification.notification_type];
+              const config = NOTIFICATION_TYPE_CONFIG[notification.notification_type] || { variant: 'default' as NotificationTypeVariant, label: 'Notification', icon: '📌' };
               const isUnread = !notification.is_read;
 
               return (
