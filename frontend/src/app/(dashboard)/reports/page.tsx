@@ -112,11 +112,11 @@ export default function ReportsPage() {
     async function fetchRefData() {
       try {
         const [locRes, custRes, supRes, catRes, userRes] = await Promise.all([
-          get<{ data: NamedEntity[] }>('/locations?page_size=200').catch(() => ({ data: [] })),
-          get<{ data: NamedEntity[] }>('/customers?page_size=500').catch(() => ({ data: [] })),
-          get<{ data: NamedEntity[] }>('/suppliers?page_size=500').catch(() => ({ data: [] })),
-          get<{ data: Array<NamedEntity & { children?: NamedEntity[] }> }>('/categories?page_size=500').catch(() => ({ data: [] })),
-          get<{ data: UserEntity[] }>('/users?page_size=200').catch(() => ({ data: [] })),
+          get<{ data: NamedEntity[] }>('/locations?page_size=100').catch(() => ({ data: [] })),
+          get<{ data: NamedEntity[] }>('/customers?page_size=100').catch(() => ({ data: [] })),
+          get<{ data: NamedEntity[] }>('/suppliers?page_size=100').catch(() => ({ data: [] })),
+          get<{ data: Array<NamedEntity & { children?: NamedEntity[] }> }>('/categories?page_size=100').catch(() => ({ data: [] })),
+          get<{ data: UserEntity[] }>('/users?page_size=100').catch(() => ({ data: [] })),
         ]);
         setLocations(locRes.data || []);
         setCustomers(custRes.data || []);
