@@ -76,8 +76,13 @@ interface ReportResultsTableProps {
   reportLabel: string;
 }
 
+// Above this row count, nudge the user to narrow the range or export.
+// Totals remain accurate — this only affects on-screen rendering guidance.
+const LARGE_RESULT_THRESHOLD = 5000;
+
 export function ReportResultsTable({ rows, reportLabel }: ReportResultsTableProps) {
   const columns = useMemo(() => buildReportColumns(rows), [rows]);
+  const isLarge = rows.length > LARGE_RESULT_THRESHOLD;
 
   return (
     <div className="space-y-4">
@@ -85,10 +90,19 @@ export function ReportResultsTable({ rows, reportLabel }: ReportResultsTableProp
         <h2 className="text-lg font-semibold text-gray-900">
           Results
           <span className="ml-2 text-sm font-normal text-gray-500">
-            ({rows.length} {rows.length === 1 ? 'row' : 'rows'})
+            ({rows.length.toLocaleString('en-NG')} {rows.length === 1 ? 'row' : 'rows'})
           </span>
         </h2>
       </div>
+
+      {isLarge && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="font-medium">Large result set.</span> This report has{' '}
+          {rows.length.toLocaleString('en-NG')} rows. The totals above reflect all rows,
+          but for easier viewing consider narrowing the date range or using{' '}
+          <span className="font-medium">Export CSV</span> for the full dataset.
+        </div>
+      )}
 
       <DataTable
         columns={columns}
