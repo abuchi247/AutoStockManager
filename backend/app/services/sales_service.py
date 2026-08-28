@@ -152,6 +152,7 @@ class SalesService:
             total_amount=Decimal("0.00"),
             discount_total=Decimal("0.00"),
             amount_paid=amount_paid or Decimal("0.00"),
+            created_by=str(self.user_id) if self.user_id else None,
         )
         self.db.add(sale)
         await self.db.flush()
