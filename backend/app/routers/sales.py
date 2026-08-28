@@ -75,16 +75,16 @@ async def list_sales(
 
     Accessible by Salesperson, Manager, and Admin roles.
     """
-    # Count query
-    count_stmt = select(func.count()).select_from(Sale)
+    # Count query — exclude soft-deleted sales
+    count_stmt = select(func.count()).select_from(Sale).filter(Sale.deleted_at.is_(None))
     if status_filter:
         count_stmt = count_stmt.filter(Sale.status == status_filter)
     count_result = await db.execute(count_stmt)
     total = count_result.scalar() or 0
 
-    # Data query
+    # Data query — exclude soft-deleted sales
     offset = (page - 1) * page_size
-    data_stmt = select(Sale).order_by(Sale.created_at.desc())
+    data_stmt = select(Sale).filter(Sale.deleted_at.is_(None)).order_by(Sale.created_at.desc())
     if status_filter:
         data_stmt = data_stmt.filter(Sale.status == status_filter)
     data_stmt = data_stmt.offset(offset).limit(page_size)

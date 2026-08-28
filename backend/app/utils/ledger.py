@@ -25,6 +25,25 @@ from app.models.inventory_movement_ledger import InventoryMovementLedger
 from app.models.stock_status_cache import StockStatusCache
 
 
+class NegativeStockError(Exception):
+    """Raised when a stock movement would drive quantity below zero.
+
+    This is a safety backstop — callers are expected to pre-validate available
+    stock under a row lock. A negative result signals a logic error, so we fail
+    the transaction rather than silently persisting corrupt inventory.
+    """
+
+    def __init__(self, spare_part_id, location_id, current, change):
+        self.spare_part_id = spare_part_id
+        self.location_id = location_id
+        self.current = current
+        self.change = change
+        super().__init__(
+            f"Stock movement would go negative for part {spare_part_id} at "
+            f"location {location_id}: current={current}, change={change}"
+        )
+
+
 async def record_inventory_movement(
     db: AsyncSession,
     spare_part_id: uuid.UUID,
@@ -124,10 +143,29 @@ async def record_inventory_movement(
 
     if cache_row is not None:
         # Update existing cache row
-        cache_row.current_quantity = cache_row.current_quantity + quantity_change
+        new_quantity = cache_row.current_quantity + quantity_change
+        # Safety backstop: stock must never go negative. Callers pre-validate
+        # under a row lock, so a negative result indicates a logic error — fail
+        # loudly rather than silently corrupting inventory.
+        if new_quantity < Decimal("0"):
+            raise NegativeStockError(
+                spare_part_id=spare_part_id,
+                location_id=location_id,
+                current=cache_row.current_quantity,
+                change=quantity_change,
+            )
+        cache_row.current_quantity = new_quantity
         cache_row.updated_at = datetime.now(timezone.utc)
     else:
-        # Create new cache row for this (spare_part_id, location_id) pair
+        # Create new cache row for this (spare_part_id, location_id) pair.
+        # A brand-new row cannot start negative.
+        if quantity_change < Decimal("0"):
+            raise NegativeStockError(
+                spare_part_id=spare_part_id,
+                location_id=location_id,
+                current=Decimal("0"),
+                change=quantity_change,
+            )
         cache_row = StockStatusCache(
             spare_part_id=spare_part_id,
             location_id=location_id,
