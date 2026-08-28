@@ -110,10 +110,12 @@ def _mock_execute_sequence(mock_db, results):
         mock_res = MagicMock()
         if isinstance(r, list):
             mock_res.scalars.return_value.all.return_value = r
+            mock_res.scalars.return_value.first.return_value = r[0] if r else None
             mock_res.all.return_value = r
         else:
             mock_res.scalar_one_or_none.return_value = r
             mock_res.scalar.return_value = r
+            mock_res.scalars.return_value.first.return_value = r
         mock_results.append(mock_res)
     mock_db.execute = AsyncMock(side_effect=mock_results)
 
@@ -216,7 +218,7 @@ class TestSubmitCount:
         )
 
         # First call returns session, second returns snapshot_item
-        _mock_execute_sequence(mock_db, [session, snapshot_item])
+        _mock_execute_sequence(mock_db, [session, snapshot_item, None])
 
         service = AuditService(db=mock_db)
         result = await service.submit_count(
@@ -247,7 +249,7 @@ class TestSubmitCount:
             spare_part_id=spare_part_id_1,
             snapshot_quantity=Decimal("100.0000"),
         )
-        _mock_execute_sequence(mock_db, [session, snapshot_item])
+        _mock_execute_sequence(mock_db, [session, snapshot_item, None])
 
         service = AuditService(db=mock_db)
         await service.submit_count(
@@ -275,7 +277,7 @@ class TestSubmitCount:
             spare_part_id=spare_part_id_1,
             snapshot_quantity=Decimal("100.0000"),
         )
-        _mock_execute_sequence(mock_db, [session, snapshot_item])
+        _mock_execute_sequence(mock_db, [session, snapshot_item, None])
 
         service = AuditService(db=mock_db)
         await service.submit_count(
@@ -339,7 +341,7 @@ class TestSubmitCount:
             spare_part_id=spare_part_id_1,
             snapshot_quantity=Decimal("100.0000"),
         )
-        _mock_execute_sequence(mock_db, [session, snapshot_item])
+        _mock_execute_sequence(mock_db, [session, snapshot_item, None])
 
         service = AuditService(db=mock_db)
         await service.submit_count(

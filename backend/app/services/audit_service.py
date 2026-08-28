@@ -289,16 +289,30 @@ class AuditService:
         # Calculate variance = counted_quantity - snapshot_quantity
         variance = counted_quantity - snapshot_item.snapshot_quantity
 
-        # Create the audit count record
-        audit_count = AuditCount(
+        # If a count already exists for this part in this session, UPDATE it
+        # instead of creating a duplicate (which would double-apply adjustments).
+        existing_stmt = select(AuditCount).filter_by(
             session_id=session_id,
             spare_part_id=spare_part_id,
-            counted_quantity=counted_quantity,
-            variance=variance,
-            counted_by=counted_by,
-            counted_at=datetime.now(timezone.utc),
         )
-        self.db.add(audit_count)
+        existing_result = await self.db.execute(existing_stmt)
+        audit_count = existing_result.scalars().first()
+
+        if audit_count is not None:
+            audit_count.counted_quantity = counted_quantity
+            audit_count.variance = variance
+            audit_count.counted_by = counted_by
+            audit_count.counted_at = datetime.now(timezone.utc)
+        else:
+            audit_count = AuditCount(
+                session_id=session_id,
+                spare_part_id=spare_part_id,
+                counted_quantity=counted_quantity,
+                variance=variance,
+                counted_by=counted_by,
+                counted_at=datetime.now(timezone.utc),
+            )
+            self.db.add(audit_count)
 
         # Transition session to IN_PROGRESS if still INITIATED
         if session.status == AuditStatus.INITIATED:

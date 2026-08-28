@@ -30,14 +30,16 @@ import type {
   AuditCountSubmit,
 } from '@/lib/types';
 
-function getStatusBadge(status: AuditStatus): React.ReactNode {
-  const map: Record<AuditStatus, { variant: BadgeVariant; label: string }> = {
+function getStatusBadge(status: string): React.ReactNode {
+  const normalized = (status || '').toLowerCase();
+  const map: Record<string, { variant: BadgeVariant; label: string }> = {
+    initiated: { variant: 'info', label: 'Initiated' },
     in_progress: { variant: 'info', label: 'In Progress' },
     pending_approval: { variant: 'warning', label: 'Pending Approval' },
     completed: { variant: 'success', label: 'Completed' },
     cancelled: { variant: 'danger', label: 'Cancelled' },
   };
-  const { variant, label } = map[status] ?? { variant: 'default' as BadgeVariant, label: status };
+  const { variant, label } = map[normalized] ?? { variant: 'default' as BadgeVariant, label: status };
   return <Badge variant={variant}>{label}</Badge>;
 }
 
@@ -52,16 +54,19 @@ function formatDate(dateStr: string): string {
 }
 
 function formatAuditType(type: string): string {
-  return type === 'cycle_count' ? 'Cycle Count' : 'Full Stock Count';
+  return (type || '').toLowerCase() === 'cycle_count' ? 'Cycle Count' : 'Full Stock Count';
 }
 
-interface ReconciliationItem {
+// Post-snapshot movement (matches backend ReconciliationResponse.movements)
+interface ReconciliationMovement {
+  ledger_entry_id: string;
   spare_part_id: string;
-  part_name?: string;
-  snapshot_quantity: number;
-  counted_quantity: number | null;
-  variance: number | null;
-  movements_during_audit: number;
+  quantity_change: number;
+  movement_type: string;
+  reference_type: string;
+  reference_id: string;
+  created_at: string;
+  created_by: string;
 }
 
 export default function AuditDetailPage() {
@@ -71,10 +76,8 @@ export default function AuditDetailPage() {
   const params = useParams();
   const auditId = params.id as string;
 
-  const [audit, setAudit] = useState<AuditSession | null>(null);
-  const [snapshotItems, setSnapshotItems] = useState<AuditSnapshotItem[]>([]);
-  const [counts, setCounts] = useState<AuditCount[]>([]);
-  const [reconciliation, setReconciliation] = useState<ReconciliationItem[]>([]);
+  const [audit, setAudit] = useState<(AuditSession & { snapshot_items?: AuditSnapshotItem[]; counts?: AuditCount[] }) | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReconciliationMovement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -90,7 +93,8 @@ export default function AuditDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await get<AuditSession>(`/audits/${auditId}`);
+      // The main endpoint returns snapshot_items and counts embedded
+      const response = await get<AuditSession & { snapshot_items?: AuditSnapshotItem[]; counts?: AuditCount[] }>(`/audits/${auditId}`);
       setAudit(response);
     } catch (err: unknown) {
       const message = extractApiError(err, 'Failed to load audit session');
@@ -100,34 +104,12 @@ export default function AuditDetailPage() {
     }
   }, [auditId]);
 
-  const fetchSnapshotItems = useCallback(async () => {
-    try {
-      const response = await get<AuditSnapshotItem[]>(
-        `/audits/${auditId}/snapshot`
-      );
-      setSnapshotItems(response);
-    } catch {
-      // Snapshot items may not be available separately
-    }
-  }, [auditId]);
-
-  const fetchCounts = useCallback(async () => {
-    try {
-      const response = await get<AuditCount[]>(
-        `/audits/${auditId}/counts`
-      );
-      setCounts(response);
-    } catch {
-      // Counts may not exist yet
-    }
-  }, [auditId]);
-
   const fetchReconciliation = useCallback(async () => {
     try {
-      const response = await get<{ session_id: string; movements: ReconciliationItem[] }>(
+      const response = await get<{ session_id: string; movements: ReconciliationMovement[] }>(
         `/audits/${auditId}/reconciliation`
       );
-      setReconciliation(response.movements);
+      setReconciliation(response.movements || []);
     } catch {
       // Reconciliation may not be available
     }
@@ -135,10 +117,13 @@ export default function AuditDetailPage() {
 
   useEffect(() => {
     fetchAudit();
-    fetchSnapshotItems();
-    fetchCounts();
     fetchReconciliation();
-  }, [fetchAudit, fetchSnapshotItems, fetchCounts, fetchReconciliation]);
+  }, [fetchAudit, fetchReconciliation]);
+
+  // Derived from the embedded response
+  const snapshotItems = audit?.snapshot_items ?? [];
+  const counts = audit?.counts ?? [];
+  const countMap = new Map(counts.map((c) => [c.spare_part_id, c]));
 
   const handleCountChange = (sparePartId: string, value: string) => {
     setCountInputs((prev) => ({ ...prev, [sparePartId]: value }));
@@ -160,19 +145,16 @@ export default function AuditDetailPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      await post(`/audits/${auditId}/counts`, { counts: entries });
+      // Backend accepts one count per request — submit them sequentially
+      for (const entry of entries) {
+        await post(`/audits/${auditId}/counts`, entry);
+      }
       setSuccess(`Successfully submitted ${entries.length} count(s).`);
       setCountInputs({});
-      fetchCounts();
-      fetchReconciliation();
-      fetchAudit();
+      await fetchAudit();
+      await fetchReconciliation();
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to submit counts.')
-          : 'Failed to submit counts.';
-      setError(message);
+      setError(extractApiError(err, 'Failed to submit counts.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -184,22 +166,14 @@ export default function AuditDetailPage() {
     try {
       await post(`/audits/${auditId}/approve`);
       setSuccess('Audit approved and adjustments applied.');
-      fetchAudit();
-      fetchReconciliation();
+      await fetchAudit();
+      await fetchReconciliation();
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { error?: { message?: string } } } }).response?.data
-              ?.error?.message ?? 'Failed to approve audit.')
-          : 'Failed to approve audit.';
-      setError(message);
+      setError(extractApiError(err, 'Failed to approve audit.'));
     } finally {
       setIsApproving(false);
     }
   };
-
-  // Build a map of existing counts by spare_part_id
-  const countMap = new Map(counts.map((c) => [c.spare_part_id, c]));
 
   if (isLoading) {
     return (
@@ -224,8 +198,11 @@ export default function AuditDetailPage() {
 
   if (!audit) return null;
 
-  const canSubmitCounts = audit.status === 'in_progress';
-  const canApprove = audit.status === 'pending_approval';
+  const normalizedStatus = (audit.status || '').toLowerCase();
+  // Counts can be entered while the audit is open (initiated or in progress)
+  const canSubmitCounts = normalizedStatus === 'initiated' || normalizedStatus === 'in_progress';
+  // Approve is available once counts have started (in progress) or even initiated
+  const canApprove = normalizedStatus === 'initiated' || normalizedStatus === 'in_progress';
 
   if (!allowed) return null;
 
@@ -399,73 +376,52 @@ export default function AuditDetailPage() {
         )}
       </div>
 
-      {/* Reconciliation View */}
+      {/* Reconciliation View — movements that happened after the snapshot */}
       {reconciliation.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Reconciliation</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Movements During Audit</h2>
           <p className="mb-3 text-sm text-gray-500">
-            Shows variances and movements that occurred during the audit period.
+            Stock movements at this location that occurred after the snapshot was taken.
+            These are excluded from variance calculations — review them before approving.
           </p>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Part
+                    Part ID
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Snapshot Qty
+                    Type
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Qty Change
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Counted Qty
+                    Reference
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Variance
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Movements During Audit
+                    When
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
-                {reconciliation.map((item) => (
-                  <tr key={item.spare_part_id}>
+                {reconciliation.map((m) => (
+                  <tr key={m.ledger_entry_id}>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                      {item.part_name || item.spare_part_id.slice(0, 12) + '...'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
-                      {item.snapshot_quantity}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
-                      {item.counted_quantity !== null ? item.counted_quantity : '—'}
+                      {m.spare_part_id.slice(0, 12)}...
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
-                      {item.variance !== null ? (
-                        <span
-                          className={
-                            item.variance === 0
-                              ? 'text-green-600 font-medium'
-                              : item.variance > 0
-                              ? 'text-blue-600 font-medium'
-                              : 'text-red-600 font-medium'
-                          }
-                        >
-                          {item.variance > 0 ? '+' : ''}
-                          {item.variance}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+                      <Badge variant="default">{m.movement_type}</Badge>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm">
-                      {item.movements_during_audit !== 0 ? (
-                        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-                          {item.movements_during_audit > 0 ? '+' : ''}
-                          {item.movements_during_audit}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">None</span>
-                      )}
+                    <td className={`whitespace-nowrap px-4 py-3 text-sm text-right font-medium ${Number(m.quantity_change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {Number(m.quantity_change) > 0 ? '+' : ''}{m.quantity_change}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                      {m.reference_type}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                      {formatDate(m.created_at)}
                     </td>
                   </tr>
                 ))}
