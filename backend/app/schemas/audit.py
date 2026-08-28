@@ -116,6 +116,7 @@ class AuditSessionResponse(BaseModel):
 
     id: UUID = Field(..., description="Audit session UUID")
     location_id: UUID = Field(..., description="Location being audited")
+    location_name: Optional[str] = Field(default=None, description="Name of the location being audited")
     audit_type: str = Field(..., description="Type of audit (CYCLE_COUNT or FULL_STOCK_COUNT)")
     status: str = Field(..., description="Current session status")
     snapshot_timestamp: datetime = Field(..., description="Timestamp when stock was frozen")

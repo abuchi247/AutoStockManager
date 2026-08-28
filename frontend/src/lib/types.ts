@@ -524,6 +524,7 @@ export type AuditStatus = 'in_progress' | 'pending_approval' | 'completed' | 'ca
 export interface AuditSession {
   id: string;
   location_id: string;
+  location_name?: string;
   audit_type: AuditType;
   status: AuditStatus;
   snapshot_timestamp: string;

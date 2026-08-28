@@ -216,7 +216,8 @@ export default function AuditDetailPage() {
             Audit Session
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {formatAuditType(audit.audit_type)} — Created {formatDate(audit.created_at)}
+            {formatAuditType(audit.audit_type)}
+            {audit.location_name ? ` at ${audit.location_name}` : ''} — Created {formatDate(audit.created_at)}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -247,6 +248,10 @@ export default function AuditDetailPage() {
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Session Information</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-sm font-medium text-gray-500">Location</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">{audit.location_name || '—'}</p>
+          </div>
           <div>
             <p className="text-sm font-medium text-gray-500">Status</p>
             <div className="mt-1">{getStatusBadge(audit.status)}</div>

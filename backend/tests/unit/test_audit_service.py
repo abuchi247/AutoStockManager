@@ -364,13 +364,18 @@ class TestCompleteAudit:
 
     @pytest.mark.asyncio
     @patch(
+        "app.utils.fifo.consume_fifo_layers",
+        new_callable=AsyncMock,
+        return_value=(Decimal("25.00"), []),
+    )
+    @patch(
         "app.services.audit_service.record_inventory_movement",
         new_callable=AsyncMock,
     )
     async def test_creates_adjustment_for_nonzero_variance(
-        self, mock_record, mock_db, session_id, location_id, spare_part_id_1
+        self, mock_record, mock_fifo, mock_db, session_id, location_id, spare_part_id_1
     ):
-        """Should create ledger adjustment for non-zero variance."""
+        """Should create ledger adjustment for non-zero variance (shrinkage)."""
         session = _make_session(
             session_id, location_id, status=AuditStatus.IN_PROGRESS
         )

@@ -95,8 +95,25 @@ async def list_audits(
         page_size=page_size,
     )
 
+    # Resolve location names for display
+    from sqlalchemy import select as _select
+    from app.models.location import Location
+    loc_ids = list({s.location_id for s in sessions})
+    loc_map: dict = {}
+    if loc_ids:
+        loc_result = await db.execute(
+            _select(Location.id, Location.name).where(Location.id.in_(loc_ids))
+        )
+        loc_map = {row.id: row.name for row in loc_result.all()}
+
+    data = []
+    for s in sessions:
+        resp = AuditSessionResponse.model_validate(s)
+        resp.location_name = loc_map.get(s.location_id)
+        data.append(resp)
+
     return AuditSessionListResponse(
-        data=[AuditSessionResponse.model_validate(s) for s in sessions],
+        data=data,
         meta={"page": page, "total": total, "page_size": page_size},
     )
 
@@ -143,7 +160,16 @@ async def create_audit(
     )
     await db.commit()
     await db.refresh(session)
-    return AuditSessionResponse.model_validate(session)
+
+    response = AuditSessionResponse.model_validate(session)
+    # Resolve location name for immediate display
+    from sqlalchemy import select as _select
+    from app.models.location import Location as _Location
+    loc_res = await db.execute(
+        _select(_Location.name).where(_Location.id == session.location_id)
+    )
+    response.location_name = loc_res.scalar_one_or_none()
+    return response
 
 
 @router.get(
@@ -177,8 +203,16 @@ async def get_audit(
 
     # Build response and enrich snapshot items with part names/numbers
     response = AuditSessionResponse.model_validate(session)
+
+    # Resolve location name
+    from sqlalchemy import select as _select
+    from app.models.location import Location as _Location
+    loc_res = await db.execute(
+        _select(_Location.name).where(_Location.id == session.location_id)
+    )
+    response.location_name = loc_res.scalar_one_or_none()
+
     if response.snapshot_items:
-        from sqlalchemy import select as _select
         from app.models.spare_part import SparePart
         part_ids = [si.spare_part_id for si in response.snapshot_items]
         if part_ids:

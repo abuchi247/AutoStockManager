@@ -368,18 +368,78 @@ class AuditService:
         result = await self.db.execute(stmt)
         counts = result.scalars().all()
 
-        # For each non-zero variance, create an adjustment ledger entry
+        # For each non-zero variance, create an adjustment ledger entry with
+        # proper cost valuation so inventory VALUE stays accurate, not just qty.
+        from app.utils.fifo import consume_fifo_layers, InsufficientCostLayerError
+        from app.models.cost_layer import CostLayer
+        from app.models.spare_part import SparePart
+
         for count in counts:
-            if count.variance != Decimal("0"):
+            if count.variance == Decimal("0"):
+                continue
+
+            if count.variance < Decimal("0"):
+                # SHRINKAGE — physical count is less than system.
+                # Consume cost layers FIFO to value the write-off at actual cost.
+                shortfall = abs(count.variance)
+                unit_cost = Decimal("0")
+                try:
+                    total_cost, _ = await consume_fifo_layers(
+                        db=self.db,
+                        spare_part_id=count.spare_part_id,
+                        location_id=session.location_id,
+                        quantity_to_consume=shortfall,
+                    )
+                    unit_cost = (total_cost / shortfall) if shortfall > 0 else Decimal("0")
+                except InsufficientCostLayerError:
+                    # Not enough cost layers (data drift) — fall back to item cost price
+                    part_res = await self.db.execute(
+                        select(SparePart.cost_price).where(SparePart.id == count.spare_part_id)
+                    )
+                    unit_cost = Decimal(str(part_res.scalar_one_or_none() or "0"))
+
                 await record_inventory_movement(
                     db=self.db,
                     spare_part_id=count.spare_part_id,
                     location_id=session.location_id,
-                    quantity_change=count.variance,
+                    quantity_change=count.variance,  # negative
                     movement_type=MovementType.ADJUSTMENT.value,
                     reference_type=ReferenceType.AUDIT.value,
                     reference_id=session.id,
-                    unit_cost=Decimal("0"),
+                    unit_cost=unit_cost,
+                    created_by=approved_by,
+                )
+            else:
+                # FOUND STOCK — physical count exceeds system.
+                # Create a new cost layer valued at the item's current cost price
+                # so the found units carry a proper cost basis for future FIFO/COGS.
+                part_res = await self.db.execute(
+                    select(SparePart.cost_price).where(SparePart.id == count.spare_part_id)
+                )
+                unit_cost = Decimal(str(part_res.scalar_one_or_none() or "0"))
+
+                new_layer = CostLayer(
+                    spare_part_id=count.spare_part_id,
+                    location_id=session.location_id,
+                    unit_cost=unit_cost,
+                    original_quantity=count.variance,
+                    remaining_quantity=count.variance,
+                    source_type="audit_adjustment",
+                    source_reference_id=session.id,
+                    created_by=str(approved_by),
+                )
+                self.db.add(new_layer)
+                await self.db.flush()
+
+                await record_inventory_movement(
+                    db=self.db,
+                    spare_part_id=count.spare_part_id,
+                    location_id=session.location_id,
+                    quantity_change=count.variance,  # positive
+                    movement_type=MovementType.ADJUSTMENT.value,
+                    reference_type=ReferenceType.AUDIT.value,
+                    reference_id=session.id,
+                    unit_cost=unit_cost,
                     created_by=approved_by,
                 )
 

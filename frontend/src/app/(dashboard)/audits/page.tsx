@@ -278,6 +278,11 @@ export default function AuditsPage() {
       ),
     },
     {
+      key: 'location_name',
+      header: 'Location',
+      render: (item) => <span>{item.location_name || '—'}</span>,
+    },
+    {
       key: 'audit_type',
       header: 'Type',
       render: (item) => <span>{formatAuditType(item.audit_type)}</span>,
