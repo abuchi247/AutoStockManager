@@ -16,7 +16,6 @@ import { extractApiError } from '@/lib/validation/errors';
 import {
   DataTable,
   Button,
-  Input,
   Select,
   Badge,
   Alert,
@@ -74,7 +73,12 @@ function formatDate(dateStr: string): string {
 interface StartAuditForm {
   location_id: string;
   audit_type: AuditType;
-  spare_part_ids: string;
+}
+
+interface SelectedPart {
+  id: string;
+  name: string;
+  part_number: string;
 }
 
 export default function AuditsPage() {
@@ -105,8 +109,13 @@ export default function AuditsPage() {
   const [form, setForm] = useState<StartAuditForm>({
     location_id: '',
     audit_type: 'cycle_count',
-    spare_part_ids: '',
   });
+
+  // Part picker state (for cycle counts)
+  const [partSearch, setPartSearch] = useState('');
+  const [partResults, setPartResults] = useState<SelectedPart[]>([]);
+  const [selectedParts, setSelectedParts] = useState<SelectedPart[]>([]);
+  const [isSearchingParts, setIsSearchingParts] = useState(false);
 
   const fetchAudits = useCallback(async () => {
     setIsLoading(true);
@@ -140,6 +149,43 @@ export default function AuditsPage() {
     fetchAudits();
   }, [fetchAudits]);
 
+  // Debounced part search (scoped to selected location for accurate stock)
+  useEffect(() => {
+    if (!showStartModal || form.audit_type !== 'cycle_count') return;
+    if (partSearch.trim().length < 2) {
+      setPartResults([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setIsSearchingParts(true);
+      try {
+        const params = new URLSearchParams();
+        params.set('search', partSearch.trim());
+        params.set('page_size', '10');
+        if (form.location_id) params.set('location_id', form.location_id);
+        const res = await get<{ data: SelectedPart[] }>(`/spare-parts?${params.toString()}`);
+        setPartResults(res.data || []);
+      } catch {
+        setPartResults([]);
+      } finally {
+        setIsSearchingParts(false);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [partSearch, showStartModal, form.audit_type, form.location_id]);
+
+  const addPart = (part: SelectedPart) => {
+    if (!selectedParts.some((p) => p.id === part.id)) {
+      setSelectedParts((prev) => [...prev, part]);
+    }
+    setPartSearch('');
+    setPartResults([]);
+  };
+
+  const removePart = (id: string) => {
+    setSelectedParts((prev) => prev.filter((p) => p.id !== id));
+  };
+
   const fetchLocations = async () => {
     try {
       const response = await get<PaginatedResponse<Location>>(
@@ -156,7 +202,10 @@ export default function AuditsPage() {
   }, []);
 
   const openStartModal = () => {
-    setForm({ location_id: '', audit_type: 'cycle_count', spare_part_ids: '' });
+    setForm({ location_id: '', audit_type: 'cycle_count' });
+    setSelectedParts([]);
+    setPartSearch('');
+    setPartResults([]);
     setCreateError(null);
     fetchLocations();
     setShowStartModal(true);
@@ -176,12 +225,9 @@ export default function AuditsPage() {
         audit_type: form.audit_type.toUpperCase(),
       };
 
-      // Parse optional spare_part_ids (comma-separated)
-      if (form.spare_part_ids.trim()) {
-        payload.spare_part_ids = form.spare_part_ids
-          .split(',')
-          .map((id) => id.trim())
-          .filter(Boolean);
+      // For cycle counts, include the selected part IDs (optional — empty = all)
+      if (form.audit_type === 'cycle_count' && selectedParts.length > 0) {
+        payload.spare_part_ids = selectedParts.map((p) => p.id);
       }
 
       await post<{ data: AuditSession }>('/audits', payload);
@@ -354,19 +400,92 @@ export default function AuditsPage() {
             }
             aria-label="Select audit type"
           />
+          <p className="-mt-2 text-xs text-gray-500">
+            {form.audit_type === 'cycle_count'
+              ? 'Cycle Count: count a selected set of parts (e.g. high-value or fast-moving items).'
+              : 'Full Stock Count: counts every part at the selected location.'}
+          </p>
 
-          <div>
-            <Input
-              label="Part IDs (optional, comma-separated)"
-              placeholder="e.g. part-id-1, part-id-2"
-              value={form.spare_part_ids}
-              onChange={(e) => setForm({ ...form, spare_part_ids: e.target.value })}
-              aria-label="Spare part IDs for cycle count"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Leave empty for all parts at the selected location.
-            </p>
-          </div>
+          {/* Part picker — only for cycle counts */}
+          {form.audit_type === 'cycle_count' && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Parts to Count
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by part name or number..."
+                  value={partSearch}
+                  onChange={(e) => setPartSearch(e.target.value)}
+                  disabled={!form.location_id}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  aria-label="Search parts to add to the audit"
+                />
+                {isSearchingParts && (
+                  <div className="absolute right-3 top-2.5">
+                    <LoadingSpinner size="sm" />
+                  </div>
+                )}
+                {/* Search results dropdown */}
+                {partResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+                    <ul className="max-h-48 overflow-y-auto py-1">
+                      {partResults.map((part) => {
+                        const already = selectedParts.some((p) => p.id === part.id);
+                        return (
+                          <li key={part.id}>
+                            <button
+                              type="button"
+                              disabled={already}
+                              onClick={() => addPart(part)}
+                              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${already ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            >
+                              <span>
+                                <span className="font-medium text-gray-900">{part.name}</span>
+                                <span className="ml-2 text-gray-500">({part.part_number})</span>
+                              </span>
+                              {already && <span className="text-xs text-blue-600">Added</span>}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {!form.location_id && (
+                <p className="mt-1 text-xs text-amber-600">Select a location first to search parts.</p>
+              )}
+
+              {/* Selected part chips */}
+              {selectedParts.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedParts.map((part) => (
+                    <span
+                      key={part.id}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700"
+                    >
+                      {part.name} ({part.part_number})
+                      <button
+                        type="button"
+                        onClick={() => removePart(part.id)}
+                        className="ml-0.5 text-blue-500 hover:text-blue-800"
+                        aria-label={`Remove ${part.name}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500">
+                  No parts selected — leave empty to count all parts at the location.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>
