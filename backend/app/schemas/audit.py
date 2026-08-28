@@ -88,6 +88,8 @@ class AuditSnapshotItemResponse(BaseModel):
     id: UUID = Field(..., description="Snapshot item UUID")
     session_id: UUID = Field(..., description="Parent audit session UUID")
     spare_part_id: UUID = Field(..., description="Spare part UUID")
+    part_name: Optional[str] = Field(default=None, description="Spare part name")
+    part_number: Optional[str] = Field(default=None, description="Spare part number")
     snapshot_quantity: Decimal = Field(..., description="Frozen stock quantity at audit initiation")
     created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
 

@@ -175,7 +175,26 @@ async def get_audit(
             detail="Audit session not found",
         )
 
-    return AuditSessionResponse.model_validate(session)
+    # Build response and enrich snapshot items with part names/numbers
+    response = AuditSessionResponse.model_validate(session)
+    if response.snapshot_items:
+        from sqlalchemy import select as _select
+        from app.models.spare_part import SparePart
+        part_ids = [si.spare_part_id for si in response.snapshot_items]
+        if part_ids:
+            parts_stmt = _select(
+                SparePart.id, SparePart.name, SparePart.part_number
+            ).where(SparePart.id.in_(part_ids))
+            parts_result = await db.execute(parts_stmt)
+            part_map = {
+                row.id: (row.name, row.part_number) for row in parts_result.all()
+            }
+            for si in response.snapshot_items:
+                info = part_map.get(si.spare_part_id)
+                if info:
+                    si.part_name, si.part_number = info
+
+    return response
 
 
 @router.post(

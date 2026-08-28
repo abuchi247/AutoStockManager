@@ -537,6 +537,8 @@ export interface AuditSnapshotItem {
   id: string;
   session_id: string;
   spare_part_id: string;
+  part_name?: string;
+  part_number?: string;
   snapshot_quantity: number;
 }
 

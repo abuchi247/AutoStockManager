@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { get, post } from '@/lib/api';
+import { formatQuantity } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 import {
   Button,
@@ -279,10 +280,19 @@ export default function AuditDetailPage() {
 
       {/* Snapshot Items & Count Submission */}
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Snapshot Items & Counts
-          </h2>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Count Sheet
+            </h2>
+            {canSubmitCounts && (
+              <p className="mt-1 text-sm text-gray-500">
+                Physically count each part and enter the actual quantity you find in the
+                <span className="font-medium"> Physical Count</span> column. The system
+                calculates the variance (physical count − system quantity) automatically.
+              </p>
+            )}
+          </div>
           {canSubmitCounts && (
             <Button
               size="sm"
@@ -300,20 +310,20 @@ export default function AuditDetailPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Part ID
+                    Part
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    Snapshot Qty
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                    System Qty
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                     Counted Qty
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                     Variance
                   </th>
                   {canSubmitCounts && (
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      Enter Count
+                      Physical Count
                     </th>
                   )}
                 </tr>
@@ -323,16 +333,21 @@ export default function AuditDetailPage() {
                   const existingCount = countMap.get(item.spare_part_id);
                   return (
                     <tr key={item.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
-                        {item.spare_part_id.slice(0, 12)}...
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
-                        {item.snapshot_quantity}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
-                        {existingCount ? existingCount.counted_quantity : '—'}
-                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        <p className="font-medium text-gray-900">
+                          {item.part_name || `${item.spare_part_id.slice(0, 8)}...`}
+                        </p>
+                        {item.part_number && (
+                          <p className="text-xs text-gray-500">{item.part_number}</p>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {formatQuantity(item.snapshot_quantity)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
+                        {existingCount ? formatQuantity(existingCount.counted_quantity) : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-right">
                         {existingCount ? (
                           <span
                             className={
@@ -344,7 +359,7 @@ export default function AuditDetailPage() {
                             }
                           >
                             {existingCount.variance > 0 ? '+' : ''}
-                            {existingCount.variance}
+                            {formatQuantity(existingCount.variance)}
                           </span>
                         ) : (
                           '—'
