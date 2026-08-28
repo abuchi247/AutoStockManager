@@ -18,8 +18,28 @@ export type ReportRow = Record<string, unknown>;
 
 export function formatReportCell(value: unknown): string {
   if (value === null || value === undefined) return '—';
-  if (typeof value === 'number') return value.toLocaleString('en-NG');
+  if (typeof value === 'number') {
+    return value.toLocaleString('en-NG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // Numeric strings (backend returns Decimals as strings like "518000.00000000")
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    // Match a plain number (optionally negative, with decimals)
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const num = parseFloat(trimmed);
+      if (!isNaN(num)) {
+        return num.toLocaleString('en-NG', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+    }
+    return value;
+  }
   return String(value);
 }
 

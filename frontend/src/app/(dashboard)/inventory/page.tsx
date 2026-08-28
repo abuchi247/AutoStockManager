@@ -25,7 +25,7 @@ import type {
   Category,
   PaginatedResponse,
 } from '@/lib/types';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, formatQuantity } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { sparePartCreateSchema } from '@/lib/validation/schemas';
@@ -270,7 +270,7 @@ export default function InventoryPage() {
       key: 'total_stock',
       header: 'Stock',
       sortable: true,
-      render: (item) => <span>{item.total_stock ?? 0}</span>,
+      render: (item) => <span>{formatQuantity(item.total_stock ?? 0)}</span>,
     },
     {
       key: 'selling_price',

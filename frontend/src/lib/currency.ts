@@ -43,7 +43,20 @@ export function formatCurrency(amount: number | string): string {
   return new Intl.NumberFormat(getLocale(), {
     style: 'currency',
     currency: getCurrency(),
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num);
+}
+
+/**
+ * Format a quantity/stock number without trailing zeros.
+ * Whole numbers show as integers (91), fractional show up to 2 decimals (2.5).
+ */
+export function formatQuantity(amount: number | string): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '—';
+  return num.toLocaleString('en-NG', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }

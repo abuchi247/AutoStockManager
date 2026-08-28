@@ -15,7 +15,7 @@ import {
 } from '@/components';
 import type { SelectOption } from '@/components';
 import type { SparePart, SparePartUpdate, Category } from '@/lib/types';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, formatQuantity } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 
 export default function InventoryDetailPage() {
@@ -485,7 +485,7 @@ export default function InventoryDetailPage() {
             <div className="flex justify-between items-center pt-2 border-t">
               <dt className="text-sm text-gray-500">Current Stock</dt>
               <dd className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-900">{stockLevel}</span>
+                <span className="text-sm font-medium text-gray-900">{formatQuantity(stockLevel)}</span>
                 <Badge
                   variant={stockStatus === 'in_stock' ? 'success' : stockStatus === 'low' ? 'warning' : 'danger'}
                 >
@@ -495,15 +495,15 @@ export default function InventoryDetailPage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Min Stock Level</dt>
-              <dd className="text-sm font-medium text-gray-900">{part.min_stock_level}</dd>
+              <dd className="text-sm font-medium text-gray-900">{formatQuantity(part.min_stock_level)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Max Stock Level</dt>
-              <dd className="text-sm font-medium text-gray-900">{part.max_stock_level}</dd>
+              <dd className="text-sm font-medium text-gray-900">{formatQuantity(part.max_stock_level)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Reorder Quantity</dt>
-              <dd className="text-sm font-medium text-gray-900">{part.reorder_quantity}</dd>
+              <dd className="text-sm font-medium text-gray-900">{formatQuantity(part.reorder_quantity)}</dd>
             </div>
           </dl>
         </div>
@@ -725,10 +725,10 @@ export default function InventoryDetailPage() {
                         {formatCurrency(cl.unit_cost)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
-                        {cl.original_quantity}
+                        {formatQuantity(cl.original_quantity)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-right text-gray-900">
-                        {cl.remaining_quantity}
+                        {formatQuantity(cl.remaining_quantity)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                         {cl.source_type}
@@ -1009,7 +1009,7 @@ function StockByLocation({ partId }: { partId: string }) {
                 {item.location_name || '—'}
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-sm text-right font-medium text-gray-900">
-                {item.current_quantity}
+                {formatQuantity(item.current_quantity)}
               </td>
             </tr>
           ))}
