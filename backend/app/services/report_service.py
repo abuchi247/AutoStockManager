@@ -739,7 +739,7 @@ class ReportService:
         # Gross margin
         gross_margin = total_revenue - total_cogs
         gross_margin_pct = (
-            (gross_margin / total_revenue * Decimal("100"))
+            (gross_margin / total_revenue * Decimal("100")).quantize(Decimal("0.01"))
             if total_revenue > 0
             else Decimal("0.00")
         )
