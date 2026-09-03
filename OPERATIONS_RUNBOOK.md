@@ -1,6 +1,6 @@
 # Production Operations Runbook
 
-This runbook describes the minimum operating procedure for AutoStockManager deployments. It applies to the Docker Compose/Railway-style deployment in this repository and should be reviewed whenever the application, migrations, or infrastructure dependencies change.
+This runbook describes the minimum operating procedure for AutoStockManager deployments. It applies to the Docker Compose deployment in this repository and to managed container hosts such as Render (see [DEPLOYMENT.md](DEPLOYMENT.md)), and should be reviewed whenever the application, migrations, or infrastructure dependencies change.
 
 ## 1. Release prerequisites and ownership
 
@@ -198,7 +198,7 @@ docker run --rm \
     "s3://${BACKUP_BUCKET}/autostockmanager/$(date -u +%Y/%m/%d)/latest.dump"
 ```
 
-For managed PostgreSQL services (Railway, Supabase, RDS), use the platform's point-in-time backup and restore instead of the self-managed script.
+For managed PostgreSQL services (Render, Supabase, RDS), use the platform's point-in-time backup and restore instead of the self-managed script.
 
 ### Restore
 

@@ -29,6 +29,13 @@ ARG BUILD_DATE=unknown
 ENV NEXT_PUBLIC_BUILD_COMMIT=${GIT_COMMIT}
 ENV NEXT_PUBLIC_BUILD_DATE=${BUILD_DATE}
 
+# The API URL is a NEXT_PUBLIC_ var baked into the browser bundle at build
+# time, so it must be provided as a build argument (not just a runtime env).
+# On Render, set this build arg to the deployed backend's public URL, e.g.
+# https://autostockmanager-backend.onrender.com/api/v1
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN npm run build
 
 # ---------- Stage 3: Runtime ----------

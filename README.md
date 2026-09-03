@@ -38,7 +38,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 | Error Tracking | Sentry |
 | Testing (Backend) | pytest (1115 unit tests), Hypothesis (property-based) |
 | Testing (Frontend) | Vitest (48 unit tests), Playwright (E2E + accessibility via axe-core) |
-| Deployment | Docker, Docker Compose, Railway |
+| Deployment | Docker, Docker Compose, Render |
 
 ## Getting Started
 
@@ -304,201 +304,25 @@ docker exec autostockmanager-backend python scripts/create_user.py \
 
 **First login behavior:** By default, all CLI-created users must change their password on first login. The temporary password provided in the `--password` flag is only used for the initial authentication — the user immediately sets their own password. Use `--no-force-change` to skip this requirement (not recommended for production).
 
-## Deploying to Railway
+## Deploying to Render
 
-[Railway](https://railway.app) is the recommended platform for cloud deployment. This section covers the full process from project creation to a working production environment.
+[Render](https://render.com) is the recommended platform for cloud deployment. The repo includes a `render.yaml` blueprint that provisions the entire stack — PostgreSQL, Redis, the FastAPI backend, the ARQ worker, and the Next.js frontend — from a single one-click deploy, reusing the existing Dockerfiles (no code changes).
 
-### Prerequisites
+**Full step-by-step instructions, including migrating off Railway and shutting it down, are in [DEPLOYMENT.md](DEPLOYMENT.md).**
 
-- [Railway CLI](https://docs.railway.com/guides/cli) installed (`brew install railway` on macOS)
-- A Railway account (free tier available)
-- GitHub repository connected to Railway
+Quick summary:
 
-### Step 1: Create Railway Project
+1. Push this repo to GitHub.
+2. Render Dashboard → **New → Blueprint** → select the repo → **Apply**. Render reads `render.yaml` and creates all five services.
+3. After the first deploy, set the cross-service values in the dashboard (they depend on the assigned hostnames):
+   - Backend: `CORS_ORIGINS` and `FRONTEND_BASE_URL` → the frontend URL; plus SMTP credentials.
+   - Frontend: `NEXT_PUBLIC_API_URL` → `https://<backend>.onrender.com/api/v1`, then **redeploy the frontend** (it is baked in at build time).
+   - Worker: the same SMTP credentials as the backend.
+4. Verify `https://<backend>.onrender.com/health` returns healthy, then open the frontend and log in. The initial admin's temporary password is in the backend logs (search for `Temporary Password`).
 
-```bash
-# Login to Railway
-railway login
+Migrations run automatically on backend startup (`backend/start.sh` runs `alembic upgrade head`, then launches uvicorn with `WEB_CONCURRENCY` workers). Every push to the default branch auto-deploys.
 
-# Create a new project (or link to an existing one)
-railway init
-```
-
-### Step 2: Add Database Services
-
-In the Railway dashboard:
-1. Click **"+ New"** → **"Database"** → **PostgreSQL**
-2. Click **"+ New"** → **"Database"** → **Redis**
-
-Both will auto-provision and provide connection URLs.
-
-### Step 3: Deploy Backend Service
-
-1. In Railway dashboard, click **"+ New"** → **"GitHub Repo"** → select your repo
-2. Set the **Root Directory** to `backend` (or configure via `railway.json`)
-3. Railway auto-detects the Dockerfile and builds/deploys
-
-### Step 4: Deploy Frontend Service
-
-1. Click **"+ New"** → **"GitHub Repo"** → select the same repo again
-2. Set the **Root Directory** to `frontend`
-3. Railway builds and deploys the Next.js app
-
-### Step 5: Configure Environment Variables
-
-Link your CLI to the backend service and set required variables:
-
-```bash
-# Link to backend service
-railway link --service <backend-service-name>
-
-# Set environment variables
-railway variable set DATABASE_URL=<railway-postgres-url>
-railway variable set REDIS_URL=<railway-redis-url>
-railway variable set JWT_SECRET_KEY=<your-strong-secret>
-railway variable set CORS_ORIGINS='["https://<frontend-service>.up.railway.app"]'
-railway variable set ENVIRONMENT=production
-railway variable set JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-railway variable set JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-```
-
-For the frontend service:
-
-```bash
-# Link to frontend service
-railway link --service <frontend-service-name>
-
-# IMPORTANT: Use https:// (not http://) for the backend URL
-railway variable set NEXT_PUBLIC_API_URL=https://<backend-service>.up.railway.app/api/v1
-```
-
-> **Note:** `NEXT_PUBLIC_API_URL` is a build-time variable in Next.js. After changing it, you must redeploy the frontend for it to take effect.
-
-### Step 6: Initialize the Database
-
-After the backend is deployed and the database is provisioned, apply the reviewed schema migrations before running the seed/setup script. The migration command is safe to rerun and is serialized with other deployment instances:
-
-```bash
-# Link CLI to backend service
-railway link --service <backend-service-name>
-
-# Apply migrations explicitly; a failure blocks the deployment step
-cd backend && railway run alembic upgrade head
-
-# Create the admin user and seed categories
-cd backend && railway run python3 scripts/setup_db.py
-```
-
-The Docker entrypoint also runs `alembic upgrade head` before starting Uvicorn, so a failed migration prevents the API from accepting traffic. `setup_db.py` uses the same migration runner and only handles seed data after migrations succeed.
-
-This script will:
-1. Apply all pending Alembic migrations
-2. Seed 45 default categories (Brakes, Filters, Engine Parts, etc.)
-
-The initial admin account is auto-provisioned on first startup when the users table is empty. Check the backend logs for the temporary password:
-
-```bash
-railway logs --service <backend-service-name> | grep "Temporary Password"
-```
-
-**Note:** The backend does not create tables or apply schema patches at runtime. The Docker startup command and `setup_db.py` both run the reviewed Alembic migration chain before any seed data is written.
-
-### Step 7: Verify Setup
-
-After running the setup script, verify everything is working:
-
-```bash
-# Test the health endpoint
-curl https://<backend-service>.up.railway.app/health
-
-# Test login (use the temporary password from the backend logs)
-curl -X POST https://<backend-service>.up.railway.app/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"<temp-password-from-logs>"}'
-```
-
-The login will return `password_change_required: true` with a scoped token. Use the frontend to complete the password change, or call the API directly:
-
-```bash
-curl -X POST https://<backend-service>.up.railway.app/api/v1/auth/force-change-password \
-  -H "Content-Type: application/json" \
-  -d '{"password_change_token":"<token-from-login>","new_password":"YourSecurePass1!"}'
-```
-
-If you need to create additional users or re-seed categories manually, the individual scripts still work:
-
-```bash
-# Create a specific user (will require password change on first login)
-cd backend && railway run python3 scripts/create_user.py -u manager -p TempMgr1! -r Manager -e manager@example.com
-
-# Re-seed categories (skips if any exist)
-cd backend && railway run python3 scripts/seed_categories.py
-```
-
-### Step 8: Generate Public URLs
-
-In the Railway dashboard, go to each service → **Settings** → **Networking** → **Generate Domain**. This gives you public `*.up.railway.app` URLs.
-
-### Step 9: Redeploy Frontend
-
-After setting `NEXT_PUBLIC_API_URL`, redeploy the frontend to bake the URL into the build:
-
-```bash
-railway link --service <frontend-service-name>
-railway redeploy -y
-```
-
-**Migration policy:** Never modify production schema manually or rely on SQLAlchemy metadata creation. Add a reviewed revision under `backend/alembic/versions/`, validate it against a copy of the current database, then run:
-
-```bash
-# Local/container deployment
-cd backend && alembic upgrade head
-
-# Railway deployment
-railway run alembic upgrade head
-```
-
-The migration runner holds a PostgreSQL advisory lock, so only one instance applies revisions at a time. If a revision fails, the command exits non-zero and the Docker startup command does not launch the API. To use controlled startup execution instead of the deployment command, set `RUN_MIGRATIONS_ON_STARTUP=true`; failures are propagated and abort application startup.
-
-### Troubleshooting Railway Deployment
-
-| Issue | Solution |
-|-------|----------|
-| Backend returns 502 | Ensure `PORT=8000` is set as a Railway service variable. The Dockerfile hardcodes port 8000. |
-| Login fails | Run `cd backend && railway run python3 scripts/setup_db.py` to initialize tables and create admin |
-| Frontend can't reach backend | Verify `NEXT_PUBLIC_API_URL` uses `https://` (not `http://`) and includes `/api/v1` |
-| CORS errors in browser | Set `CORS_ORIGINS` to the exact frontend URL, e.g. `'["https://<frontend>.up.railway.app"]'`. Using `["*"]` is **not permitted** in production and will be rejected at startup. |
-| Variable change has no effect (frontend) | `NEXT_PUBLIC_*` vars are build-time; redeploy the frontend after changing |
-| `railway run` fails with "No such file" | Make sure you're in the `backend/` directory locally when running commands |
-| New columns/tables missing after deploy | Add a reviewed Alembic revision and run `alembic upgrade head`; the API will not apply schema changes implicitly |
-
-### Architecture on Railway
-
-```
-┌─────────────────────────────────────────────────┐
-│                   Railway                        │
-│                                                  │
-│  ┌──────────────┐       ┌──────────────┐       │
-│  │   Frontend   │──────▶│   Backend    │       │
-│  │  (Next.js)   │       │  (FastAPI)   │       │
-│  │  Port: $PORT │       │  Port: $PORT │       │
-│  └──────────────┘       └──────┬───────┘       │
-│                                 │                │
-│                    ┌────────────┼────────────┐   │
-│                    │            │            │   │
-│              ┌─────▼─────┐ ┌───▼────┐       │   │
-│              │ PostgreSQL │ │ Redis  │       │   │
-│              │   (DB)     │ │(Cache) │       │   │
-│              └───────────┘ └────────┘       │   │
-│                                              │   │
-└─────────────────────────────────────────────────┘
-```
-
-### Live URLs (Current Deployment)
-
-- **Frontend:** https://lively-flexibility-production-2bae.up.railway.app
-- **Backend API:** https://autostockmanager-production.up.railway.app
-- **Health Check:** https://autostockmanager-production.up.railway.app/health
+> **Free-tier note:** Free web services sleep after ~15 minutes of inactivity (~30s cold start) and the free PostgreSQL expires after 90 days. For steady business use, upgrade the backend and frontend to the cheapest paid instance and the database to a retained plan. See [DEPLOYMENT.md](DEPLOYMENT.md) for details.
 
 ## First-Time Configuration
 
