@@ -509,7 +509,12 @@ class SalesService:
 
     async def _get_sale_with_items(self, sale_id: uuid.UUID) -> Sale:
         """Retrieve a sale with its items loaded, or raise SaleNotFoundError."""
-        stmt = select(Sale).filter_by(id=sale_id)
+        from sqlalchemy.orm import selectinload
+        stmt = (
+            select(Sale)
+            .filter_by(id=sale_id)
+            .options(selectinload(Sale.items))
+        )
         result = await self.db.execute(stmt)
         sale = result.scalar_one_or_none()
 

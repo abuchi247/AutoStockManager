@@ -215,10 +215,35 @@ class SaleResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SaleSummaryResponse(BaseModel):
+    """Lightweight sale row for list views — excludes line items.
+
+    The sales list only renders header fields, so line items are intentionally
+    omitted to avoid over-fetching every sale's items (and their parts) per page.
+    """
+
+    id: UUID = Field(..., description="Sale UUID")
+    customer_id: Optional[UUID] = Field(default=None, description="Customer UUID")
+    customer_name: Optional[str] = Field(default=None, description="Customer name")
+    location_id: UUID = Field(..., description="Selling location UUID")
+    invoice_number: Optional[str] = Field(default=None, description="Invoice number")
+    status: str = Field(..., description="Sale status")
+    payment_type: str = Field(..., description="Payment type")
+    subtotal: Decimal = Field(..., description="Subtotal before tax")
+    tax_amount: Decimal = Field(..., description="Tax amount")
+    total_amount: Decimal = Field(..., description="Total amount")
+    discount_total: Decimal = Field(..., description="Total discount")
+    amount_paid: Optional[Decimal] = Field(default=Decimal("0.00"), description="Amount paid")
+    created_at: Optional[datetime] = Field(default=None, description="Created timestamp")
+    updated_at: Optional[datetime] = Field(default=None, description="Updated timestamp")
+
+    model_config = {"from_attributes": True}
+
+
 class SaleListResponse(BaseModel):
     """Response body for sale list with pagination metadata."""
 
-    data: list[SaleResponse] = Field(..., description="List of sales")
+    data: list[SaleSummaryResponse] = Field(..., description="List of sales")
     meta: dict = Field(
         default_factory=lambda: {"page": 1, "total": 0},
         description="Pagination metadata",

@@ -77,5 +77,6 @@ LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.source="https://github.com/autostockmanager/backend" \
       com.autostockmanager.migration-head="${MIGRATION_HEAD}"
 
-# Apply migrations then start the server. Migration failure aborts startup.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Start via the startup script: runs migrations (unless RUN_MIGRATIONS=false)
+# then launches uvicorn with WEB_CONCURRENCY workers for real concurrency.
+CMD ["sh", "/app/start.sh"]

@@ -231,17 +231,19 @@ class TestCSVExport:
 class TestPDFExport:
     """Tests for PDF export functionality (Req 12.6)."""
 
-    def test_export_sales_report_pdf_returns_bytes(
+    @pytest.mark.asyncio
+    async def test_export_sales_report_pdf_returns_bytes(
         self, report_service, sales_filters
     ):
         """PDF export should return bytes (HTML fallback if no WeasyPrint)."""
         report = SalesReportResult(filters=sales_filters)
-        result = report_service.export_sales_report_pdf(report)
+        result = await report_service.export_sales_report_pdf(report)
         assert isinstance(result, bytes)
         # Should contain HTML content (fallback) or PDF bytes
         assert len(result) > 0
 
-    def test_export_sales_report_pdf_contains_report_data(
+    @pytest.mark.asyncio
+    async def test_export_sales_report_pdf_contains_report_data(
         self, report_service, sales_filters
     ):
         """PDF export should contain report data (tested via HTML fallback)."""
@@ -251,21 +253,25 @@ class TestPDFExport:
             sale_count=10,
         )
         # Mock WeasyPrint away so we can verify the HTML content
+        async def _fake_pdf(html):
+            return html.encode("utf-8")
         with pytest.MonkeyPatch.context() as m:
-            m.setattr(report_service, "_html_to_pdf", lambda html: html.encode("utf-8"))
-            result = report_service.export_sales_report_pdf(report)
+            m.setattr(report_service, "_html_to_pdf", _fake_pdf)
+            result = await report_service.export_sales_report_pdf(report)
         html_content = result.decode("utf-8")
         assert "Sales Report" in html_content
         assert "5000.00" in html_content
 
-    def test_export_inventory_report_pdf_returns_bytes(self, report_service):
+    @pytest.mark.asyncio
+    async def test_export_inventory_report_pdf_returns_bytes(self, report_service):
         """Inventory PDF export should return bytes."""
         report = InventoryReportResult()
-        result = report_service.export_inventory_report_pdf(report)
+        result = await report_service.export_inventory_report_pdf(report)
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    def test_export_financial_summary_pdf_content(
+    @pytest.mark.asyncio
+    async def test_export_financial_summary_pdf_content(
         self, report_service, date_range
     ):
         """Financial summary PDF should include all metrics."""
@@ -275,9 +281,11 @@ class TestPDFExport:
             gross_margin=Decimal("40000.00"),
         )
         # Mock WeasyPrint away so we can verify the HTML content
+        async def _fake_pdf(html):
+            return html.encode("utf-8")
         with pytest.MonkeyPatch.context() as m:
-            m.setattr(report_service, "_html_to_pdf", lambda html: html.encode("utf-8"))
-            result = report_service.export_financial_summary_pdf(report)
+            m.setattr(report_service, "_html_to_pdf", _fake_pdf)
+            result = await report_service.export_financial_summary_pdf(report)
         html_content = result.decode("utf-8")
         assert "Financial Summary" in html_content
         assert "100000.00" in html_content

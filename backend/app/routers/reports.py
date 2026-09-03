@@ -115,7 +115,7 @@ async def get_sales_report(
             headers={"Content-Disposition": "attachment; filename=sales_report.csv"},
         )
     elif format == "pdf":
-        pdf_content = service.export_sales_report_pdf(report)
+        pdf_content = await service.export_sales_report_pdf(report)
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -192,7 +192,7 @@ async def get_inventory_report(
             headers={"Content-Disposition": "attachment; filename=inventory_report.csv"},
         )
     elif format == "pdf":
-        pdf_content = service.export_inventory_report_pdf(report)
+        pdf_content = await service.export_inventory_report_pdf(report)
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -287,7 +287,7 @@ async def get_customer_report(
             headers={"Content-Disposition": "attachment; filename=customer_report.csv"},
         )
     elif format == "pdf":
-        pdf_content = service.export_customer_report_pdf(report)
+        pdf_content = await service.export_customer_report_pdf(report)
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -378,7 +378,7 @@ async def get_supplier_report(
             headers={"Content-Disposition": "attachment; filename=supplier_report.csv"},
         )
     elif format == "pdf":
-        pdf_content = service.export_supplier_report_pdf(report)
+        pdf_content = await service.export_supplier_report_pdf(report)
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -465,7 +465,7 @@ async def get_financial_summary(
             headers={"Content-Disposition": "attachment; filename=financial_summary.csv"},
         )
     elif format == "pdf":
-        pdf_content = service.export_financial_summary_pdf(report)
+        pdf_content = await service.export_financial_summary_pdf(report)
         return Response(
             content=pdf_content,
             media_type="application/pdf",

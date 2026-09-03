@@ -160,7 +160,11 @@ class Sale(BaseModel, SoftDeleteMixin):
         "SaleItem",
         back_populates="sale",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        # Loaded explicitly via selectinload() where needed (sale detail,
+        # confirm, return). Not auto-loaded, so the sales LIST endpoint — which
+        # only renders header fields — does not over-fetch every sale's line
+        # items and their parts on each page.
+        lazy="select",
     )
 
     def __repr__(self) -> str:
@@ -253,12 +257,13 @@ class SaleItem(BaseModel):
     sale: Mapped["Sale"] = relationship(
         "Sale",
         back_populates="items",
-        lazy="selectin",
+        lazy="select",
     )
 
     spare_part: Mapped[Optional["SparePart"]] = relationship(
         "SparePart",
-        lazy="selectin",
+        # Loaded explicitly via selectinload() on the sale detail endpoint.
+        lazy="select",
     )
 
     def __repr__(self) -> str:

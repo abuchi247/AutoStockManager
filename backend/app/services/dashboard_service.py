@@ -106,7 +106,10 @@ class DashboardService:
         """
         kpi_data = KPIData()
 
-        # Sales KPIs are visible to all roles
+        # Sales KPIs are visible to all roles. These are simple indexed
+        # aggregates that run in a few milliseconds each; they share the
+        # request's single AsyncSession (which cannot run queries concurrently),
+        # so they are awaited sequentially.
         kpi_data.total_sales_today = await self._get_total_sales_today()
         kpi_data.total_sales_month = await self._get_total_sales_month()
 
@@ -117,7 +120,6 @@ class DashboardService:
             kpi_data.pending_po_count = await self._get_pending_po_count()
             kpi_data.top_selling_products = await self._get_top_selling_products()
 
-        # Salesperson sees only sales KPIs (already populated above)
         # Storekeeper sees inventory-related KPIs
         elif user_role == UserRole.STOREKEEPER.value:
             kpi_data.low_stock_count = await self._get_low_stock_count()

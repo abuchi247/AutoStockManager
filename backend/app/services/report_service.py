@@ -255,7 +255,11 @@ class ReportService:
         if filters.customer_id:
             conditions.append(Sale.customer_id == filters.customer_id)
 
-        stmt = select(Sale).where(and_(*conditions))
+        # Eager-load line items — the report reads sale.items for COGS and
+        # category filtering. Sale.items is lazy=select, so it must be loaded
+        # explicitly here (a lazy load would fail in this async context).
+        from sqlalchemy.orm import selectinload
+        stmt = select(Sale).where(and_(*conditions)).options(selectinload(Sale.items))
         result = await self.db.execute(stmt)
         sales = result.scalars().all()
 
@@ -1038,7 +1042,7 @@ class ReportService:
     # Export: PDF (Req 12.6)
     # -------------------------------------------------------------------------
 
-    def export_sales_report_pdf(self, report: SalesReportResult) -> bytes:
+    async def export_sales_report_pdf(self, report: SalesReportResult) -> bytes:
         """Export sales report to PDF format using WeasyPrint.
 
         Args:
@@ -1048,43 +1052,44 @@ class ReportService:
             PDF content as bytes.
         """
         html = self._render_sales_report_html(report)
-        return self._html_to_pdf(html)
+        return await self._html_to_pdf(html)
 
-    def export_inventory_report_pdf(
+    async def export_inventory_report_pdf(
         self, report: InventoryReportResult
     ) -> bytes:
         """Export inventory report to PDF format."""
         html = self._render_inventory_report_html(report)
-        return self._html_to_pdf(html)
+        return await self._html_to_pdf(html)
 
-    def export_customer_report_pdf(
+    async def export_customer_report_pdf(
         self, report: CustomerReportResult
     ) -> bytes:
         """Export customer report to PDF format."""
         html = self._render_customer_report_html(report)
-        return self._html_to_pdf(html)
+        return await self._html_to_pdf(html)
 
-    def export_supplier_report_pdf(
+    async def export_supplier_report_pdf(
         self, report: SupplierReportResult
     ) -> bytes:
         """Export supplier report to PDF format."""
         html = self._render_supplier_report_html(report)
-        return self._html_to_pdf(html)
+        return await self._html_to_pdf(html)
 
-    def export_financial_summary_pdf(
+    async def export_financial_summary_pdf(
         self, report: FinancialSummaryResult
     ) -> bytes:
         """Export financial summary to PDF format."""
         html = self._render_financial_summary_html(report)
-        return self._html_to_pdf(html)
+        return await self._html_to_pdf(html)
 
 
     # -------------------------------------------------------------------------
     # Private Helpers: HTML Rendering for PDF
     # -------------------------------------------------------------------------
 
-    def _html_to_pdf(self, html: str) -> bytes:
-        """Convert HTML to PDF using WeasyPrint.
+    @staticmethod
+    def _render_pdf_sync(html: str) -> bytes:
+        """Synchronous WeasyPrint rendering (runs in a worker thread).
 
         Falls back to returning HTML as bytes if WeasyPrint is not available
         or if PDF rendering fails (e.g., missing system fonts on CI).
@@ -1093,11 +1098,20 @@ class ReportService:
             from weasyprint import HTML
             return HTML(string=html).write_pdf()
         except ImportError:
-            # WeasyPrint not installed — return HTML bytes as fallback
             return html.encode("utf-8")
         except Exception:
-            # Rendering failed (missing fonts, codec errors, etc.)
             return html.encode("utf-8")
+
+    async def _html_to_pdf(self, html: str) -> bytes:
+        """Convert HTML to PDF, offloading the CPU-heavy render to a thread.
+
+        WeasyPrint is synchronous and CPU-bound; running it directly on the
+        event loop would block every other request for the duration of the
+        render. anyio.to_thread runs it in a worker thread so the event loop
+        stays responsive.
+        """
+        import anyio
+        return await anyio.to_thread.run_sync(self._render_pdf_sync, html)
 
     def _base_css(self) -> str:
         """Return base CSS for PDF reports."""

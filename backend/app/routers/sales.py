@@ -28,6 +28,7 @@ from app.schemas.sale import (
     SaleListResponse,
     SaleResponse,
     SaleReturnRequest,
+    SaleSummaryResponse,
 )
 from app.services.sales_service import (
     InsufficientStockError,
@@ -103,7 +104,7 @@ async def list_sales(
 
     data = []
     for s in sales:
-        resp = SaleResponse.model_validate(s)
+        resp = SaleSummaryResponse.model_validate(s)
         resp.customer_name = customer_map.get(s.customer_id) if s.customer_id else None
         data.append(resp)
 
