@@ -2,7 +2,7 @@
 
 This document defines the backup schedule, recovery objectives, encryption requirements,
 retention policies, restore verification procedures, and access controls for the
-AutoStockManager production deployment.
+StockPilot production deployment.
 
 **Owner:** Infrastructure / DevOps team lead
 **Review cadence:** Quarterly or after any significant schema/data change
@@ -47,20 +47,20 @@ When using a managed database service (RDS, Cloud SQL, Supabase, etc.):
 pg_dump \
   --format=custom \
   --no-owner \
-  --file="/backup/autostockmanager-$(date +%Y%m%d-%H%M%S).dump" \
+  --file="/backup/stockpilot-$(date +%Y%m%d-%H%M%S).dump" \
   "$BACKUP_PGDATABASE_URL"
 
 # Encrypt before uploading to off-host storage
 gpg --symmetric --cipher-algo AES256 \
-  --output "/backup/autostockmanager-$(date +%Y%m%d-%H%M%S).dump.gpg" \
-  "/backup/autostockmanager-$(date +%Y%m%d-%H%M%S).dump"
+  --output "/backup/stockpilot-$(date +%Y%m%d-%H%M%S).dump.gpg" \
+  "/backup/stockpilot-$(date +%Y%m%d-%H%M%S).dump"
 
 # Upload to off-host storage
-aws s3 cp "/backup/autostockmanager-$(date +%Y%m%d-%H%M%S).dump.gpg" \
+aws s3 cp "/backup/stockpilot-$(date +%Y%m%d-%H%M%S).dump.gpg" \
   "s3://${BACKUP_BUCKET}/postgres/daily/"
 
 # Remove local unencrypted copy
-rm -f "/backup/autostockmanager-$(date +%Y%m%d-%H%M%S).dump"
+rm -f "/backup/stockpilot-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
 ### Redis

@@ -5,7 +5,7 @@ Usage (from inside the backend container):
     python scripts/create_user.py --username admin --password Admin123! --role ADMIN --email admin@example.com
 
 Or with Docker:
-    docker exec autostockmanager-backend python scripts/create_user.py \
+    docker exec stockpilot-backend python scripts/create_user.py \
         --username admin --password Admin123! --role ADMIN --email admin@example.com
 
 Roles: ADMIN, MANAGER, SALESPERSON, STOREKEEPER

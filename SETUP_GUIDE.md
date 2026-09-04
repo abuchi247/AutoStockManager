@@ -1,4 +1,4 @@
-# AutoStockManager — Setup & Operations Guide (SOP)
+# StockPilot — Setup & Operations Guide (SOP)
 
 A step-by-step guide for business owners setting up the system for the first time. Follow each phase in order.
 
@@ -7,14 +7,14 @@ A step-by-step guide for business owners setting up the system for the first tim
 ## Phase 1: Start the System
 
 ```bash
-cd /Users/abuchiobiegbu/Desktop/AutoStockManager
+cd /Users/abuchiobiegbu/Desktop/StockPilot
 docker compose up --build -d
 ```
 
 Wait 30 seconds, then get your admin password:
 
 ```bash
-docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"
+docker logs stockpilot-backend 2>&1 | grep "Temporary Password"
 ```
 
 Open http://localhost:3000 and log in:
@@ -375,7 +375,7 @@ If you need to start over completely:
 ```bash
 docker compose down -v          # Deletes all data
 docker compose up --build -d    # Rebuilds and starts fresh
-docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"
+docker logs stockpilot-backend 2>&1 | grep "Temporary Password"
 ```
 
 This gives you a clean database with only the admin account and default categories.

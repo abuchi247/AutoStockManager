@@ -13,7 +13,7 @@ deploying to Railway or running CI against a fresh database.
 
 Usage:
     # Inside the container:
-    docker exec autostockmanager-backend python scripts/setup_db.py
+    docker exec stockpilot-backend python scripts/setup_db.py
 
     # Railway CLI (from backend/ directory):
     railway run python3 scripts/setup_db.py
@@ -68,7 +68,7 @@ async def setup() -> None:
                 {
                     "id": uuid.uuid4(),
                     "u": "admin",
-                    "e": "admin@autostockmanager.com",
+                    "e": "admin@stockpilot.app",
                     "pw": pw_hash,
                     "r": "Admin",
                     "now": now,

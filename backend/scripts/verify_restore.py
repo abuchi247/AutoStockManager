@@ -529,7 +529,7 @@ class RestoreVerifier:
 def main() -> None:
     """CLI entry point for restore verification."""
     parser = argparse.ArgumentParser(
-        description="Verify a restored PostgreSQL backup for AutoStockManager"
+        description="Verify a restored PostgreSQL backup for StockPilot"
     )
     parser.add_argument(
         "--database-url",

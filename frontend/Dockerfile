@@ -1,5 +1,5 @@
 ###############################################################################
-# Production Dockerfile for AutoStockManager frontend
+# Production Dockerfile for StockPilot frontend
 # - Multi-stage build: deps → build → runtime
 # - Runs as non-root user
 # - No development mounts or default credentials
@@ -31,8 +31,9 @@ ENV NEXT_PUBLIC_BUILD_DATE=${BUILD_DATE}
 
 # The API URL is a NEXT_PUBLIC_ var baked into the browser bundle at build
 # time, so it must be provided as a build argument (not just a runtime env).
-# On Render, set this build arg to the deployed backend's public URL, e.g.
-# https://autostockmanager-backend.onrender.com/api/v1
+# Set this build arg to the backend's public URL, e.g.
+# https://api.yourdomain.com/api/v1  (or https://yourdomain.com/api/v1 when
+# the API is proxied under the same domain as the frontend).
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
@@ -67,7 +68,7 @@ ARG GIT_COMMIT=unknown
 ARG BUILD_DATE=unknown
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.source="https://github.com/autostockmanager/frontend"
+      org.opencontainers.image.source="https://github.com/abuchi247/StockPilot"
 
 # Start the optimized production server
 CMD ["node", "server.js"]

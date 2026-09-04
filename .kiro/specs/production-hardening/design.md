@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design hardens the existing AutoStockManager application without changing its ERP domain model or introducing subscription billing. The work is organized into three layers:
+This design hardens the existing StockPilot application without changing its ERP domain model or introducing subscription billing. The work is organized into three layers:
 
 1. **Security boundary**: validate production secrets, deliver password-reset credentials safely, move browser refresh tokens to HTTP-only cookies, and tighten request handling.
 2. **Operational boundary**: add structured request-correlated logs, error tracking, dependency-aware health checks, deterministic migrations, background jobs, and CI enforcement.

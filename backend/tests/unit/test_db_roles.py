@@ -106,8 +106,8 @@ class TestValidateRoleSeparation:
         assert any("same database identity" in w.lower() for w in warnings)
 
     def test_no_superuser_warning_for_custom_user(self):
-        url = "postgresql+asyncpg://autostockmanager_app_user:s@localhost/db"
-        migration_url = "postgresql+asyncpg://autostockmanager_migrate_user:s@localhost/db"
+        url = "postgresql+asyncpg://stockpilot_app_user:s@localhost/db"
+        migration_url = "postgresql+asyncpg://stockpilot_migrate_user:s@localhost/db"
         warnings = validate_role_separation(url, migration_url)
         assert not any("privileged" in w.lower() for w in warnings)
         assert not any("same database identity" in w.lower() for w in warnings)
@@ -126,9 +126,9 @@ class TestGenerateRoleSql:
 
     def test_generates_sql_with_default_names(self):
         sql = generate_role_sql()
-        assert "autostockmanager_app" in sql
-        assert "autostockmanager_migrate" in sql
-        assert "autostockmanager_backup" in sql
+        assert "stockpilot_app" in sql
+        assert "stockpilot_migrate" in sql
+        assert "stockpilot_backup" in sql
         assert "CREATE ROLE" in sql
         assert "GRANT" in sql
 
@@ -142,9 +142,9 @@ class TestGenerateRoleSql:
 
     def test_includes_login_user_creation(self):
         sql = generate_role_sql()
-        assert "autostockmanager_app_user" in sql
-        assert "autostockmanager_migrate_user" in sql
-        assert "autostockmanager_backup_user" in sql
+        assert "stockpilot_app_user" in sql
+        assert "stockpilot_migrate_user" in sql
+        assert "stockpilot_backup_user" in sql
         assert "LOGIN" in sql
 
     def test_does_not_include_passwords(self):

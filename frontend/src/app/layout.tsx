@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'AutoStockManager - Spare Parts ERP',
-  description: 'Comprehensive ERP system for automotive spare parts management',
+  title: 'StockPilot - Inventory & Sales ERP',
+  description: 'Inventory, sales, and business management for any product-based business',
 };
 
 export default function RootLayout({

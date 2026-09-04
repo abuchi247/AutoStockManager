@@ -16,10 +16,10 @@ export default function AuthLayout({
         {/* Branding */}
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight text-[#333]">
-            AutoStockManager
+            StockPilot
           </h1>
           <p className="mt-1 text-sm text-[#666]">
-            Spare Parts ERP System
+            Inventory &amp; Sales ERP
           </p>
         </div>
 

@@ -6,7 +6,7 @@ credit ledger entry and creates them. Safe to run multiple times (idempotent).
 
 Usage:
     # Local Docker:
-    docker exec autostockmanager-backend python scripts/backfill_credit_ledger.py
+    docker exec stockpilot-backend python scripts/backfill_credit_ledger.py
 
     # Railway:
     cd backend && railway run python3 scripts/backfill_credit_ledger.py

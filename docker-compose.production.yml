@@ -83,8 +83,8 @@ x-hardening: &hardening
 services:
   backend:
     build: *backend-build
-    image: ${BACKEND_IMAGE:-autostockmanager-backend}:${IMAGE_TAG:-latest}
-    container_name: autostockmanager-backend
+    image: ${BACKEND_IMAGE:-stockpilot-backend}:${IMAGE_TAG:-latest}
+    container_name: stockpilot-backend
     # Bound to the reverse-proxy interface. TLS terminates at the proxy.
     ports:
       - "${BACKEND_BIND_ADDR:-127.0.0.1}:${BACKEND_PORT:-8000}:8000"
@@ -101,8 +101,8 @@ services:
 
   worker:
     build: *backend-build
-    image: ${BACKEND_IMAGE:-autostockmanager-backend}:${IMAGE_TAG:-latest}
-    container_name: autostockmanager-worker
+    image: ${BACKEND_IMAGE:-stockpilot-backend}:${IMAGE_TAG:-latest}
+    container_name: stockpilot-worker
     # Overrides the image CMD, so the worker never runs migrations itself.
     command: ["arq", "app.services.background_jobs.WorkerSettings"]
     environment:
@@ -127,8 +127,13 @@ services:
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_DATE: ${BUILD_DATE:-unknown}
-    image: ${FRONTEND_IMAGE:-autostockmanager-frontend}:${IMAGE_TAG:-latest}
-    container_name: autostockmanager-frontend
+        # NEXT_PUBLIC_API_URL is baked into the browser bundle at build time,
+        # so it MUST be supplied as a build arg here (the runtime environment
+        # value below cannot change an already-built client bundle). Rebuild
+        # the frontend image whenever this URL changes.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    image: ${FRONTEND_IMAGE:-stockpilot-frontend}:${IMAGE_TAG:-latest}
+    container_name: stockpilot-frontend
     ports:
       - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000"
     environment:
@@ -141,7 +146,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: autostockmanager-postgres
+    container_name: stockpilot-postgres
     # No published ports: reachable only from the application network.
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -179,7 +184,7 @@ services:
   # ---------------------------------------------------------------------------
   backup-runner:
     image: postgres:15-alpine
-    container_name: autostockmanager-backup-runner
+    container_name: stockpilot-backup-runner
     environment:
       PGHOST: postgres
       PGPORT: "5432"
@@ -209,7 +214,7 @@ services:
 
   backup-scheduler:
     image: mcuadros/ofelia:latest
-    container_name: autostockmanager-backup-scheduler
+    container_name: stockpilot-backup-scheduler
     command: daemon --docker
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -223,7 +228,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: autostockmanager-redis
+    container_name: stockpilot-redis
     # No published ports: reachable only from the application network.
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     environment:

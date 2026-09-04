@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Auto Spare Parts ERP System (AutoStockManager) has a solid functional foundation but was built without several safeguards required to run safely in production and to support paying customers reliably. This spec addresses security hardening, production infrastructure, frontend robustness, performance, recovery, and release quality.
+The Auto Spare Parts ERP System (StockPilot) has a solid functional foundation but was built without several safeguards required to run safely in production and to support paying customers reliably. This spec addresses security hardening, production infrastructure, frontend robustness, performance, recovery, and release quality.
 
 This effort does not introduce new business features (e.g. subscriptions/billing are covered separately). It closes gaps in the existing system so that it is safe to operate, observable when things go wrong, resilient on both the backend and frontend, and able to scale predictably. Where a fix conflicts with the current single-tenant, token-in-localStorage architecture, this document favors the minimal change that removes the risk without a large rewrite, and calls out follow-on work explicitly.
 

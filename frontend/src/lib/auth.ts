@@ -8,9 +8,9 @@
  * refreshed.
  */
 
-const ACCESS_TOKEN_KEY = 'autostockmanager_access_token';
-const REFRESH_TOKEN_KEY = 'autostockmanager_refresh_token';
-const USER_KEY = 'autostockmanager_user';
+const ACCESS_TOKEN_KEY = 'stockpilot_access_token';
+const REFRESH_TOKEN_KEY = 'stockpilot_refresh_token';
+const USER_KEY = 'stockpilot_user';
 
 let accessToken: string | null = null;
 

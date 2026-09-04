@@ -14,7 +14,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: autostockmanager-backend
+    container_name: stockpilot-backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -46,7 +46,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: autostockmanager-worker
+    container_name: stockpilot-worker
     command: ["arq", "app.services.background_jobs.WorkerSettings"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -84,7 +84,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: autostockmanager-frontend
+    container_name: stockpilot-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
@@ -97,7 +97,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: autostockmanager-postgres
+    container_name: stockpilot-postgres
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
@@ -107,7 +107,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-autostockmanager}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-stockpilot}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -117,7 +117,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: autostockmanager-redis
+    container_name: stockpilot-redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -145,7 +145,7 @@ services:
   # ---------------------------------------------------------------------------
   backup:
     image: postgres:15-alpine
-    container_name: autostockmanager-backup
+    container_name: stockpilot-backup
     profiles:
       - backup
     environment:

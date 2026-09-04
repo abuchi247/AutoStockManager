@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # =============================================================================
-# AutoStockManager — PostgreSQL restore script
+# StockPilot — PostgreSQL restore script
 #
 # POSIX sh — compatible with Alpine Linux's /bin/sh (ash/busybox).
 # ALWAYS restore into an isolated test database first — never run against
@@ -51,7 +51,7 @@ fi
 
 # ---- Verify checksum ---------------------------------------------------------
 # Resolve symlinks so we find the checksum for the real file
-# (e.g. latest.dump → autostockmanager-2026-01-01T02-00-00.dump whose .sha256 exists)
+# (e.g. latest.dump → stockpilot-2026-01-01T02-00-00.dump whose .sha256 exists)
 REAL_DUMP_FILE="${DUMP_FILE}"
 if [ -L "${DUMP_FILE}" ]; then
     REAL_DUMP_FILE="$(readlink -f "${DUMP_FILE}" 2>/dev/null || readlink "${DUMP_FILE}")"

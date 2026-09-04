@@ -1,6 +1,6 @@
 # Production Operations Runbook
 
-This runbook describes the minimum operating procedure for AutoStockManager deployments. It applies to the Docker Compose deployment in this repository and to managed container hosts such as Render (see [DEPLOYMENT.md](DEPLOYMENT.md)), and should be reviewed whenever the application, migrations, or infrastructure dependencies change.
+This runbook describes the minimum operating procedure for StockPilot deployments. It applies to the Docker Compose deployment in this repository and to managed container hosts such as Render (see [DEPLOYMENT.md](DEPLOYMENT.md)), and should be reviewed whenever the application, migrations, or infrastructure dependencies change.
 
 ## 1. Release prerequisites and ownership
 
@@ -149,8 +149,8 @@ This starts `backup-scheduler` (ofelia cron) and `backup-runner`. Ofelia reads t
 | `BACKUP_RETAIN` | `30` | Number of daily dumps to keep locally |
 
 Backup files land in the `backup-data` Docker named volume:
-- `autostockmanager-YYYY-MM-DDTHH-MM-SS.dump` — pg_dump custom format
-- `autostockmanager-YYYY-MM-DDTHH-MM-SS.dump.sha256` — SHA-256 checksum
+- `stockpilot-YYYY-MM-DDTHH-MM-SS.dump` — pg_dump custom format
+- `stockpilot-YYYY-MM-DDTHH-MM-SS.dump.sha256` — SHA-256 checksum
 - `latest.dump` — symlink to the most recent backup
 - `backup.log` — append-only log of every backup run
 
@@ -173,7 +173,7 @@ docker-compose run --rm --profile backup backup
 
 # With a pre-release label
 docker-compose run --rm --profile backup -e BACKUP_LABEL=pre-release backup
-# → creates: autostockmanager-2026-08-09T12-00-00.pre-release.dump
+# → creates: stockpilot-2026-08-09T12-00-00.pre-release.dump
 ```
 
 Production stack:
@@ -191,11 +191,11 @@ The `backup-data` named volume stores backups on the Docker host. Move copies of
 ```bash
 # Copy the latest backup to S3
 docker run --rm \
-  -v autostockmanager_backup-data:/backups:ro \
+  -v stockpilot_backup-data:/backups:ro \
   -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
   -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   amazon/aws-cli s3 cp /backups/latest.dump \
-    "s3://${BACKUP_BUCKET}/autostockmanager/$(date -u +%Y/%m/%d)/latest.dump"
+    "s3://${BACKUP_BUCKET}/stockpilot/$(date -u +%Y/%m/%d)/latest.dump"
 ```
 
 For managed PostgreSQL services (Render, Supabase, RDS), use the platform's point-in-time backup and restore instead of the self-managed script.
@@ -206,22 +206,22 @@ For managed PostgreSQL services (Render, Supabase, RDS), use the platform's poin
 
 ```bash
 # 1. Verify backup integrity
-docker-compose run --rm --profile backup -e PGDATABASE=autostockmanager_restore \
+docker-compose run --rm --profile backup -e PGDATABASE=stockpilot_restore \
   bash -c "sha256sum --check /backups/latest.dump.sha256"
 
 # 2. Restore into an isolated test database
-PGDATABASE=autostockmanager_restore \
+PGDATABASE=stockpilot_restore \
   docker-compose run --rm --profile backup backup \
   sh /restore.sh /backups/latest.dump
 
 # 3. Run the restore script directly (shows interactive 5-second warning)
-docker exec autostockmanager-postgres sh /restore.sh /backups/latest.dump
+docker exec stockpilot-postgres sh /restore.sh /backups/latest.dump
 ```
 
 Or using the restore script locally:
 ```bash
 PGHOST=localhost PGPORT=5432 \
-PGDATABASE=autostockmanager_restore \
+PGDATABASE=stockpilot_restore \
 PGUSER=postgres PGPASSWORD=<password> \
 bash scripts/restore.sh ./backups/latest.dump
 ```
@@ -229,13 +229,13 @@ bash scripts/restore.sh ./backups/latest.dump
 After restore, always verify:
 ```bash
 # 1. Check the Alembic revision matches the backup
-docker exec autostockmanager-backend alembic current
+docker exec stockpilot-backend alembic current
 
 # 2. Check the health endpoint
 curl http://localhost:8000/health
 
 # 3. Spot-check critical table counts
-docker exec autostockmanager-postgres psql \
+docker exec stockpilot-postgres psql \
   -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -c "SELECT COUNT(*) FROM sales; SELECT COUNT(*) FROM spare_parts; SELECT COUNT(*) FROM users;"
 ```
@@ -338,7 +338,7 @@ Both workflows run on pushes to `main` and on pull requests targeting `main`. Co
 Local equivalents of the gates:
 
 ```bash
-cd backend && pytest && docker build -t autostockmanager-backend:check .
+cd backend && pytest && docker build -t stockpilot-backend:check .
 cd frontend && npm ci && npm run lint && npx tsc --noEmit && npm test && npm run build && npm run perf:bundle
 cd frontend && npm run e2e            # requires the backend stack and E2E_USERNAME/E2E_PASSWORD
 python .github/scripts/security_exceptions.py
@@ -562,7 +562,7 @@ Current local checks are:
 ```bash
 cd backend && pytest
 cd frontend && npm run lint && npx tsc --noEmit && npm test && npm run build
-cd backend && docker build -t autostockmanager-backend:check .
+cd backend && docker build -t stockpilot-backend:check .
 ```
 
 Use `npm ci` rather than `npm install` in CI or reproducible release builds. Keep generated build output, `.env` files, database dumps, and secret-manager exports out of commits.
@@ -575,18 +575,18 @@ Production deployments MUST use separate database identities for the application
 
 | Role | Login User | Purpose | Privileges |
 |------|-----------|---------|------------|
-| `autostockmanager_app` | `autostockmanager_app_user` | Application runtime (Uvicorn) | DML only: SELECT, INSERT, UPDATE, DELETE |
-| `autostockmanager_migrate` | `autostockmanager_migrate_user` | Alembic migrations (deployment step) | DDL + DML: CREATE, ALTER, DROP, TRUNCATE, all DML |
-| `autostockmanager_backup` | `autostockmanager_backup_user` | pg_dump backup operations | SELECT only |
+| `stockpilot_app` | `stockpilot_app_user` | Application runtime (Uvicorn) | DML only: SELECT, INSERT, UPDATE, DELETE |
+| `stockpilot_migrate` | `stockpilot_migrate_user` | Alembic migrations (deployment step) | DDL + DML: CREATE, ALTER, DROP, TRUNCATE, all DML |
+| `stockpilot_backup` | `stockpilot_backup_user` | pg_dump backup operations | SELECT only |
 
 ### Configuration
 
 ```bash
 # Application uses a DML-only identity (no DDL capability)
-DATABASE_URL=postgresql+asyncpg://autostockmanager_app_user:<secret>@host:5432/autostockmanager
+DATABASE_URL=postgresql+asyncpg://stockpilot_app_user:<secret>@host:5432/stockpilot
 
 # Migration step uses a DDL-capable identity (separate credential)
-MIGRATION_DATABASE_URL=postgresql+asyncpg://autostockmanager_migrate_user:<secret>@host:5432/autostockmanager
+MIGRATION_DATABASE_URL=postgresql+asyncpg://stockpilot_migrate_user:<secret>@host:5432/stockpilot
 ```
 
 The migration runner (`alembic upgrade head`) uses `MIGRATION_DATABASE_URL` when set, falling back to `DATABASE_URL` for backward compatibility in development. In production, these MUST be different credentials with different privilege levels.
@@ -597,7 +597,7 @@ Generate the role SQL from the application code:
 
 ```python
 from app.services.db_roles import generate_role_sql
-print(generate_role_sql(database_name="autostockmanager"))
+print(generate_role_sql(database_name="stockpilot"))
 ```
 
 Execute the generated SQL as a database superuser during initial production setup. Set passwords for each login user via the secret manager—never in the SQL script or source code.

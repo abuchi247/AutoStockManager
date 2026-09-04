@@ -1,10 +1,12 @@
-# Auto Spare Parts ERP System
+# StockPilot — Inventory & Sales ERP
 
-A comprehensive Enterprise Resource Planning system designed for automotive spare parts distributors and retailers. Built with Python FastAPI, Next.js, PostgreSQL, and Redis.
+A comprehensive Enterprise Resource Planning system for product-based businesses — inventory, sales, purchasing, and reporting in one place. Built with Python FastAPI, Next.js, PostgreSQL, and Redis.
+
+> StockPilot currently ships with an automotive spare-parts catalogue out of the box. The core (inventory, sales, customers, suppliers, purchasing, transfers, auditing) is business-agnostic and is being generalized to support additional business types.
 
 ## Overview
 
-This system digitizes and streamlines operations for auto spare parts businesses, replacing manual spreadsheet and paper-based processes with a modern, scalable ERP solution featuring immutable ledger architecture, FIFO cost management, and snapshot-based auditing.
+StockPilot digitizes and streamlines operations for product-based businesses, replacing manual spreadsheet and paper-based processes with a modern, scalable ERP solution featuring immutable ledger architecture, FIFO cost management, and snapshot-based auditing.
 
 ## Key Capabilities
 
@@ -50,8 +52,8 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/abuchi247/AutoStockManager.git
-   cd AutoStockManager
+   git clone https://github.com/abuchi247/StockPilot.git
+   cd StockPilot
    ```
 
 2. **Create environment file**
@@ -68,12 +70,12 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 4. **Database migrations** run automatically inside the backend container before Uvicorn accepts traffic. To re-run them manually (e.g. after adding migrations):
    ```bash
-   docker exec autostockmanager-backend alembic upgrade head
+   docker exec stockpilot-backend alembic upgrade head
    ```
 
 5. **Retrieve the initial admin password**. On a fresh database (no users), the backend auto-creates an `admin` account with a random temporary password and prints it to the container logs exactly once:
    ```bash
-   docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"
+   docker logs stockpilot-backend 2>&1 | grep "Temporary Password"
    ```
    You will see output like:
    ```
@@ -85,7 +87,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 7. **Seed default categories** (optional)
    ```bash
-   docker exec autostockmanager-backend python scripts/seed_categories.py
+   docker exec stockpilot-backend python scripts/seed_categories.py
    ```
    This creates 10 parent categories (Brakes, Filters, Engine Parts, etc.) with 35 subcategories.
 
@@ -100,7 +102,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
 
 9. **Get your admin password.** On a fresh database the backend auto-creates an `admin` account and prints the temporary password to the container logs exactly once:
    ```bash
-   docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"
+   docker logs stockpilot-backend 2>&1 | grep "Temporary Password"
    ```
    Log in at http://localhost:3000 with username `admin` and that password. You will be prompted to set a new password before accessing the system.
 
@@ -108,7 +110,7 @@ This system digitizes and streamlines operations for auto spare parts businesses
     ```bash
     docker compose down -v          # stops containers and deletes all volumes
     docker compose up --build -d    # rebuilds images and starts fresh
-    docker logs autostockmanager-backend 2>&1 | grep "Temporary Password"  # get new password
+    docker logs stockpilot-backend 2>&1 | grep "Temporary Password"  # get new password
     ```
 
 > **Local development with hot-reload:** if you want live code reloading on the frontend, stop the frontend container (`docker compose stop frontend`) and run `npm run dev` in the `frontend/` directory instead. The backend services stay in Docker.
@@ -141,14 +143,14 @@ The system follows security best practices for initial credentials:
 If you need to create additional users via CLI, they also require a password change on first login by default:
 
 ```bash
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   --username manager --password TempPass1! --role Manager --email manager@example.com
 ```
 
 To skip the forced password change (e.g., for automated testing), add `--no-force-change`:
 
 ```bash
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   --username testuser --password TestPass1! --role Salesperson --email test@example.com --no-force-change
 ```
 
@@ -278,23 +280,23 @@ This is an internal ERP system — there's no public signup. Admins create user 
 
 ```bash
 # Create an admin (will be required to set own password on first login)
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   --username admin --password TempAdmin1! --role Admin --email admin@example.com
 
 # Create a manager
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   -u manager -p TempMgr1! -r Manager -e manager@example.com
 
 # Create a salesperson
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   -u sales1 -p TempSales1! -r Salesperson -e sales@example.com
 
 # Create a storekeeper
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   -u store1 -p TempStore1! -r Storekeeper -e store@example.com
 
 # Skip forced password change (for testing/automation only)
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   -u testuser -p TestPass1! -r Salesperson -e test@example.com --no-force-change
 ```
 
@@ -304,25 +306,20 @@ docker exec autostockmanager-backend python scripts/create_user.py \
 
 **First login behavior:** By default, all CLI-created users must change their password on first login. The temporary password provided in the `--password` flag is only used for the initial authentication — the user immediately sets their own password. Use `--no-force-change` to skip this requirement (not recommended for production).
 
-## Deploying to Render
+## Deployment
 
-[Render](https://render.com) is the recommended platform for cloud deployment. The repo includes a `render.yaml` blueprint that provisions the entire stack — PostgreSQL, Redis, the FastAPI backend, the ARQ worker, and the Next.js frontend — from a single one-click deploy, reusing the existing Dockerfiles (no code changes).
+StockPilot deploys as a self-contained Docker Compose stack (backend API, ARQ worker, frontend, PostgreSQL, Redis) behind a Caddy reverse proxy that terminates HTTPS automatically. The recommended host is a small VPS in a **Johannesburg** region, which gives the lowest latency for West-African (e.g. Nigerian) users while keeping cost around $6–12/month.
 
-**Full step-by-step instructions, including migrating off Railway and shutting it down, are in [DEPLOYMENT.md](DEPLOYMENT.md).**
+**Full step-by-step instructions — server setup, Caddy HTTPS, DNS, data migration off Railway, and Railway shutdown — are in [DEPLOYMENT.md](DEPLOYMENT.md).**
 
 Quick summary:
 
-1. Push this repo to GitHub.
-2. Render Dashboard → **New → Blueprint** → select the repo → **Apply**. Render reads `render.yaml` and creates all five services.
-3. After the first deploy, set the cross-service values in the dashboard (they depend on the assigned hostnames):
-   - Backend: `CORS_ORIGINS` and `FRONTEND_BASE_URL` → the frontend URL; plus SMTP credentials.
-   - Frontend: `NEXT_PUBLIC_API_URL` → `https://<backend>.onrender.com/api/v1`, then **redeploy the frontend** (it is baked in at build time).
-   - Worker: the same SMTP credentials as the backend.
-4. Verify `https://<backend>.onrender.com/health` returns healthy, then open the frontend and log in. The initial admin's temporary password is in the backend logs (search for `Temporary Password`).
+1. Provision a small VPS in a Johannesburg region and point your domain's DNS at its IP.
+2. Install Docker + the Compose plugin, clone this repo, and create a production `.env` (see `.env.example`).
+3. Bring up the stack with `docker compose -f docker-compose.production.yml up -d --build` behind Caddy for automatic TLS.
+4. Migrations run automatically on backend startup (`backend/start.sh` runs `alembic upgrade head`, then launches uvicorn with `WEB_CONCURRENCY` workers). Grab the initial admin's temporary password from the backend logs (search for `Temporary Password`).
 
-Migrations run automatically on backend startup (`backend/start.sh` runs `alembic upgrade head`, then launches uvicorn with `WEB_CONCURRENCY` workers). Every push to the default branch auto-deploys.
-
-> **Free-tier note:** Free web services sleep after ~15 minutes of inactivity (~30s cold start) and the free PostgreSQL expires after 90 days. For steady business use, upgrade the backend and frontend to the cheapest paid instance and the database to a retained plan. See [DEPLOYMENT.md](DEPLOYMENT.md) for details.
+> **Why not a free PaaS tier:** free tiers sleep after inactivity (~30s cold starts) and often place servers far from West Africa, both of which hurt the user experience for the target market. A small always-on VPS close to your users is faster and more predictable for a real business.
 
 ## First-Time Configuration
 
@@ -347,13 +344,13 @@ This information appears on all generated invoices. To update it later, change t
 
 ```bash
 # Run all backend tests (1115 unit tests)
-docker exec autostockmanager-backend pytest
+docker exec stockpilot-backend pytest
 
 # Run with verbose output
-docker exec autostockmanager-backend pytest -v
+docker exec stockpilot-backend pytest -v
 
 # Run specific test file
-docker exec autostockmanager-backend pytest tests/unit/test_sales_service.py
+docker exec stockpilot-backend pytest tests/unit/test_sales_service.py
 
 # Run locally (requires system Python with deps installed)
 cd backend && pytest --tb=short -q
@@ -388,7 +385,7 @@ cd frontend && npm run perf:lighthouse
 |----------|---------|-------------|
 | `POSTGRES_USER` | `postgres` | PostgreSQL username |
 | `POSTGRES_PASSWORD` | — | PostgreSQL password |
-| `POSTGRES_DB` | `autostockmanager` | Database name |
+| `POSTGRES_DB` | `stockpilot` | Database name |
 | `DATABASE_URL` | (derived) | Full async connection string (auto-built from above if not set) |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis connection URL for caching and sessions |
 | `JWT_SECRET_KEY` | — | JWT signing secret (min 32 chars in production) |
@@ -419,7 +416,7 @@ The Playwright suite covers browser login and creation/cancellation of an isolat
 Create a dedicated test user first (bypassing the forced password change so Playwright can log in directly):
 
 ```bash
-docker exec autostockmanager-backend python scripts/create_user.py \
+docker exec stockpilot-backend python scripts/create_user.py \
   -u testuser -p TestPass1! -r Salesperson -e test@example.com --no-force-change
 ```
 

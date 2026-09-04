@@ -12,7 +12,7 @@ Usage (from inside the backend container):
     python scripts/seed_categories.py
 
 Or with Docker:
-    docker exec autostockmanager-backend python scripts/seed_categories.py
+    docker exec stockpilot-backend python scripts/seed_categories.py
 
 Or with Railway CLI (from the backend/ directory):
     railway run python3 scripts/seed_categories.py

@@ -1,5 +1,5 @@
 ###############################################################################
-# Production Dockerfile for AutoStockManager backend
+# Production Dockerfile for StockPilot backend
 # - Multi-stage build for smaller image
 # - Runs as non-root user
 # - No development mounts or default credentials
@@ -74,8 +74,8 @@ ARG BUILD_DATE=unknown
 ARG MIGRATION_HEAD=unknown
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.source="https://github.com/autostockmanager/backend" \
-      com.autostockmanager.migration-head="${MIGRATION_HEAD}"
+      org.opencontainers.image.source="https://github.com/abuchi247/StockPilot" \
+      app.stockpilot.migration-head="${MIGRATION_HEAD}"
 
 # Start via the startup script: runs migrations (unless RUN_MIGRATIONS=false)
 # then launches uvicorn with WEB_CONCURRENCY workers for real concurrency.

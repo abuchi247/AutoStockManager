@@ -16,7 +16,7 @@ jobs:
     env:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: e2e-postgres-password
-      POSTGRES_DB: autostockmanager_e2e
+      POSTGRES_DB: stockpilot_e2e
       SECRET_KEY: e2e-jwt-secret-key-longer-than-32-characters
       ENVIRONMENT: development
       E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
