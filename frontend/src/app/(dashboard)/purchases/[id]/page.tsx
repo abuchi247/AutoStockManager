@@ -6,13 +6,14 @@ import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner, Modal, Input, Select } from '@/components';
 import type { BadgeVariant, SelectOption } from '@/components';
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
+import { normalizePurchaseOrderStatus } from '@/lib/enums';
 import { formatCurrency } from '@/lib/currency';
 import { extractApiError } from '@/lib/validation/errors';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { usePermissions } from '@/hooks/usePermissions';
 
 function getStatusBadge(status: PurchaseOrderStatus | string): React.ReactNode {
-  const normalized = status.toLowerCase() as PurchaseOrderStatus;
+  const normalized = normalizePurchaseOrderStatus(status);
   const variants: Record<PurchaseOrderStatus, BadgeVariant> = {
     draft: 'default',
     approved: 'info',
@@ -67,7 +68,7 @@ export default function PurchaseOrderDetailPage() {
     setError(null);
     try {
       const response = await get<PurchaseOrder>(`/purchase-orders/${id}`);
-      setOrder({ ...response, status: response.status?.toLowerCase() as PurchaseOrderStatus });
+      setOrder({ ...response, status: normalizePurchaseOrderStatus(response.status) });
     } catch (err: unknown) {
       const message = extractApiError(err, 'Failed to load purchase order');
       setError(message);
@@ -214,9 +215,10 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const canApprove = order.status.toLowerCase() === 'draft' && can('purchasing');
-  const canReceive = (['approved', 'ordered', 'partially_received'].includes(order.status.toLowerCase())) && can('receiving');
-  const canCancel = (['draft', 'approved'].includes(order.status.toLowerCase())) && can('purchasing');
+  // order.status is normalized to lowercase at fetch time (normalizePurchaseOrderStatus).
+  const canApprove = order.status === 'draft' && can('purchasing');
+  const canReceive = ['approved', 'ordered', 'partially_received'].includes(order.status) && can('receiving');
+  const canCancel = ['draft', 'approved'].includes(order.status) && can('purchasing');
 
   if (!allowed) return null;
 

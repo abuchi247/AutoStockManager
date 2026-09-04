@@ -51,6 +51,9 @@ htmlcov/
 coverage/
 .nyc_output/
 
+# Caches (fontconfig, tooling — auto-generated at runtime/test time)
+.cache/
+
 # Hypothesis test data (unicode maps, example databases — auto-generated, not source)
 .hypothesis/
 

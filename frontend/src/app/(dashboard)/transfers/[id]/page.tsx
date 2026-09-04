@@ -15,6 +15,7 @@ import { get, post } from '@/lib/api';
 import { Button, Badge, Alert, LoadingSpinner } from '@/components';
 import type { BadgeVariant } from '@/components';
 import type { Transfer, TransferStatus } from '@/lib/types';
+import { normalizeTransferStatus } from '@/lib/enums';
 import { extractApiError } from '@/lib/validation/errors';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -120,7 +121,7 @@ export default function TransferDetailPage() {
     setError(null);
     try {
       const response = await get<Transfer>(`/transfers/${transferId}`);
-      setTransfer({ ...response, status: response.status?.toLowerCase() as TransferStatus });
+      setTransfer({ ...response, status: normalizeTransferStatus(response.status) });
     } catch (err: unknown) {
       const message = extractApiError(err, 'Failed to load transfer');
       setError(message);

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeRole } from '@/lib/enums';
 import api from '@/lib/api';
 
 interface ProfileData {
@@ -105,7 +106,7 @@ export default function ProfilePage() {
     }
   }
 
-  const roleKey = (profile?.role ?? user?.role ?? '').toLowerCase();
+  const roleKey = normalizeRole(profile?.role ?? user?.role);
   const initials = (profile?.username ?? user?.username ?? 'U')
     .charAt(0)
     .toUpperCase();

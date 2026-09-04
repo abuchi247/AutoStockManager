@@ -25,11 +25,12 @@ import type {
 import { useAuth } from '@/hooks/useAuth';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { getCurrency, setCurrency, CURRENCY_OPTIONS } from '@/lib/currency';
+import { normalizeRole } from '@/lib/enums';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { userCreateSchema, userUpdateSchema } from '@/lib/validation/schemas';
 
-function getRoleBadge(role: UserRole): React.ReactNode {
+function getRoleBadge(role: UserRole | string): React.ReactNode {
   const variants: Record<UserRole, 'info' | 'success' | 'warning' | 'default'> = {
     admin: 'info',
     manager: 'success',
@@ -42,7 +43,13 @@ function getRoleBadge(role: UserRole): React.ReactNode {
     salesperson: 'Salesperson',
     storekeeper: 'Storekeeper',
   };
-  return <Badge variant={variants[role]}>{labels[role]}</Badge>;
+  // The API returns capitalized roles (e.g. "Admin") while these maps are keyed
+  // by the lowercase UserRole values. normalizeRole is the shared contract for
+  // that casing; fall back gracefully so the badge never renders blank.
+  const key = normalizeRole(role);
+  const variant = variants[key] ?? 'default';
+  const label = labels[key] ?? (role ? role.toString() : 'Unknown');
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function getStatusBadge(isActive: boolean): React.ReactNode {
@@ -136,7 +143,10 @@ export default function SettingsPage() {
     setEditingUser(userProfile);
     setEditData({
       email: userProfile.email,
-      role: userProfile.role,
+      // Normalize the API's capitalized role (e.g. "Admin") to the lowercase
+      // UserRole the Select options are keyed by, so the dropdown preselects
+      // the user's current role. handleSaveUser re-capitalizes for the API.
+      role: normalizeRole(userProfile.role),
       is_active: userProfile.is_active,
     });
     setEditError(null);

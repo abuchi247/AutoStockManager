@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="h-screen-dynamic overflow-hidden bg-background font-sans antialiased">
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

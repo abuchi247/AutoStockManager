@@ -519,7 +519,9 @@ export interface TransferCreate {
 // --- Audits ---
 
 export type AuditType = 'cycle_count' | 'full_stock_count';
-export type AuditStatus = 'in_progress' | 'pending_approval' | 'completed' | 'cancelled';
+// 'initiated' is the status the backend assigns a freshly created audit session
+// (before any counts are entered); the audit pages treat it as a live/open state.
+export type AuditStatus = 'initiated' | 'in_progress' | 'pending_approval' | 'completed' | 'cancelled';
 
 export interface AuditSession {
   id: string;

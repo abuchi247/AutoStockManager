@@ -30,6 +30,7 @@ import type {
   AuditCount,
   AuditCountSubmit,
 } from '@/lib/types';
+import { normalizeAuditStatus, normalizeAuditType } from '@/lib/enums';
 
 function getStatusBadge(status: string): React.ReactNode {
   const normalized = (status || '').toLowerCase();
@@ -96,7 +97,11 @@ export default function AuditDetailPage() {
     try {
       // The main endpoint returns snapshot_items and counts embedded
       const response = await get<AuditSession & { snapshot_items?: AuditSnapshotItem[]; counts?: AuditCount[] }>(`/audits/${auditId}`);
-      setAudit(response);
+      setAudit({
+        ...response,
+        status: normalizeAuditStatus(response.status),
+        audit_type: normalizeAuditType(response.audit_type),
+      });
     } catch (err: unknown) {
       const message = extractApiError(err, 'Failed to load audit session');
       setError(message);
@@ -199,7 +204,8 @@ export default function AuditDetailPage() {
 
   if (!audit) return null;
 
-  const normalizedStatus = (audit.status || '').toLowerCase();
+  // audit.status is normalized to lowercase at fetch time (normalizeAuditStatus).
+  const normalizedStatus = audit.status;
   // Counts can be entered while the audit is open (initiated or in progress)
   const canSubmitCounts = normalizedStatus === 'initiated' || normalizedStatus === 'in_progress';
   // Approve is available once counts have started (in progress) or even initiated

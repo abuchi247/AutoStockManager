@@ -23,6 +23,7 @@ import type {
   SparePart,
   PaginatedResponse,
 } from '@/lib/types';
+import { normalizePurchaseOrderStatus } from '@/lib/enums';
 import { formatCurrency } from '@/lib/currency';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
@@ -85,7 +86,7 @@ export default function PurchasesPage() {
   const createOrder = useCreateMutation<PurchaseOrderCreate>('/purchase-orders', [queryKeys.purchases.all, queryKeys.inventory.all, queryKeys.dashboard.all]);
 
   // ── Derived values (non-hooks) ───────────────────────────────────────────
-  const orders = normalizeList(ordersQuery.data).data.map((po) => ({ ...po, status: po.status?.toLowerCase() as PurchaseOrderStatus }));
+  const orders = normalizeList(ordersQuery.data).data.map((po) => ({ ...po, status: normalizePurchaseOrderStatus(po.status) }));
   const suppliers = useMemo(() => suppliersQuery.data?.data ?? [], [suppliersQuery.data]);
   const isLoading = ordersQuery.isLoading;
   const error = ordersQuery.error?.message ?? null;

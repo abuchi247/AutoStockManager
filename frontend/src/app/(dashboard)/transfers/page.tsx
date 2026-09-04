@@ -31,6 +31,7 @@ import type {
   SparePart,
   Location,
 } from '@/lib/types';
+import { normalizeTransferStatus } from '@/lib/enums';
 
 import { formatFieldErrors, validateWithSchema } from '@/lib/validation/errors';
 import { transferCreateSchema } from '@/lib/validation/schemas';
@@ -95,7 +96,7 @@ export default function TransfersPage() {
   const partsQuery = useResourceQuery<PaginatedResponse<SparePart>>(queryKeys.parts.search(debouncedPartSearch), `/spare-parts?search=${encodeURIComponent(debouncedPartSearch)}&page_size=10`, { enabled: debouncedPartSearch.length >= 2, staleTime: 60_000 });
 
   // ── Derived values (non-hooks) ───────────────────────────────────────────
-  const transfers = normalizeList(transfersQuery.data).data.map((t) => ({ ...t, status: t.status?.toLowerCase() as TransferStatus }));
+  const transfers = normalizeList(transfersQuery.data).data.map((t) => ({ ...t, status: normalizeTransferStatus(t.status) }));
   const locations = useMemo(() => locationsQuery.data?.data ?? [], [locationsQuery.data]);
   const isLoading = transfersQuery.isLoading;
   const error = transfersQuery.error?.message ?? null;

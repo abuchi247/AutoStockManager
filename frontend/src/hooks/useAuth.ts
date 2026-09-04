@@ -20,6 +20,7 @@ import type {
   UserProfile,
   UserRole,
 } from '@/lib/types';
+import { normalizeRole } from '@/lib/enums';
 
 export interface PasswordChangeRequired {
   passwordChangeRequired: true;
@@ -54,7 +55,7 @@ function userFromToken(token: string, existingUser: StoredUser | null = null): S
     id,
     username: existingUser?.username || id,
     email: existingUser?.email || '',
-    role: role.toLowerCase(),
+    role: normalizeRole(role),
   };
 }
 
@@ -63,7 +64,7 @@ function userFromProfile(profile: UserProfile): StoredUser {
     id: profile.id,
     username: profile.username,
     email: profile.email,
-    role: profile.role.toLowerCase(),
+    role: normalizeRole(profile.role),
   };
 }
 

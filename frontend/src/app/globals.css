@@ -69,6 +69,14 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Full-viewport height that accounts for mobile browser chrome.
+     Falls back to 100vh where the dynamic viewport unit is unsupported.
+     Tailwind 3.3 ships no h-dvh utility, so this is provided directly. */
+  .h-screen-dynamic {
+    height: 100vh; /* fallback */
+    height: 100dvh;
+  }
 }
 
 /* Animations */

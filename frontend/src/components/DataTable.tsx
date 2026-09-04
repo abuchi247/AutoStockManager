@@ -150,6 +150,55 @@ export function DataTable<T extends Record<string, any>>({
         ? `Showing rows ${rowWindow.start + 1} to ${rowWindow.end} of ${data.length}`
         : `${data.length} ${data.length === 1 ? 'row' : 'rows'} loaded`;
 
+  // Mobile stacked-card view. On small screens a wide table forces awkward
+  // horizontal scrolling, so each row is rendered as a card of label/value
+  // pairs instead. Hidden at `sm` and up where the real table takes over.
+  //
+  // This is a purely VISUAL reflow: it is marked aria-hidden so it never enters
+  // the accessibility tree, and the semantic <table> below stays the single
+  // source of truth for screen readers at every width. Keeping it out of the
+  // a11y tree also avoids duplicating interactive controls (each cell's buttons
+  // would otherwise appear twice).
+  const mobileCards = (
+    <div className="sm:hidden" aria-hidden="true">
+      {isLoading ? (
+        <ul className="divide-y divide-border">
+          {[...Array(5)].map((_, i) => (
+            <li key={i} className="space-y-2 p-4">
+              <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+            </li>
+          ))}
+        </ul>
+      ) : data.length === 0 ? (
+        <p className="px-4 py-12 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {data.map((item, index) => (
+            <li
+              key={String(item[keyField] ?? index)}
+              className="space-y-2 p-4 transition-colors hover:bg-muted/50"
+            >
+              {columns.map((col) => {
+                const value = col.render ? col.render(item) : String(item[col.key] ?? '');
+                return (
+                  <div key={col.key} className="flex items-start justify-between gap-3">
+                    <span className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {col.header}
+                    </span>
+                    <span className="min-w-0 flex-1 text-right text-sm text-foreground">
+                      {value}
+                    </span>
+                  </div>
+                );
+              })}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
   const table = (
     <table
       className="min-w-full"
@@ -256,6 +305,9 @@ export function DataTable<T extends Record<string, any>>({
         {statusMessage}
       </p>
       {isVirtualized ? (
+        // Virtualized (large) lists keep the bounded scrollable table at every
+        // width — stacking hundreds of rows as cards would defeat the whole
+        // point of virtualization — so no mobile-card variant here.
         <div
           ref={scrollRef}
           onScroll={handleScroll}
@@ -268,7 +320,10 @@ export function DataTable<T extends Record<string, any>>({
           {table}
         </div>
       ) : (
-        <div className="overflow-x-auto">{table}</div>
+        <>
+          {mobileCards}
+          <div className="hidden overflow-x-auto sm:block">{table}</div>
+        </>
       )}
 
       {/* Pagination */}

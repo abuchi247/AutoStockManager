@@ -49,7 +49,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-page">
+    <div className="flex h-screen-dynamic overflow-hidden bg-page">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -69,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         {/* Header */}
         <div className="px-5 py-6 border-b border-white/10">
-          <h2 className="text-xl font-bold text-white m-0">AutoStock</h2>
+          <h2 className="text-xl font-bold text-white m-0">StockPilot</h2>
           <p className="text-xs text-gray-400 mt-1">{user?.username || 'User'}</p>
         </div>
 

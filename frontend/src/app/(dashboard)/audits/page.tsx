@@ -24,6 +24,7 @@ import {
 } from '@/components';
 import type { Column, SelectOption, BadgeVariant } from '@/components';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { normalizeAuditStatus, normalizeAuditType } from '@/lib/enums';
 import type {
   AuditSession,
   AuditType,
@@ -47,6 +48,7 @@ const AUDIT_TYPE_OPTIONS: SelectOption[] = [
 
 function getStatusBadge(status: AuditStatus): React.ReactNode {
   const map: Record<AuditStatus, { variant: BadgeVariant; label: string }> = {
+    initiated: { variant: 'info', label: 'Initiated' },
     in_progress: { variant: 'info', label: 'In Progress' },
     pending_approval: { variant: 'warning', label: 'Pending Approval' },
     completed: { variant: 'success', label: 'Completed' },
@@ -133,8 +135,8 @@ export default function AuditsPage() {
       );
       setAudits(response.data.map((a: AuditSession) => ({ 
         ...a, 
-        status: a.status?.toLowerCase() as AuditStatus,
-        audit_type: a.audit_type?.toLowerCase() as AuditType,
+        status: normalizeAuditStatus(a.status),
+        audit_type: normalizeAuditType(a.audit_type),
       })));
       setTotalPages(response.meta.total_pages ?? 1);
     } catch (err: unknown) {
