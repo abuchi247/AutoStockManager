@@ -39,6 +39,10 @@ docker-compose.override.yml
 # Local-only prod-stack smoke-test override (never deploy this)
 docker-compose.prodtest.local.yml
 
+# Per-customer generated instances (contain real secrets in .env) — created on
+# the server by scripts/provision_customer.sh, never committed.
+customers/
+
 # Database
 *.db
 *.sqlite3
