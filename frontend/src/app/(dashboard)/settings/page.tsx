@@ -105,6 +105,18 @@ export default function SettingsPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editData, setEditData] = useState<UserUpdate>({});
 
+  // Reset password modal (admin sets a temporary password for a user)
+  const resetUserPassword = useMutation({
+    mutationFn: ({ id, new_password }: { id: string; new_password: string }) =>
+      post(`/users/${id}/reset-password`, { new_password }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
+  });
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+  const [resetUser, setResetUser] = useState<UserProfile | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+
   // Debounced search only changes the Query key after the short input pause.
   useEffect(() => { const timeout = setTimeout(() => setPage(1), 300); return () => clearTimeout(timeout); }, [search]);
 
@@ -165,6 +177,49 @@ export default function SettingsPage() {
     updateUser.mutate({ id: editingUser.id, payload }, { onError: (err) => setEditError(err.message), onSuccess: () => { setShowEditModal(false); setEditingUser(null); setEditData({}); } });
   };
 
+  const openResetPassword = (userProfile: UserProfile) => {
+    setResetUser(userProfile);
+    setResetPasswordValue('');
+    setResetError(null);
+    setResetSuccess(null);
+    setShowResetModal(true);
+  };
+
+  const closeResetPassword = useCallback(() => {
+    setShowResetModal(false);
+    setResetUser(null);
+    setResetPasswordValue('');
+    setResetError(null);
+    setResetSuccess(null);
+  }, []);
+
+  const handleResetPassword = () => {
+    if (!resetUser) return;
+    // Client-side complexity check mirrors the backend so the admin gets
+    // immediate feedback; the backend re-validates authoritatively.
+    const pw = resetPasswordValue;
+    const complexityOk =
+      pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw);
+    if (!complexityOk) {
+      setResetError(
+        'Temporary password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a digit.',
+      );
+      return;
+    }
+    setResetError(null);
+    resetUserPassword.mutate(
+      { id: resetUser.id, new_password: pw },
+      {
+        onError: (err) => setResetError(err.message),
+        onSuccess: () => {
+          setResetSuccess(
+            `Password reset for "${resetUser.username}". Share the temporary password securely — they must change it on next login.`,
+          );
+        },
+      },
+    );
+  };
+
 
 
   const columns: Column<UserProfile>[] = [
@@ -207,14 +262,29 @@ export default function SettingsPage() {
       key: 'actions',
       header: 'Actions',
       render: (item) => (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => handleEditUser(item)}
-          disabled={item.id === currentUser?.id}
-        >
-          Edit
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleEditUser(item)}
+            disabled={item.id === currentUser?.id}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => openResetPassword(item)}
+            disabled={item.id === currentUser?.id}
+            title={
+              item.id === currentUser?.id
+                ? 'Use your Profile page to change your own password'
+                : 'Set a temporary password for this user'
+            }
+          >
+            Reset password
+          </Button>
+        </div>
       ),
     },
   ];
@@ -400,6 +470,59 @@ export default function SettingsPage() {
               }
             />
           </div>
+        </div>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={showResetModal}
+        onClose={closeResetPassword}
+        title={`Reset Password: ${resetUser?.username || ''}`}
+        size="md"
+        footer={
+          resetSuccess ? (
+            <Button onClick={closeResetPassword}>Done</Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={closeResetPassword}>
+                Cancel
+              </Button>
+              <Button onClick={handleResetPassword} isLoading={resetUserPassword.isPending}>
+                Reset Password
+              </Button>
+            </>
+          )
+        }
+      >
+        <div className="space-y-4">
+          {resetError && (
+            <Alert variant="error" onClose={() => setResetError(null)}>
+              {resetError}
+            </Alert>
+          )}
+          {resetSuccess ? (
+            <Alert variant="success">{resetSuccess}</Alert>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Set a temporary password for <span className="font-medium">{resetUser?.username}</span>.
+                They will be required to change it the next time they log in, and any account
+                lockout will be cleared.
+              </p>
+              <Input
+                label="Temporary password"
+                type="text"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+                placeholder="Min 8 chars, 1 uppercase, 1 lowercase, 1 digit"
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-gray-400">
+                Share this password with the user securely (not by email in plain text).
+                It is shown here so you can communicate it — it is not stored in readable form.
+              </p>
+            </>
+          )}
         </div>
       </Modal>
     </div>

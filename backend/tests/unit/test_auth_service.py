@@ -256,6 +256,8 @@ def _make_user(
     is_active: bool = True,
     locked_until=None,
     failed_login_attempts: int = 0,
+    first_failed_login_at=None,
+    must_change_password: bool = False,
 ) -> User:
     """Create a test User instance with a hashed password."""
     settings = _test_settings()
@@ -266,7 +268,9 @@ def _make_user(
         role=role,
         is_active=is_active,
         failed_login_attempts=failed_login_attempts,
+        first_failed_login_at=first_failed_login_at,
         locked_until=locked_until,
+        must_change_password=must_change_password,
     )
     user.id = uuid.uuid4()
     user.deleted_at = None
@@ -362,9 +366,17 @@ class TestAuthServiceLogin:
 
     @pytest.mark.asyncio
     async def test_login_locks_after_threshold(self):
-        """Account should lock after 5 failed attempts (Requirement 2.8)."""
+        """Account should lock after 5 failed attempts within the window (Requirement 2.8).
+
+        The prior 4 failures are anchored inside the sliding window, so the 5th
+        failure reaches the threshold and locks the account.
+        """
         settings = _test_settings()
-        user = _make_user(password="TestPass1", failed_login_attempts=4)
+        user = _make_user(
+            password="TestPass1",
+            failed_login_attempts=4,
+            first_failed_login_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+        )
         db = _mock_db_with_user(user)
 
         service = AuthService(db, settings)
@@ -376,16 +388,62 @@ class TestAuthServiceLogin:
         assert user.locked_until > datetime.now(timezone.utc)
 
     @pytest.mark.asyncio
-    async def test_login_resets_attempts_on_success(self):
-        """Successful login should reset failed_login_attempts to 0."""
+    async def test_login_failures_outside_window_reset_counter(self):
+        """A failure after the window elapses starts a fresh window at count 1
+        and does NOT lock, even if the stored counter was already at threshold-1.
+
+        This is the whole point of the sliding window: occasional typos spread
+        over time must not accumulate into a lockout.
+        """
         settings = _test_settings()
-        user = _make_user(password="TestPass1", failed_login_attempts=3)
+        user = _make_user(
+            password="TestPass1",
+            failed_login_attempts=4,
+            # First failure is older than the 15-minute window, so it aged out.
+            first_failed_login_at=datetime.now(timezone.utc) - timedelta(minutes=20),
+        )
+        db = _mock_db_with_user(user)
+
+        service = AuthService(db, settings)
+        with pytest.raises(AuthenticationError):
+            await service.login("testuser", "WrongPass1")
+
+        # Window restarted: counter is 1, not 5, and the account is not locked.
+        assert user.failed_login_attempts == 1
+        assert user.locked_until is None
+        assert user.first_failed_login_at is not None
+
+    @pytest.mark.asyncio
+    async def test_first_failure_anchors_window(self):
+        """The first failure records first_failed_login_at and sets count to 1."""
+        settings = _test_settings()
+        user = _make_user(password="TestPass1")
+        db = _mock_db_with_user(user)
+
+        service = AuthService(db, settings)
+        with pytest.raises(AuthenticationError):
+            await service.login("testuser", "WrongPass1")
+
+        assert user.failed_login_attempts == 1
+        assert user.first_failed_login_at is not None
+        assert user.locked_until is None
+
+    @pytest.mark.asyncio
+    async def test_login_resets_attempts_on_success(self):
+        """Successful login should reset failed_login_attempts and window to 0/None."""
+        settings = _test_settings()
+        user = _make_user(
+            password="TestPass1",
+            failed_login_attempts=3,
+            first_failed_login_at=datetime.now(timezone.utc) - timedelta(minutes=2),
+        )
         db = _mock_db_with_user(user)
 
         service = AuthService(db, settings)
         await service.login("testuser", "TestPass1")
 
         assert user.failed_login_attempts == 0
+        assert user.first_failed_login_at is None
         assert user.locked_until is None
 
 
@@ -575,3 +633,67 @@ class TestAuthServicePasswordReset:
 
         assert user.failed_login_attempts == 0
         assert user.locked_until is None
+
+
+class TestAdminResetPassword:
+    """Test AuthService.admin_reset_password (admin-driven reset)."""
+
+    @pytest.mark.asyncio
+    async def test_admin_reset_sets_password_and_forces_change(self):
+        """Admin reset sets the new password, forces a change on next login,
+        clears any lockout, and revokes the target's sessions."""
+        settings = _test_settings()
+        user = _make_user(
+            password="OldPass1",
+            failed_login_attempts=5,
+            first_failed_login_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+            locked_until=datetime.now(timezone.utc) + timedelta(minutes=30),
+            must_change_password=False,
+        )
+        db = _mock_db_with_user(user)
+        session_service = MagicMock()
+        session_service.revoke_all_sessions = AsyncMock(return_value=3)
+
+        service = AuthService(db, settings, session_service=session_service)
+        result = await service.admin_reset_password(
+            user_id=str(user.id),
+            new_password="TempPass123",
+            performed_by=str(uuid.uuid4()),
+        )
+
+        assert "message" in result
+        assert verify_password("TempPass123", user.password_hash, settings)
+        assert user.must_change_password is True
+        # Lockout fully cleared.
+        assert user.failed_login_attempts == 0
+        assert user.first_failed_login_at is None
+        assert user.locked_until is None
+        # Target's sessions revoked.
+        session_service.revoke_all_sessions.assert_awaited_once_with(str(user.id))
+
+    @pytest.mark.asyncio
+    async def test_admin_reset_rejects_weak_password(self):
+        """A temporary password that fails complexity is rejected."""
+        settings = _test_settings()
+        user = _make_user()
+        db = _mock_db_with_user(user)
+
+        service = AuthService(db, settings)
+        with pytest.raises(PasswordValidationError):
+            await service.admin_reset_password(user_id=str(user.id), new_password="weak")
+
+    @pytest.mark.asyncio
+    async def test_admin_reset_unknown_user(self):
+        """Resetting a non-existent user raises AuthenticationError."""
+        settings = _test_settings()
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result)
+        db.flush = AsyncMock()
+
+        service = AuthService(db, settings)
+        with pytest.raises(AuthenticationError):
+            await service.admin_reset_password(
+                user_id=str(uuid.uuid4()), new_password="TempPass123"
+            )

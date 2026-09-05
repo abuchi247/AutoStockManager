@@ -62,6 +62,14 @@ class TestUserModelColumns:
         assert isinstance(col.type, Integer)
         assert col.nullable is False
 
+    def test_first_failed_login_at_column(self):
+        """User should have a nullable first_failed_login_at datetime column that
+        anchors the sliding-window lockout."""
+        col = User.__table__.columns["first_failed_login_at"]
+        assert isinstance(col.type, DateTime)
+        assert col.type.timezone is True
+        assert col.nullable is True
+
     def test_inherits_base_model_columns(self):
         """User should inherit id, created_at, updated_at, created_by, updated_by from BaseModel."""
         columns = User.__table__.columns

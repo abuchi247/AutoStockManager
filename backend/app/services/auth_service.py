@@ -379,8 +379,9 @@ class AuthService:
                 )
             raise AuthenticationError("Invalid username or password")
 
-        # Successful login: reset failed attempts
+        # Successful login: reset failed attempts and the sliding window
         user.failed_login_attempts = 0
+        user.first_failed_login_at = None
         user.locked_until = None
         await self.db.flush()
 
@@ -648,6 +649,7 @@ class AuthService:
         user.password_hash = hash_password(new_password, self.settings)
         # Reset lockout state on password reset
         user.failed_login_attempts = 0
+        user.first_failed_login_at = None
         user.locked_until = None
         await self.db.flush()
 
@@ -658,19 +660,109 @@ class AuthService:
 
         return {"message": "Password reset successfully"}
 
+    async def admin_reset_password(
+        self,
+        user_id: str,
+        new_password: str,
+        performed_by: Optional[str] = None,
+    ) -> dict[str, str]:
+        """Admin-driven reset of another user's password (Requirement 2.4).
+
+        Used when a user has forgotten their password and cannot use the
+        self-service email flow. The admin sets a temporary password, which the
+        user is forced to change on their next login (must_change_password=True).
+
+        Security properties (best practice for an admin-issued temporary
+        credential):
+        - The new password must meet complexity requirements.
+        - must_change_password is set so the temporary password is single-use;
+          the user must choose their own on first login.
+        - Any lockout is cleared (failed_login_attempts=0, locked_until=None) so
+          a locked-out user who forgot their password is recovered in one step.
+        - All of the target user's active sessions are revoked, so any attacker
+          holding a live session is immediately logged out.
+
+        This method does NOT require the target user's current password — it is
+        an administrative action, gated by the user_management permission at the
+        router layer. It must never be exposed as a self-service endpoint.
+
+        Args:
+            user_id: UUID of the user whose password is being reset.
+            new_password: The new temporary password (complexity-validated).
+            performed_by: UUID of the admin performing the reset (for audit).
+
+        Returns:
+            Dict with a success message.
+
+        Raises:
+            PasswordValidationError: If the new password fails complexity.
+            AuthenticationError: If the target user does not exist.
+        """
+        is_valid, error_msg = validate_password_complexity(new_password)
+        if not is_valid:
+            raise PasswordValidationError(error_msg)
+
+        result = await self.db.execute(
+            select(User).filter_by(id=user_id, deleted_at=None)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is None:
+            raise AuthenticationError("User not found")
+
+        user.password_hash = hash_password(new_password, self.settings)
+        # Force the user to set their own password on next login.
+        user.must_change_password = True
+        # Recover any lockout state in the same action.
+        user.failed_login_attempts = 0
+        user.first_failed_login_at = None
+        user.locked_until = None
+        if performed_by:
+            user.updated_by = performed_by
+        await self.db.flush()
+
+        # Revoke every active session for the target user so a stale/attacker
+        # session cannot continue after the reset.
+        if self.session_service is not None:
+            await self.session_service.revoke_all_sessions(str(user.id))
+
+        return {"message": "Password reset successfully"}
+
     async def _handle_failed_login(self, user: User) -> None:
         """Handle a failed login attempt, implementing account lockout (Requirement 2.8).
 
-        Locks the account after 5 failed attempts within 15 minutes.
-        The lockout duration is 30 minutes.
+        Uses a true sliding window: the account locks only after
+        account_lockout_threshold (5) failures occur within
+        account_lockout_window_minutes (15). Once locked, it stays locked for
+        account_lockout_duration_minutes (30).
+
+        The window is anchored by first_failed_login_at. If the current failure
+        arrives after that anchor plus the window, the previous failures have
+        aged out, so a fresh window starts at count 1. This prevents an
+        occasional typo over days from eventually locking a legitimate user,
+        while still stopping a burst of guesses.
 
         Args:
             user: The user whose login attempt failed.
         """
-        user.failed_login_attempts += 1
+        now = datetime.now(timezone.utc)
+        window = timedelta(minutes=self.settings.account_lockout_window_minutes)
+
+        first_failure = user.first_failed_login_at
+        # Normalize to an aware datetime for comparison (stored as tz-aware).
+        if first_failure is not None and first_failure.tzinfo is None:
+            first_failure = first_failure.replace(tzinfo=timezone.utc)
+
+        if first_failure is None or (now - first_failure) > window:
+            # Start (or restart) the sliding window at this failure.
+            user.first_failed_login_at = now
+            user.failed_login_attempts = 1
+        else:
+            # Still within the window — accumulate.
+            user.failed_login_attempts += 1
 
         if user.failed_login_attempts >= self.settings.account_lockout_threshold:
-            user.locked_until = datetime.now(timezone.utc) + timedelta(
+            user.locked_until = now + timedelta(
                 minutes=self.settings.account_lockout_duration_minutes
             )
 
@@ -763,6 +855,7 @@ class AuthService:
         user.password_hash = hash_password(new_password, self.settings)
         user.must_change_password = False
         user.failed_login_attempts = 0
+        user.first_failed_login_at = None
         user.locked_until = None
         await self.db.flush()
 

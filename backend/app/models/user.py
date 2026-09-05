@@ -92,7 +92,14 @@ class User(BaseModel, SoftDeleteMixin):
         Integer,
         default=0,
         nullable=False,
-        comment="Number of consecutive failed login attempts",
+        comment="Number of failed login attempts in the current lockout window",
+    )
+
+    first_failed_login_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="Timestamp of the first failed login in the current lockout window (NULL when no active window); anchors the sliding-window lockout",
     )
 
     must_change_password: Mapped[bool] = mapped_column(

@@ -7,6 +7,7 @@ Provides the following endpoints:
 - POST /api/v1/users                 - Create a new user (Admin only)
 - GET  /api/v1/users/{id}            - Get user by ID (Admin only)
 - PUT  /api/v1/users/{id}            - Update a user (Admin only)
+- POST /api/v1/users/{id}/reset-password - Admin reset a user's password (Admin only)
 
 Satisfies Requirements: 2.1, 17.1
 """
@@ -23,6 +24,7 @@ from app.services.permission_service import require_permission
 from app.models.user import User, UserRole
 from app.schemas.auth import ErrorResponse
 from app.schemas.user import (
+    AdminPasswordReset,
     UserCreate,
     UserListResponse,
     UserResponse,
@@ -31,11 +33,13 @@ from app.schemas.user import (
 )
 from app.services.auth_service import (
     AuthenticationError,
+    AuthService,
     PasswordValidationError,
     hash_password,
     validate_password_complexity,
     verify_password,
 )
+from app.services.session_service import SessionService, get_redis_client
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
@@ -352,3 +356,79 @@ async def update_user(
     await db.refresh(user)
 
     return UserResponse.model_validate(user)
+
+
+@router.post(
+    "/{user_id}/reset-password",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Admin reset a user's password",
+    description=(
+        "Admin-only. Sets a temporary password for a user who has forgotten "
+        "theirs. The user must change it on next login, any account lockout is "
+        "cleared, and all of that user's active sessions are revoked."
+    ),
+    responses={
+        400: {"model": ErrorResponse, "description": "Password validation failed"},
+        403: {"model": ErrorResponse, "description": "Insufficient permissions"},
+        404: {"model": ErrorResponse, "description": "User not found"},
+    },
+)
+async def admin_reset_user_password(
+    user_id: UUID,
+    request: AdminPasswordReset,
+    db: DbSession,
+    settings: AppSettings,
+    current_user: User = Depends(require_permission("user_management")),
+) -> UserResponse:
+    """Reset another user's password as an administrator.
+
+    Requirements:
+    - 2.1: Admin can manage users
+    - 2.4: Password reset
+    - 17.1: Enforce RBAC (Admin only)
+    """
+    # Load the target user first so we can 404 cleanly and, importantly, so an
+    # admin cannot reset their own password through this admin path (that would
+    # bypass the current-password check on the self-service endpoint).
+    result = await db.execute(select(User).filter_by(id=user_id, deleted_at=None))
+    target = result.scalar_one_or_none()
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    if target.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use the change-password endpoint to change your own password.",
+        )
+
+    # Build an AuthService with session-service integration so the reset can
+    # revoke the target user's active sessions.
+    redis_client = await get_redis_client()
+    session_service = SessionService(db=db, redis_client=redis_client, settings=settings)
+    auth_service = AuthService(db=db, settings=settings, session_service=session_service)
+
+    try:
+        await auth_service.admin_reset_password(
+            user_id=str(user_id),
+            new_password=request.new_password,
+            performed_by=str(current_user.id),
+        )
+    except PasswordValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.message,
+        )
+    except AuthenticationError as e:
+        # admin_reset_password raises this only when the user does not exist,
+        # which we already handled above; map defensively to 404.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.message,
+        )
+
+    await db.commit()
+    await db.refresh(target)
+    return UserResponse.model_validate(target)

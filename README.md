@@ -22,7 +22,7 @@ StockPilot digitizes and streamlines operations for product-based businesses, re
 - **Reporting & Dashboard** — Sales, inventory, customer, supplier, and financial reports with CSV/PDF export. Dashboard with Top 5 Products and Top 5 Customers widgets filterable by period (month, 3M, 6M, 1Y, all time).
 - **Notifications** — Low stock alerts, credit limit warnings, overdue customer reminders, and pending approval notifications
 - **Audit Trail** — Append-only, immutable record of all critical system events
-- **Security** — Role-based access control (Admin, Manager, Salesperson, Storekeeper) with JWT authentication, rate limiting, account lockout, and forced password change on first login
+- **Security** — Role-based access control (Admin, Manager, Salesperson, Storekeeper) with JWT authentication, rate limiting, sliding-window account lockout (locks after 5 failed logins within 15 minutes for 30 minutes), admin-initiated password reset for users who forget theirs, and forced password change on first login
 
 ## Technology Stack
 

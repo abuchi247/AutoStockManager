@@ -89,6 +89,22 @@ class UserUpdate(BaseModel):
     )
 
 
+class AdminPasswordReset(BaseModel):
+    """Request body for an admin resetting another user's password.
+
+    The admin supplies a temporary password. The user is then forced to change
+    it on next login, and any account lockout is cleared. This is distinct from
+    self-service password change (which requires the current password) and the
+    email-based reset flow (which requires a valid reset token).
+    """
+
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        description="Temporary password (min 8 chars, at least one uppercase, one lowercase, and one digit)",
+    )
+
+
 # =============================================================================
 # Response Schemas
 # =============================================================================
