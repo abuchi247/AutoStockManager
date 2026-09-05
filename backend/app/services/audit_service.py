@@ -281,10 +281,20 @@ class AuditService:
         snapshot_item = result.scalar_one_or_none()
 
         if snapshot_item is None:
-            raise SnapshotItemNotFoundError(
+            # The snapshot only captures parts that had a Stock_Status_Cache row
+            # at initiation, so a part the system believes has no stock at this
+            # location has no snapshot item. That is exactly the case a physical
+            # audit must be able to record (e.g. finding units the system shows
+            # as zero), so treat the missing snapshot as a system quantity of 0
+            # and create the snapshot item now to keep the audit history
+            # complete. variance then becomes counted_quantity - 0.
+            snapshot_item = AuditSnapshotItem(
                 session_id=session_id,
                 spare_part_id=spare_part_id,
+                snapshot_quantity=Decimal("0"),
             )
+            self.db.add(snapshot_item)
+            await self.db.flush()
 
         # Calculate variance = counted_quantity - snapshot_quantity
         variance = counted_quantity - snapshot_item.snapshot_quantity

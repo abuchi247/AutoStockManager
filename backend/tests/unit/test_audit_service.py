@@ -34,7 +34,6 @@ from app.services.audit_service import (
     AuditService,
     AuditSessionNotFoundError,
     InvalidAuditStatusError,
-    SnapshotItemNotFoundError,
 )
 
 
@@ -314,21 +313,30 @@ class TestSubmitCount:
             )
 
     @pytest.mark.asyncio
-    async def test_rejects_missing_snapshot_item(
+    async def test_counts_part_with_no_snapshot_as_zero_system_quantity(
         self, mock_db, session_id, location_id, spare_part_id_1
     ):
-        """Should raise SnapshotItemNotFoundError if part not in snapshot."""
+        """A part with no snapshot item (system shows no stock at the location)
+        must still be countable: the snapshot quantity is treated as 0 and the
+        variance is the full counted quantity. This is exactly what a physical
+        audit needs — recording units the system does not know about — and must
+        not be rejected."""
         session = _make_session(session_id, location_id)
-        _mock_execute_sequence(mock_db, [session, None])
+        # execute() sequence: session lookup, snapshot lookup (None), existing
+        # count lookup (None -> create new).
+        _mock_execute_sequence(mock_db, [session, None, None])
 
         service = AuditService(db=mock_db)
-        with pytest.raises(SnapshotItemNotFoundError):
-            await service.submit_count(
-                session_id=session_id,
-                spare_part_id=spare_part_id_1,
-                counted_quantity=Decimal("10.0000"),
-                counted_by=uuid.uuid4(),
-            )
+        audit_count = await service.submit_count(
+            session_id=session_id,
+            spare_part_id=spare_part_id_1,
+            counted_quantity=Decimal("10.0000"),
+            counted_by=uuid.uuid4(),
+        )
+
+        # snapshot treated as 0, so variance == counted quantity
+        assert audit_count.counted_quantity == Decimal("10.0000")
+        assert audit_count.variance == Decimal("10.0000")
 
     @pytest.mark.asyncio
     async def test_transitions_initiated_to_in_progress(
