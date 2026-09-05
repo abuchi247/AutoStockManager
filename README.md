@@ -40,7 +40,7 @@ StockPilot digitizes and streamlines operations for product-based businesses, re
 | Error Tracking | Sentry |
 | Testing (Backend) | pytest (1115 unit tests), Hypothesis (property-based) |
 | Testing (Frontend) | Vitest (48 unit tests), Playwright (E2E + accessibility via axe-core) |
-| Deployment | Docker, Docker Compose, Render |
+| Deployment | Docker, Docker Compose, VPS + Caddy (automatic HTTPS) |
 
 ## Getting Started
 
@@ -222,13 +222,13 @@ Each user sees only their own notifications. Notifications support read/unread s
 │   │   ├── config.py            # Settings (pydantic-settings)
 │   │   ├── database.py          # Async SQLAlchemy engine
 │   │   ├── health.py            # Readiness/liveness probes
-│   │   ├── models/              # SQLAlchemy ORM models (26 tables)
+│   │   ├── models/              # SQLAlchemy ORM models (27 tables)
 │   │   ├── schemas/             # Pydantic request/response schemas
 │   │   ├── services/            # Business logic layer + background jobs (ARQ)
 │   │   ├── routers/             # FastAPI route handlers
 │   │   ├── middleware/          # Auth, rate limiting, security headers, telemetry
 │   │   └── utils/               # FIFO, PDF generation, barcode tools
-│   ├── alembic/                 # Database migrations (8 revisions)
+│   ├── alembic/                 # Database migrations (14 revisions)
 │   ├── tests/                   # 1115 unit + property-based tests
 │   ├── scripts/                 # CLI utilities (create_user, seed, setup_db)
 │   ├── Dockerfile
