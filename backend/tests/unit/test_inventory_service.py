@@ -527,6 +527,20 @@ class TestSparePartSchemas:
                 selling_price=Decimal("20.00"),
             )
 
+    def test_create_schema_requires_category_id(self):
+        """category_id is required — the DB column is NOT NULL, so a missing
+        category must be rejected at validation time (HTTP 422) rather than
+        reaching the database and raising an unhandled IntegrityError (500)."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            SparePartCreate(
+                part_number="SP-001",
+                name="Brake Pad",
+                cost_price=Decimal("10.00"),
+                selling_price=Decimal("20.00"),
+            )
+
     def test_create_schema_rejects_negative_price(self):
         """Test that negative prices are rejected."""
         from pydantic import ValidationError

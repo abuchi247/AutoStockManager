@@ -52,9 +52,9 @@ class SparePartCreate(BaseModel):
         description="Manufacturer or brand name",
         examples=["Bosch"],
     )
-    category_id: Optional[UUID] = Field(
-        default=None,
-        description="Primary category UUID",
+    category_id: UUID = Field(
+        ...,
+        description="Primary category UUID (required — every part belongs to a category)",
     )
     subcategory_id: Optional[UUID] = Field(
         default=None,

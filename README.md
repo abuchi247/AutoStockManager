@@ -38,7 +38,7 @@ StockPilot digitizes and streamlines operations for product-based businesses, re
 | Rate Limiting | slowapi + Redis |
 | Background Jobs | ARQ (async Redis-based task queue) |
 | Error Tracking | Sentry |
-| Testing (Backend) | pytest (1115 unit tests), Hypothesis (property-based) |
+| Testing (Backend) | pytest (1116 unit tests), Hypothesis (property-based) |
 | Testing (Frontend) | Vitest (48 unit tests), Playwright (E2E + accessibility via axe-core) |
 | Deployment | Docker, Docker Compose, VPS + Caddy (automatic HTTPS) |
 
@@ -229,7 +229,7 @@ Each user sees only their own notifications. Notifications support read/unread s
 │   │   ├── middleware/          # Auth, rate limiting, security headers, telemetry
 │   │   └── utils/               # FIFO, PDF generation, barcode tools
 │   ├── alembic/                 # Database migrations (14 revisions)
-│   ├── tests/                   # 1115 unit + property-based tests
+│   ├── tests/                   # 1116 unit + property-based tests
 │   ├── scripts/                 # CLI utilities (create_user, seed, setup_db)
 │   ├── Dockerfile
 │   └── requirements.txt
@@ -343,7 +343,7 @@ This information appears on all generated invoices. To update it later, change t
 ### Backend Tests
 
 ```bash
-# Run all backend tests (1115 unit tests)
+# Run all backend tests (1116 unit tests)
 docker exec stockpilot-backend pytest
 
 # Run with verbose output

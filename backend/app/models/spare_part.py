@@ -39,7 +39,7 @@ class SparePart(BaseModel, SoftDeleteMixin):
         name                 - Product display name
         description          - Optional product description
         brand                - Manufacturer/brand name
-        category_id          - FK to primary category
+        category_id          - FK to primary category (required)
         subcategory_id       - FK to subcategory (nullable)
         vehicle_compatibility - JSON list of compatible vehicles
         unit_of_measure      - Unit for quantity tracking (e.g., PCS, BOX, LTR)
@@ -92,11 +92,11 @@ class SparePart(BaseModel, SoftDeleteMixin):
         comment="Manufacturer or brand name",
     )
 
-    category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    category_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("categories.id"),
-        nullable=True,
-        comment="Primary category for this spare part (optional)",
+        nullable=False,
+        comment="Primary category for this spare part (required)",
     )
 
     subcategory_id: Mapped[Optional[uuid.UUID]] = mapped_column(

@@ -33,7 +33,12 @@ export const sparePartCreateSchema = z.object({
   name: requiredText(500, 'Name'),
   description: optionalText(2000),
   brand: optionalText(255),
-  category_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
+  // Category is required — every part belongs to a category, and the backend
+  // enforces a NOT NULL category_id.
+  category_id: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    uuid.refine((v) => Boolean(v), { message: 'Category is required' }),
+  ),
   subcategory_id: z.preprocess((value) => value === '' ? undefined : value, uuid.optional()),
   vehicle_compatibility: z.array(z.string()).optional(),
   unit_of_measure: z.string().max(50).default('PCS'),
