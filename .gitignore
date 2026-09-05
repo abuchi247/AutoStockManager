@@ -36,6 +36,8 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+# Local-only prod-stack smoke-test override (never deploy this)
+docker-compose.prodtest.local.yml
 
 # Database
 *.db

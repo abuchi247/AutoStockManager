@@ -13,11 +13,17 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_factory
 from app.models.category import Category
+
+# Arbitrary, stable key for the Postgres advisory lock that serializes the
+# category seed across concurrent worker startups (categories have no unique
+# constraint, so a race would insert duplicate trees rather than raise).
+_CATEGORY_SEED_LOCK_KEY = 872_314_501
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +56,17 @@ async def ensure_default_categories() -> None:
     fresh database). Existing data is never touched.
     """
     async with async_session_factory() as session:
+        # Serialize the check-and-insert across concurrent uvicorn workers.
+        # The categories table has no unique constraint on name, so without a
+        # lock two workers could both see an empty table and each insert the
+        # full tree, producing duplicates. A transaction-scoped Postgres
+        # advisory lock makes exactly one worker do the seed; the lock releases
+        # when this transaction ends.
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:k)"),
+            {"k": _CATEGORY_SEED_LOCK_KEY},
+        )
+
         result = await session.execute(
             select(func.count(Category.id)).where(Category.deleted_at.is_(None))
         )
@@ -186,7 +203,16 @@ async def ensure_default_role_permissions() -> None:
             )
             session.add(rp)
 
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Concurrency guard: multiple uvicorn workers run this startup hook.
+            # role_permissions.role is unique, so if another worker seeded first
+            # this commit collides. That is a benign outcome — the rows exist —
+            # so roll back quietly instead of crashing the worker.
+            await session.rollback()
+            logger.info("default_role_permissions_already_seeded_by_another_worker")
+            return
         logger.warning(
             "default_role_permissions_seeded",
             extra={"roles": list(DEFAULT_ROLE_PERMISSIONS.keys())},

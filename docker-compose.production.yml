@@ -198,7 +198,17 @@ services:
       - backup-data:/backups
       - ./scripts/backup.sh:/backup.sh:ro
       - ./scripts/restore.sh:/restore.sh:ro
-    entrypoint: ["sh", "/backup.sh"]
+    # Stay alive (idle) so the ofelia scheduler can `docker exec` the backup
+    # script into this container on schedule (job-exec), and so operators can
+    # `docker compose exec backup-runner ...` to inspect /backups. The backup
+    # itself is NOT run at startup; it runs on the ofelia schedule, or on demand
+    # via `docker compose run --rm backup-runner sh /backup.sh` (the explicit
+    # command overrides the idle `command` below without touching entrypoint).
+    #
+    # Clear the postgres image's entrypoint so `command` (and any `run` override)
+    # executes verbatim rather than being wrapped by docker-entrypoint.sh.
+    entrypoint: [""]
+    command: ["tail", "-f", "/dev/null"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -206,6 +216,7 @@ services:
       - app-network
     security_opt:
       - no-new-privileges:true
+    restart: unless-stopped
     # ofelia reads this label to schedule the job
     labels:
       ofelia.enabled: "true"

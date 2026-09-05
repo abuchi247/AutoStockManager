@@ -298,7 +298,7 @@ scheduler) that runs `pg_dump` daily at 02:00 UTC into the `backup-data`
 volume. Run an immediate backup before a risky change:
 
 ```bash
-docker compose -f docker-compose.production.yml run --rm backup-runner
+docker compose -f docker-compose.production.yml run --rm backup-runner sh /backup.sh
 ```
 
 Copy dumps off the server periodically (e.g. to object storage). See

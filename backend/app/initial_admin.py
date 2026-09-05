@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_factory
@@ -80,7 +81,22 @@ async def ensure_initial_admin() -> None:
         )
 
         session.add(admin)
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Concurrency guard: the backend runs multiple uvicorn workers
+            # (WEB_CONCURRENCY), and each runs this startup hook. On a fresh
+            # database several workers can all read user_count == 0 and race to
+            # insert the "admin" row; exactly one wins and the rest hit the
+            # unique constraint on username. That is a benign outcome — the
+            # admin now exists — so roll back and exit quietly instead of
+            # crashing the worker's startup with an alarming traceback.
+            await session.rollback()
+            logger.info(
+                "initial_admin_already_created_by_another_worker",
+                extra={"username": "admin"},
+            )
+            return
 
         # Log the temporary password prominently. This is the ONLY time it
         # appears — it is not stored anywhere in plaintext.

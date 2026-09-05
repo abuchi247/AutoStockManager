@@ -176,10 +176,11 @@ docker-compose run --rm --profile backup -e BACKUP_LABEL=pre-release backup
 # → creates: stockpilot-2026-08-09T12-00-00.pre-release.dump
 ```
 
-Production stack:
+Production stack (the `backup-runner` container stays idle for the scheduler, so
+pass the backup command explicitly for an on-demand run):
 ```bash
-docker compose -f docker-compose.production.yml run --rm backup-runner
-docker compose -f docker-compose.production.yml run --rm -e BACKUP_LABEL=pre-release backup-runner
+docker compose -f docker-compose.production.yml run --rm backup-runner sh /backup.sh
+docker compose -f docker-compose.production.yml run --rm -e BACKUP_LABEL=pre-release backup-runner sh /backup.sh
 ```
 
 The backup lands in `./backups/` (dev) or the `backup-data` volume (production).
