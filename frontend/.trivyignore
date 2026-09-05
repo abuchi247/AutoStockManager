@@ -48,6 +48,7 @@ CVE-2026-29786
 CVE-2026-31802
 CVE-2026-48815
 CVE-2026-59874
+CVE-2026-73566
 
 # pacote — bundled inside npm (usr/local/lib/node_modules/npm/node_modules/pacote)
 # in the Node.js base image. npm is the package manager and is not invoked at
